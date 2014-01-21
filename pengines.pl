@@ -306,13 +306,9 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(http/http_session)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
-:- use_module(library(http/http_cookie)).
-:- use_module(library(http/html_write)).
 :- use_module(library(time)).
-:- use_module(library(memfile)).
 :- use_module(library(charsio)).
 :- use_module(library(apply)).
-:- use_module(library(error)).
 :- use_module(library(option)).
 :- use_module(library(settings)).
 :- use_module(library(debug)).
@@ -323,7 +319,7 @@ Settings currently recognized by the Pengines library:
 
 :- style_check(-atom).
 
-:- debug(pengine(transition)).
+% :- debug(pengine(transition)).
 
 
 
