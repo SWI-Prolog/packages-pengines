@@ -60,8 +60,8 @@ A pengine is comprised of:
     * A dynamic clause database, private to the pengine, into which other processes may assert clauses
 
     * A message queue for incoming requests
-    
-    * A message queue for outgoing responses    
+
+    * A message queue for outgoing responses
 
 Everything needed to work with pengines are included in the package, including a JavaScript library for
 creating and interacting with pengines from a web client. However, the web server (in the file
@@ -121,7 +121,7 @@ by a master.
  4. http://www.swi-prolog.org/pldoc/package/semweb.html
 
  5. http://cliopatria.swi-prolog.org/home
- 
+
  6. http://www.swi-prolog.org/pldoc/doc/home/vnc/prolog/lib/swipl/library/sandbox.pl
 
 
@@ -136,11 +136,11 @@ q(b) and q(c) to standard output. Using pengine_ask/3 with the option template(X
 ==
 :- use_module(pengines).
 
-main :- 
+main :-
     pengine_create([
         server('http://pengines.org'),
         src_text("
-        
+
             q(X) :- p(X).
             p(a). p(b). p(c).
         ")
@@ -165,18 +165,18 @@ expected. All we need to do is to use pengine_input/1 instead of read/1 and peng
 of write/1.
 
 ==
-<html lang="en">   
+<html lang="en">
     <head>
         <script src="/vendor/jquery/jquery-2.0.3.min.js"></script>
         <script src="/assets/js/pengine.js"></script>
         <script type="text/x-prolog">
-    	   
+
             main :-
-                repeat, 
+                repeat,
                 pengine_input(X),
                 pengine_output(X),
-                X == stop. 
-                
+                X == stop.
+
         </script>
         <script>
             var pengine = new Pengine({
@@ -203,7 +203,7 @@ of write/1.
 
 Our third example shows that a non-deterministic predicate can be called remotely by means of
 pengine_rpc/2, yet behave exactly as if called locally:
- 
+
 ==
 ?- use_module(pengines).
 
@@ -257,7 +257,7 @@ process_event(success(_ID, Solutions, true, true), Query, _Options) :-
 process_event(success(ID, _Query, _Paging, true), Query, Options) :-
     pengine_next(ID, Options),
     wait_event(Query, Options).
-    
+
 ==
 
 ---++ Mapping Prolog terms into JSON
@@ -276,11 +276,11 @@ Pengines defines the following mapping between ground Prolog terms and JSON.
     * The Prolog terms =|@(true)|= and =|@(false)|= are mapped to the JSON constants =true= and =false=,
       respectively.
     * The Prolog term =|@(null)|= is mapped to the JSON constant =null=.
-    * A Prolog term json(NameValueList), where =NameValueList= is a list of =|Name=Value|= pairs, is mapped 
+    * A Prolog term json(NameValueList), where =NameValueList= is a list of =|Name=Value|= pairs, is mapped
       to a JSON object.
-    * Any other complex Prolog term =T= is mapped to a JSON object of the form =|{"functor": F, "args": A}|= 
+    * Any other complex Prolog term =T= is mapped to a JSON object of the form =|{"functor": F, "args": A}|=
       where =F= is a string representing the functor of =T= and =A= is the list of JSON values representing
-      =T='s arguments. 
+      =T='s arguments.
 
 
 ---++ Settings
@@ -300,7 +300,7 @@ Settings currently recognized by the Pengines library:
 */
 
 
-    
+
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/http_session)).
@@ -317,8 +317,8 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(settings)).
 :- use_module(library(debug)).
 :- use_module(library(sandbox)).
+:- use_module(library(term_to_json)).
 
-:- use_module(lib/term_to_json).
 
 
 :- style_check(-atom).
@@ -331,20 +331,20 @@ Settings currently recognized by the Pengines library:
 	sandbox:safe_primitive/1,		% Goal
 	sandbox:safe_meta/2.			% Goal, Calls
 
-sandbox:safe_primitive(pengine:pengine_create(_)). 
-sandbox:safe_primitive(pengine:pengine_event(_)). 
-sandbox:safe_primitive(pengine:pengine_event(_, _)). 
-sandbox:safe_primitive(pengine:pengine_send(_, _, _)). 
-sandbox:safe_primitive(pengine:pengine_input(_)). 
-sandbox:safe_primitive(pengine:pengine_output(_, _)). 
-sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)). 
-sandbox:safe_primitive(pengine:pengine_event_loop(_)). 
+sandbox:safe_primitive(pengine:pengine_create(_)).
+sandbox:safe_primitive(pengine:pengine_event(_)).
+sandbox:safe_primitive(pengine:pengine_event(_, _)).
+sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
+sandbox:safe_primitive(pengine:pengine_input(_)).
+sandbox:safe_primitive(pengine:pengine_output(_, _)).
+sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
+sandbox:safe_primitive(pengine:pengine_event_loop(_)).
 
-sandbox:safe_primitive(_:html(_, _, _)). 
-sandbox:safe_primitive(_:with_output_to(_, _)). 
+sandbox:safe_primitive(_:html(_, _, _)).
+sandbox:safe_primitive(_:with_output_to(_, _)).
 
-sandbox:safe_primitive(system:sleep(_)). 
-sandbox:safe_primitive(system:atom_concat(_, _, _)). 
+sandbox:safe_primitive(system:sleep(_)).
+sandbox:safe_primitive(system:atom_concat(_, _, _)).
 
 
 
@@ -363,12 +363,12 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
     Creates a new pengine. Valid options are:
 
     * id(-ID)
-      ID gets instantiated to the id of the pengine. The id is a complex term, its structure 
+      ID gets instantiated to the id of the pengine. The id is a complex term, its structure
       will remain undocumented and should not be relied on.
 
     * name(+Name)
-      The pengine is named Name (an atom). A slave pengine (child) can subsequently be referred 
-      to by this name, but only by its master (parent). The atoms ‘parent’ and ‘self’ are reserved 
+      The pengine is named Name (an atom). A slave pengine (child) can subsequently be referred
+      to by this name, but only by its master (parent). The atoms ‘parent’ and ‘self’ are reserved
       names and must not be used here.
 
     * server(+URL)
@@ -384,15 +384,15 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
       Inject the clauses specified in the file located at URL in the pengine.
 
     * probe(+Query)
-      Run Query before creating the pengine. If the query fails, the pengine is not created. 
+      Run Query before creating the pengine. If the query fails, the pengine is not created.
       Makes sense only if the pengine is to be run remotely. Query is `true' by default.
 
     * probe_template(+Template)
       Template is a term possibly containing variables shared with the probe query. By default,
       the template is identical to the probe query. The second argument of the `create' event
       will be bound to an instance of this term, which makes it useful for getting information
-      about the environment in which the pengine is to be run. 
-      
+      about the environment in which the pengine is to be run.
+
     * format(+Format)
       Determines the format of event responses. Format is an atom, either `prolog' (default), `json', or `json-s'.
 
@@ -405,9 +405,9 @@ Successful creation of a pengine will return an _event term_ of the following fo
     * create(ID, Term)
       ID is the id of the pengine that was created.
       Term is an instance of Template.
-      
+
 An error will be returned if the pengine could not be created:
-      
+
     * error(ID, Term)
       ID is invalid, since no pengine was created.
       Term is the exception's error term.
@@ -436,7 +436,7 @@ pengine_send(Target, Event) :-
 
 /**  pengine_send(+NameOrID, +Term, +Options) is det
 
-Succeeds immediately and places Term in the queue of the pengine NameOrID. 
+Succeeds immediately and places Term in the queue of the pengine NameOrID.
 Options is a list of options:
 
    * delay(+Time)
@@ -493,7 +493,7 @@ pengine_ask(ID, Query) :-
 
 /** pengine_ask(+NameOrID, @Query, +Options) is det
 
-Asks pengine NameOrID a query Query. 
+Asks pengine NameOrID a query Query.
 
 Options is a list of options:
 
@@ -505,7 +505,7 @@ Options is a list of options:
       Retrieve solutions in chunks of Integer rather than one by one. 0 means no paging
       (default). Other integers indicate the maximum number of solutions to
       retrieve in one chunk.
-      
+
 Any remaining options are passed to pengine_send/3.
 
 Note that the predicate pengine_ask/3 is deterministic, even for queries that have more than one
@@ -533,7 +533,7 @@ of _event terms_.
     * prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/1.
       Term is the current prompt, as set by pengine_set_prompt/1.
-      
+
 Defined in terms of pengine_send/3, like so:
 
 ==
@@ -562,12 +562,12 @@ Same as pengine_next(NameOrID, []).
 pengine_next(ID) :- pengine_send(ID, request(next)).
 
 
-/** pengine_next(+NameOrID, +Options) is det 
+/** pengine_next(+NameOrID, +Options) is det
 
-Asks pengine NameOrID for the next solution to a query started by 
+Asks pengine NameOrID for the next solution to a query started by
 pengine_ask/3. Options are passed to pengine_send/3.
 
-Here too, results will be returned in the form of _event terms_. 
+Here too, results will be returned in the form of _event terms_.
 
     * success(ID, Term, Paging, More)
       ID is the id of the pengine that succeeded in finding yet another solution to the query.
@@ -613,7 +613,7 @@ pengine_stop(ID) :- pengine_send(ID, request(stop)).
 
 /** pengine_stop(+NameOrID, +Options) is det
 
-Tells pengine NameOrID to stop looking for more solutions to a query started by pengine_ask/3. 
+Tells pengine NameOrID to stop looking for more solutions to a query started by pengine_ask/3.
 Options are passed to pengine_send/3.
 
 Defined in terms of pengine_send/3, like so:
@@ -630,7 +630,7 @@ pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
 
 /** pengine_abort(+NameOrID) is det
 
-Aborts the search. 
+Aborts the search.
 
 */
 
@@ -641,8 +641,8 @@ pengine_abort(id(_F,T)) :- !,
 pengine_abort(ID) :-
     catch(thread_signal(ID, abort), _, true),
     thread_join(ID, _Mess).
-    
-    
+
+
 /** pengine_destroy(+NameOrID) is det
 
 Destroys the pengine NameOrID.
@@ -669,14 +669,14 @@ pengine_property(id(Thread, _), Property) :-
 
 /** pengine_exit(+Term) is det
 
-Terminates the pengine immediately, leaving exited(Term) as result state.... 
+Terminates the pengine immediately, leaving exited(Term) as result state....
 
 */
 
 pengine_exit(Term) :-
     thread_exit(Term).
 
-    
+
 /** pengine_output(+Term) is det
 
 Same as pengine_output(Term, []).
@@ -693,7 +693,7 @@ Sends Term to the parent pengine or thread.
 Defined in terms of pengine_send/3, like so:
 
 ==
-pengine_output(Term, Options) :- 
+pengine_output(Term, Options) :-
     pengine_send(parent, Term, Options).
 ==
 
@@ -1017,7 +1017,7 @@ queue.
    Valid options are:
 
    * timeout(+Time)
-     Time is a float or integer and specifies the maximum time to wait in seconds. 
+     Time is a float or integer and specifies the maximum time to wait in seconds.
      If no event has arrived before the time is up EventTerm is bound to the atom `timeout'.
 
 */
@@ -1028,7 +1028,7 @@ pengine_event(Event, Options) :-
     ->  true
     ;   Event = timeout
     ).
-    
+
 
 /** pengine_event_loop(+Closure) is det
 
@@ -1260,7 +1260,7 @@ Valid options are:
 pengine_seek_agreement([], Query, Options) :-
     option(use_local(true), Options), !,
     catch(Query, _, false).
-pengine_seek_agreement([], _Query, _Options).  
+pengine_seek_agreement([], _Query, _Options).
 pengine_seek_agreement([URL0|URLs], Query, Options) :-
     (   URL0 = URL-OverrideOptions
     ->  true
