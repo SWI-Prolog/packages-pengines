@@ -1,6 +1,6 @@
 :- module(term_to_json,
-	  [ term_to_json/3,			% +Term, +Bindings, -Json 
-	    term_to_json/2			% +Term, -Json 
+	  [ term_to_json/3,			% +Term, +Bindings, -Json
+	    term_to_json/2			% +Term, -Json
 	  ]).
 
 :- use_module(library('http/json')).
@@ -89,7 +89,7 @@ varname(I, Name) :-
 	N is I // 26,
 	varname(L, Name0),
 	atomic_concat(Name0, N, Name).
-	
+
 is_pair_list([]).
 is_pair_list([A=_|List]) :-
     atom(A),
