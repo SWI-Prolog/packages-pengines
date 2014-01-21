@@ -7,7 +7,7 @@
 
 \onefile
 \htmloutput{.}					% Output directory
-\htmlmainfile{nlp}				% Main document file
+\htmlmainfile{pengines}				% Main document file
 \bodycolor{white}				% Page colour
 
 \begin{document}
@@ -32,7 +32,8 @@ Pengines provides ...
 
 \newpage
 
-\input{pengines.tex}
+\input{penlib.tex}
+\input{termtojson.tex}
 
 \printindex
 

@@ -4,50 +4,24 @@
 # Copyright: LGPL (see COPYING or www.gnu.org
 ################################################################
 
-.SUFFIXES: .tex .dvi .doc .pl
+PACKAGE=pengines
+DOC=pengines
+include ../Makefile.defs
 
-SHELL=@SHELL@
-PLBASE=@PLBASE@
-PLARCH=@PLARCH@
-PL=@PL@
-srcdir=@srcdir@
-TXTEXT=@TXTEXT@
-
-ifeq (@PROLOG_SYSTEM@,yap)
-prefix = @prefix@
-ROOTDIR = $(prefix)
-EROOTDIR = @exec_prefix@
-BINDIR = $(EROOTDIR)/bin
-LIBDIR=$(EROOTDIR)/lib
-YAPLIBDIR=$(EROOTDIR)/lib/Yap
-SHAREDIR=$(ROOTDIR)/share/Yap
-CLPDIR=$(SHAREDIR)
-EXDIR=$(CLPQRDIR)/clpqr/examples
-else
-XPCEBASE=$(PLBASE)/xpce
-PKGDOC=$(PLBASE)/doc/packages
-PCEHOME=../../xpce
-LIBDIR=$(PLBASE)/library
-EXDIR=$(PKGDOC)/examples/pengines
-endif	#YAP/SWI
-
-INSTALL=@INSTALL@
-INSTALL_PROGRAM=@INSTALL_PROGRAM@
-INSTALL_DATA=@INSTALL_DATA@
-LN_INSTALL_DATA=$(shell echo `pwd`/../ln-install)
-LN_INSTALL_PROGRAM=$(shell echo `pwd`/../ln-install)
-
-LIBPL=		$(srcdir)/pengines.pl $(srcdir)/term_to_json.pl
+LIBPL=		pengines.pl term_to_json.pl
 EXAMPLES=
 
 all::
 		@echo "Nothing to be done for this package"
 
 install:	$(LIBPL)
-		$(INSTALL_DATA) $(LIBPL) $(DESTDIR)$(LIBDIR)
+		for f in $(LIBPL); do \
+		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR); \
+		done
+		$(MKINDEX)
 
 ln-install::
-		@$(MAKE) INSTALL_DATA=$(LN_INSTALL_DATA) INSTALL_PROGRAM=$(LN_INSTALL_PROGRAM) install
+		$(MAKE) INSTALL_DATA="../ln-install" INSTALL_PROGRAM="../ln-install" install
 
 rpm-install:	install
 
@@ -73,11 +47,13 @@ check::
 # Documentation
 ################################################################
 
-TEXEXTRA=	pengines.tex
+TEXEXTRA=	penlib.tex termtojson.tex
 $(TEX):		$(TEXEXTRA)
 
-pengines.tex:	pengines.pl
-		$(PLTOTEX) --section 'library(pengines)'
+penlib.tex:	pengines.pl
+		$(PLTOTEX) --section --out=penlib.tex 'library(pengines)'
+termtojson.tex:	term_to_json.pl
+		$(PLTOTEX) --section 'library(term_to_json)'
 
 ################################################################
 # Clean
