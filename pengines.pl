@@ -1447,7 +1447,7 @@ to_json(stop(ID0)) :-
 to_json(success(ID0, Bindings0, Paging, More)) :-
     term_to_atom(ID0, ID),
     term_to_json(Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, paging= @Paging, more= @More])).
+    reply_json(json([event=success, id=ID, data=Bindings, paging= @(Paging), more= @(More)])).
 to_json(failure(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=failure, id=ID])).
@@ -1481,7 +1481,7 @@ to_json_s(stop(ID0)) :-
 to_json_s(success(ID0, Bindings0, Paging, More)) :-
     term_to_atom(ID0, ID),
     solution_to_json(Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, paging= @Paging, more= @More])).
+    reply_json(json([event=success, id=ID, data=Bindings, paging= @(Paging), more= @(More)])).
 to_json_s(failure(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=failure, id=ID])).
