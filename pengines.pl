@@ -150,9 +150,9 @@ main :-
 
 handle(create(ID, _)) :-
     pengine_ask(ID, q(X)).
-handle(success(ID, X, _, false)) :-
+handle(success(ID, [X], false)) :-
     writeln(X).
-handle(success(ID, X, _, true)) :-
+handle(success(ID, [X], true)) :-
     writeln(X),
     pengine_next(ID).
 ==
@@ -248,13 +248,11 @@ process_event(output(ID, Term), Query, Options) :-
     pengine_output(output(ID, Term)),
     pengine_pull_response(ID, Options),
     wait_event(Query, Options).
-process_event(success(_ID, Query, false, false), Query, _Options).
-process_event(success(_ID, Solutions, true, false), Query, _Options) :-
+process_event(success(_ID, Solutions, false), Query, _Options) :-
     member(Query, Solutions).
-process_event(success(_ID, Query, false, true), Query, _Options).
-process_event(success(_ID, Solutions, true, true), Query, _Options) :-
+process_event(success(_ID, Solutions, true), Query, _Options) :-
     member(Query, Solutions).
-process_event(success(ID, _Query, _Paging, true), Query, Options) :-
+process_event(success(ID, _Query, true), Query, Options) :-
     pengine_next(ID, Options),
     wait_event(Query, Options).
 
@@ -510,12 +508,12 @@ Note that the predicate pengine_ask/3 is deterministic, even for queries that ha
 solution. Also, the variables in Query will not be bound. Instead, results will be returned in the form
 of _event terms_.
 
-    * success(ID, Term, Paging, More)
+    * success(ID, Terms, More)
       ID is the id of the pengine that succeeded in solving the query.
-      Term is an instantiation of Template, or in the case of paging a _list_ of instantiations of Template.
-      Paging is either `true' or `false', indicating paging or no paging.
-      More is either `true' or `false', indicating whether we can expect the pengine to be able to
-      return more solutions or not, would we call pengine_next/1.
+      Terms is a list holding instantiations of `Template`. More is
+      either `true` or `false`, indicating whether we can expect the
+      pengine to be able to return more solutions or not, would we call
+      pengine_next/1.
 
     * failure(ID)
       ID is the id of the pengine that failed for lack of a solutions.
@@ -567,12 +565,12 @@ pengine_ask/3. Options are passed to pengine_send/3.
 
 Here too, results will be returned in the form of _event terms_.
 
-    * success(ID, Term, Paging, More)
-      ID is the id of the pengine that succeeded in finding yet another solution to the query.
-      Term is an instantiation of Template, or in the case of paging a _list_ of instantiations of Template.
-      Paging is either `true' or `false', indicating paging or no paging.
-      More is either `true' or `false', indicating whether we can expect the pengine to be able to
-      return more solutions or not, would we call pengine_next/1.
+    * success(ID, Terms, More)
+      ID is the id of the pengine that succeeded in finding yet another
+      solution to the query. Terms is a list holding instantiations of
+      `Template`. More is either `true` or `false`, indicating whether
+      we can expect the pengine to be able to return more solutions or
+      not, would we call pengine_next/1.
 
     * failure(ID)
       ID is the id of the pengine that failed for lack of more solutions.
@@ -801,15 +799,15 @@ interpret(ID) :-
 
 
 
-solve(Template, Goal, ID, Paging) :-
+solve(Template, Goal, ID) :-
     parent(ID, Parent),
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
-            ->  thread_send_message(Parent, success(ID, Template, Paging, true)),
+            ->  thread_send_message(Parent, success(ID, Template, true)),
                 debug(pengine(event), 'sending to ~q: ~q', [Parent, success(Template, true)]),
                 interpret2(ID)
-            ;   thread_send_message(Parent, success(ID, Template, Paging, false)),
+            ;   thread_send_message(Parent, success(ID, Template, false)),
                 debug(pengine(event), 'sending to ~q: ~q', [Parent, success(Template, false)]),
                 interpret(ID)
             )
@@ -851,10 +849,10 @@ ask(ID, Goal, Options) :-
     catch(safe_goal(Goal), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
-        option(paging(N), Options, 0),
-        (   N == 0
-        ->  solve(Template, Goal, ID, false)
-        ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID, true)
+        option(paging(N), Options, 1),
+        (   N == 1
+        ->  solve([Template], Goal, ID)
+        ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID)
         )
     ;   parent(ID, Parent),
         thread_send_message(Parent, error(ID, Error))
@@ -1091,9 +1089,9 @@ pengine_event_loop(prompt(ID, Term), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))),
     pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(success(ID, Sol, Paging, More), Closure, Created, Options) :-
+pengine_event_loop(success(ID, Sol, More), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
-    ignore(call(Closure, success(ID, Sol, Paging, More))),
+    ignore(call(Closure, success(ID, Sol, More))),
     pengine_event_loop(Closure, Created, Options).
 pengine_event_loop(failure(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
@@ -1171,13 +1169,9 @@ process_event(output(ID, Term), Query, Options) :-
     pengine_output(output(ID, Term)),
     pengine_pull_response(ID, Options),
     wait_event(Query, Options).
-process_event(success(_ID, Query, false, false), Query, _Options).
-process_event(success(_ID, Solutions, true, false), Query, _Options) :-
+process_event(success(_ID, Solutions, _), Query, _Options) :-
     member(Query, Solutions).
-process_event(success(_ID, Query, false, true), Query, _Options).
-process_event(success(_ID, Solutions, true, true), Query, _Options) :-
-    member(Query, Solutions).
-process_event(success(ID, _Query, _Paging, true), Query, Options) :-
+process_event(success(ID, _Query, true), Query, Options) :-
     pengine_next(ID, Options),
     wait_event(Query, Options).
 
@@ -1371,11 +1365,11 @@ thread(_:id(_, Thread), Thread).
 
 fix_bindings(json, request(ask(Goal, Options)), _ID, Bindings, request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
-    option(paging(Paging), Options, 0),
+    option(paging(Paging), Options, 1),
     NewOptions = [template(Template), paging(Paging)].
 fix_bindings('json-s', request(ask(Goal, Options)), _ID, Bindings, request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
-    option(paging(Paging), Options, 0),
+    option(paging(Paging), Options, 1),
     NewOptions = [template(Template), paging(Paging)].
 fix_bindings(_, Command, _, _, Command).
 
@@ -1421,7 +1415,7 @@ output_result('json-s', Term0, BaseURL) :-
 
 
 add_URL_to_ID(create(ID, Term), Base, create(Base:ID, Term)).
-add_URL_to_ID(success(ID, Bindings, Paging, More), Base, success(Base:ID, Bindings, Paging, More)).
+add_URL_to_ID(success(ID, Bindings, More), Base, success(Base:ID, Bindings, More)).
 add_URL_to_ID(failure(ID), Base, failure(Base:ID)).
 add_URL_to_ID(error(ID, Error), Base, error(Base:ID, Error)).
 add_URL_to_ID(output(ID, Term), Base, output(Base:ID, Term)).
@@ -1444,10 +1438,10 @@ to_json(create(ID0, Term0)) :-
 to_json(stop(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=stop, id=ID])).
-to_json(success(ID0, Bindings0, Paging, More)) :-
+to_json(success(ID0, Bindings0, More)) :-
     term_to_atom(ID0, ID),
     term_to_json(Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, paging= @(Paging), more= @(More)])).
+    reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
 to_json(failure(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=failure, id=ID])).
@@ -1478,10 +1472,10 @@ to_json_s(create(ID0, Term0)) :-
 to_json_s(stop(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=stop, id=ID])).
-to_json_s(success(ID0, Bindings0, Paging, More)) :-
+to_json_s(success(ID0, Bindings0, More)) :-
     term_to_atom(ID0, ID),
     solution_to_json(Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, paging= @(Paging), more= @(More)])).
+    reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
 to_json_s(failure(ID0)) :-
     term_to_atom(ID0, ID),
     reply_json(json([event=failure, id=ID])).
