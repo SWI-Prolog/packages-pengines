@@ -5,6 +5,15 @@ config.h
 config.h.in
 config.status
 configure
+penlib.tex
+termtojson.tex
 pengines.tex
 pengines.html
 pengines.pdf
+pengines.aux
+pengines.idx
+pengines.ilg
+pengines.log
+pengines.out
+pengines.toc
+config.log
