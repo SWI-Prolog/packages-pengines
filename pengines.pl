@@ -316,6 +316,8 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(term_to_json)).
 
 
+:- meta_predicate
+	pengine_event_loop(1).
 
 :- style_check(-atom).
 
