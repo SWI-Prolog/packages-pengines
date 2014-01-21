@@ -8,10 +8,10 @@ PACKAGE=pengines
 DOC=pengines
 include ../Makefile.defs
 JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
+EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
 
 LIBPL=		pengines.pl term_to_json.pl
 JS=		web/js/pengines.js
-EXAMPLES=
 
 all::
 		@echo "Nothing to be done for this package"
@@ -36,8 +36,9 @@ pdf-install:	install-examples
 html-install:	install-examples
 
 install-examples::
-#		mkdir -p $(DESTDIR)$(EXDIR)
-#		(cd Examples && $(INSTALL_DATA) $(EXAMPLES) $(DESTDIR)$(EXDIR))
+		mkdir -p $(EXDIR)/web
+		(cd examples && $(INSTALL_DATA) *.pl $(EXDIR))
+		(cd examples/web && $(INSTALL_DATA) *.html *.js *.png $(EXDIR)/web)
 
 uninstall:
 		(cd $(PLLIBDIR) && rm -f $(LIBPL))
