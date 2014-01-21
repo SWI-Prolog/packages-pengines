@@ -793,9 +793,6 @@ interpret(ID) :-
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
-    ;   Event = done(ID0)
-    ->  thread_join(ID0, _Message),
-        interpret(ID)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
@@ -842,9 +839,6 @@ interpret2(ID) :-
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
-    ;   Event = done(ID0)
-    ->  thread_join(ID0, _Message),
-        interpret2(ID)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
@@ -868,15 +862,20 @@ ask(ID, Goal, Options) :-
 
 
 
-done(Parent, Self) :-
-    forall(retract(current_alarm(AlarmId)), (
-            catch(remove_alarm(AlarmId), _, true)
-        )
-    ),
-    forall(retract(child(Self, Child)), pengine_abort(Child)),
-    thread_send_message(Parent, done(Self)).
+%%	done(+Parent, +Self)
+%
+%	Called  from  the  pengine  thread   =at_exit=  option.  Removes
+%	possible pending alarms and  destroys   _child_  pengines  using
+%	pengine_destroy/1.
 
+:- public
+	done/2.
 
+done(_Parent, Self) :-
+    forall(retract(current_alarm(AlarmId)),
+	   catch(remove_alarm(AlarmId), _, true)),
+    forall(retract(child(Self, Child)),
+	   pengine_destroy(Child)).
 
 
 /** pengine_pull_response(+NameOrID) is det
