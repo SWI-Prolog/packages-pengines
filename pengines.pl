@@ -1085,13 +1085,9 @@ pengine_event_loop(prompt(ID, Term), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))),
     pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(success(ID, Sol, Paging, true), Closure, Created, Options) :-
-    debug(pengine(transition), '~q: 3 = /~q => 6', [ID, success(Sol, true)]),
-    ignore(call(Closure, success(ID, Sol, Paging, true))),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(success(ID, Sol, Paging, false), Closure, Created, Options) :-
-    debug(pengine(transition), '~q: 3 = /~q => 2', [ID, success(Sol, false)]),
-    ignore(call(Closure, success(ID, Sol, Paging, false))),
+pengine_event_loop(success(ID, Sol, Paging, More), Closure, Created, Options) :-
+    debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
+    ignore(call(Closure, success(ID, Sol, Paging, More))),
     pengine_event_loop(Closure, Created, Options).
 pengine_event_loop(failure(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
