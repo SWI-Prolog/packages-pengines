@@ -1,0 +1,40 @@
+\documentclass[11pt]{article}
+\usepackage{times}
+\usepackage{pl}
+\usepackage{html}
+\sloppy
+\makeindex
+
+\onefile
+\htmloutput{.}					% Output directory
+\htmlmainfile{nlp}				% Main document file
+\bodycolor{white}				% Page colour
+
+\begin{document}
+
+\title{Prolog Engines: pengines}
+\author{Torbjörn Lager \\
+	University of Gothenburg \\
+	Sweden \\
+	E-mail: \email{lager@ling.gu.se}}
+
+\maketitle
+
+\begin{abstract}
+Pengines provides ...
+\end{abstract}
+
+\pagebreak
+\tableofcontents
+
+\vfill
+\vfill
+
+\newpage
+
+\input{pengines.tex}
+
+\printindex
+
+\end{document}
+

@@ -1,0 +1,92 @@
+################################################################
+# SWI-Prolog Pengines package
+# Author:    Torbjörn Lager, Jan Wielemaker
+# Copyright: LGPL (see COPYING or www.gnu.org
+################################################################
+
+.SUFFIXES: .tex .dvi .doc .pl
+
+SHELL=@SHELL@
+PLBASE=@PLBASE@
+PLARCH=@PLARCH@
+PL=@PL@
+srcdir=@srcdir@
+TXTEXT=@TXTEXT@
+
+ifeq (@PROLOG_SYSTEM@,yap)
+prefix = @prefix@
+ROOTDIR = $(prefix)
+EROOTDIR = @exec_prefix@
+BINDIR = $(EROOTDIR)/bin
+LIBDIR=$(EROOTDIR)/lib
+YAPLIBDIR=$(EROOTDIR)/lib/Yap
+SHAREDIR=$(ROOTDIR)/share/Yap
+CLPDIR=$(SHAREDIR)
+EXDIR=$(CLPQRDIR)/clpqr/examples
+else
+XPCEBASE=$(PLBASE)/xpce
+PKGDOC=$(PLBASE)/doc/packages
+PCEHOME=../../xpce
+LIBDIR=$(PLBASE)/library
+EXDIR=$(PKGDOC)/examples/pengines
+endif	#YAP/SWI
+
+INSTALL=@INSTALL@
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_DATA=@INSTALL_DATA@
+LN_INSTALL_DATA=$(shell echo `pwd`/../ln-install)
+LN_INSTALL_PROGRAM=$(shell echo `pwd`/../ln-install)
+
+LIBPL=		$(srcdir)/pengines.pl $(srcdir)/term_to_json.pl
+EXAMPLES=
+
+all::
+		@echo "Nothing to be done for this package"
+
+install:	$(LIBPL)
+		$(INSTALL_DATA) $(LIBPL) $(DESTDIR)$(LIBDIR)
+
+ln-install::
+		@$(MAKE) INSTALL_DATA=$(LN_INSTALL_DATA) INSTALL_PROGRAM=$(LN_INSTALL_PROGRAM) install
+
+rpm-install:	install
+
+pdf-install:	install-examples
+
+html-install:	install-examples
+
+install-examples::
+#		mkdir -p $(DESTDIR)$(EXDIR)
+#		(cd Examples && $(INSTALL_DATA) $(EXAMPLES) $(DESTDIR)$(EXDIR))
+
+uninstall:
+		(cd $(CLPDIR) && rm -f $(LIBPL))
+		rm -rf $(CLPRDIR)
+		rm -rf $(CLPQDIR)
+		rm -rf $(CLPQRDIR)
+
+check::
+#		$(PL) -q -f test_pengines.pl -g test,halt -t 'halt(1)'
+
+
+################################################################
+# Documentation
+################################################################
+
+TEXEXTRA=	pengines.tex
+$(TEX):		$(TEXEXTRA)
+
+pengines.tex:	pengines.pl
+		$(PLTOTEX) --section 'library(pengines)'
+
+################################################################
+# Clean
+################################################################
+
+clean:
+		rm -f *~ *% config.log
+
+distclean:	clean
+		rm -f config.h config.cache config.status Makefile
+		rm -rf autom4te.cache
+
