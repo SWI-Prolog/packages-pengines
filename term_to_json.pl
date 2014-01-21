@@ -47,15 +47,15 @@ term_to_json(Term, JSON) :-
 
 val_to_json(N=V, N=A) :-
     term_to_json(V,A).
-    
-    
+
+
 to_json(Term, '_') :-
 	var(Term), !.
 to_json('$VAR'(Name), VarName) :- !,
 	varname(Name, VarName).
-to_json(@true, @true) :- !.
-to_json(@false, @false) :- !.
-to_json(@null, @null) :- !.
+to_json(@(true), @(true)) :- !.
+to_json(@(false), @(false)) :- !.
+to_json(@(null), @(null)) :- !.
 to_json(Term, Term) :-
 	atom(Term), !.
 to_json(Term, Value) :-
