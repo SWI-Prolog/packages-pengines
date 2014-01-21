@@ -628,8 +628,10 @@ pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
 
 /** pengine_abort(+NameOrID) is det
 
-Aborts the search.
+Aborts the running query.  The pengine goes back to state `2', waiting
+for new queries.
 
+@see pengine_destroy/1.
 */
 
 pengine_abort(BaseURL:ID) :- !,
@@ -637,8 +639,7 @@ pengine_abort(BaseURL:ID) :- !,
 pengine_abort(id(_F,T)) :- !,
     pengine_abort(T).
 pengine_abort(ID) :-
-    catch(thread_signal(ID, abort), _, true),
-    thread_join(ID, _Mess).
+    catch(thread_signal(ID, throw(abort_query)), _, true).
 
 
 /** pengine_destroy(+NameOrID) is det
@@ -774,7 +775,11 @@ replace_stream(Error, Error).
 
 
 interpret0(ID) :-
-    catch(interpret(ID), abort, interpret0(ID)).
+    catch(interpret(ID), abort_query,
+	  ( parent(ID, Parent),
+	    thread_send_message(Parent, abort(ID)),
+	    interpret0(ID)
+	  )).
 
 
 interpret(ID) :-
@@ -782,7 +787,9 @@ interpret(ID) :-
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
         parent(ID, Parent),
-        thread_send_message(Parent, destroy(ID))
+        thread_send_message(Parent, destroy(ID)),
+	thread_self(Me),		% Make the thread silently disappear
+	thread_detach(Me)
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
