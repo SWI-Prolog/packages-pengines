@@ -7,16 +7,22 @@
 PACKAGE=pengines
 DOC=pengines
 include ../Makefile.defs
+JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
 
 LIBPL=		pengines.pl term_to_json.pl
+JS=		web/js/pengines.js
 EXAMPLES=
 
 all::
 		@echo "Nothing to be done for this package"
 
-install:	$(LIBPL)
+install:	$(LIBPL) $(JS)
+		mkdir -p $(JSDIR)
 		for f in $(LIBPL); do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR); \
+		done
+		for f in $(JS); do \
+		  $(INSTALL_DATA) $$f $(JSDIR); \
 		done
 		$(MKINDEX)
 
@@ -34,10 +40,9 @@ install-examples::
 #		(cd Examples && $(INSTALL_DATA) $(EXAMPLES) $(DESTDIR)$(EXDIR))
 
 uninstall:
-		(cd $(CLPDIR) && rm -f $(LIBPL))
-		rm -rf $(CLPRDIR)
-		rm -rf $(CLPQDIR)
-		rm -rf $(CLPQRDIR)
+		(cd $(PLLIBDIR) && rm -f $(LIBPL))
+		(cd $(JSDIR) && rm -f $(JS))
+
 
 check::
 #		$(PL) -q -f test_pengines.pl -g test,halt -t 'halt(1)'
