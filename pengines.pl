@@ -1129,27 +1129,34 @@ pengine_rpc(URL, Query) :-
 
 /** pengine_rpc(+URL, +Query, +Options) is nondet
 
-Semantically equivalent to Query, except that the query is run in (and in the Prolog context of) the
-pengine server referred to by URL, rather than locally.
+Semantically equivalent to Query, except that the   query is run in (and
+in the Prolog context of) the pengine  server referred to by URL, rather
+than locally.
 
 Valid options are:
 
     * paging(+Integer)
-      Can be used to reduce the number of network roundtrips being made. See pengine_ask/3.
+      Can be used to reduce the number of network roundtrips being made.
+      See pengine_ask/3.
 
     * guard(+Goal)
-      The guard is run locally after each return of Query, and if it succeeds, the pengine behind the call is first stopped and then destroyed. If it fails, pengine_rpc/3 will backtrack and look for more solutions. [Not yet implemented]
+      The guard is run locally after each return of Query, and if it
+      succeeds, the pengine behind the call is first stopped and then
+      destroyed. If it fails, pengine_rpc/3 will backtrack and look for
+      more solutions. [Not yet implemented]
 
-Remaining options (except the server option) are passed to pengine_create/1.
-
+Remaining  options  (except   the   server    option)   are   passed  to
+pengine_create/1.
 */
 
 pengine_rpc(URL, Query, Options) :-
-    pengine_create([
-        server(URL)
-        | Options
-    ]),
-    wait_event(Query, Options).
+    setup_call_cleanup(
+	pengine_create([ server(URL),
+			 id(Id)
+		       | Options
+		       ]),
+	wait_event(Query, Options),
+	pengine_destroy(Id)).
 
 wait_event(Query, Options) :-
     pengine_event(Event),
