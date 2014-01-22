@@ -865,33 +865,56 @@ guarded_main_loop(ID) :-
     ).
 
 
+%%	solve(+Template, :Goal, +ID) is det.
+%
+%	Solve Goal. Note that because we can ask for a new goal in state
+%	`6', we must provide for an ancesteral cut (prolog_cut_to/1). We
+%	need to be sure to  have  a   choice  point  before  we can call
+%	prolog_current_choice/1. This is the reason   why this predicate
+%	has two clauses.
 
 solve(Template, Goal, ID) :-
     parent(ID, Parent),
+    prolog_current_choice(Choice),
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
             ->  thread_send_message(Parent, success(ID, Template, true)),
                 debug(pengine(event), 'sending to ~q: ~q',
 		      [Parent, success(Template, true)]),
-                interpret2(ID)
-            ;   thread_send_message(Parent, success(ID, Template, false)),
+                more_solutions(ID, Choice)
+            ;   !,			% commit
+		thread_send_message(Parent, success(ID, Template, false)),
                 debug(pengine(event), 'sending to ~q: ~q',
 		      [Parent, success(Template, false)]),
                 guarded_main_loop(ID)
             )
-        ;   thread_send_message(Parent, error(ID, Error)),
+        ;   !,				% commit
+	    thread_send_message(Parent, error(ID, Error)),
             debug(pengine(event), 'sending to ~q: ~q', [Parent, error(Error)]),
             guarded_main_loop(ID)
         )
-    ;   thread_send_message(Parent, failure(ID)),
+    ;   !,				% commit
+	thread_send_message(Parent, failure(ID)),
         debug(pengine(event), 'sending to ~q: failure', [Parent]),
         guarded_main_loop(ID)
     ).
+solve(_, _, _).				% leave a choice point
 
+%%	more_solutions(+Pengine, +Choice)
+%
+%	Called after a solution was found while  there can be more. This
+%	is state `6' of the state machine. It processes these events:
+%
+%	  * stop
+%	  Go back via state `7' to state `2' (guarded_main_loop/1)
+%	  * next
+%	  Fail.  This causes solve/3 to backtrack on the goal asked.
+%	  * ask(Goal, Options)
+%	  Ask another goal.  Note that we must commit the choice point
+%	  of the previous goal asked for.
 
-
-interpret2(ID) :-
+more_solutions(ID, Choice) :-
     thread_get_message(Event),
     (   Event = request(stop)
     ->  debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
@@ -901,18 +924,21 @@ interpret2(ID) :-
     ;   Event = request(next)
     ->  debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
         fail
-    % no reason why we shouldn't allow an ask request here!
-    % except that maybe we are leaving a choicepoint?
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
+	prolog_cut_to(Choice),
         ask(ID, Goal, Options)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
-        interpret2(ID)
+        more_solutions(ID, Choice)
     ).
 
-
+%%	ask(+Pengine, :Goal, +Options)
+%
+%	Migrate from state `2' to `3'.  This predicate validates that it
+%	is safe to call Goal using safe_goal/1 and then calls solve/3 to
+%	prove the goal. It takes care of the paging(N) option.
 
 ask(ID, Goal, Options) :-
     catch(safe_goal(Goal), Error, true),
