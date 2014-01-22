@@ -345,7 +345,8 @@ Settings currently recognized by the Pengines library:
 
 
 :- meta_predicate
-	pengine_event_loop(1).
+	pengine_event_loop(1),
+	pengine_event_loop(1, +).
 
 % :- debug(pengine(transition)).
 
@@ -681,9 +682,11 @@ pengine_abort(ID) :-
 
 Destroys the pengine NameOrID.
 
+@tbd	Should abort the pengine if it is running a query.
 */
 
-pengine_destroy(ID) :- pengine_send(ID, request(destroy)).
+pengine_destroy(ID) :-
+    pengine_send(ID, request(destroy)).
 
 
 
@@ -1058,12 +1061,10 @@ remote_pengine_abort(BaseURL, ID, Options) :-
 
 
 url_message(URL, Message, Options) :-
-    setup_call_cleanup( http_open(URL, Stream, Options),
-                        read(Stream, Message),
-                        close(Stream)
-    ).
-
-
+    setup_call_cleanup(
+	http_open(URL, Stream, Options),
+	read(Stream, Message),
+	close(Stream)).
 
 
 /** pengine_event(?EventTerm) is det
