@@ -1,5 +1,5 @@
 :- module(pengine,
-        [   pengine_create/1,
+	  [ pengine_create/1,
             pengine_send/2,
             pengine_send/3,
             pengine_ask/2,
@@ -32,7 +32,7 @@
             pengine_src_text/1,
             pengine_src_url/1,
             pengine_find_n/4
-        ]).
+	  ]).
 
 /** <module> Pengines: Web Logic Programming Made Easy
 
@@ -60,7 +60,7 @@ A pengine is comprised of:
     * A Prolog thread
 
     * A dynamic clause database, private to the pengine, into which
-    other processes may assert clauses
+      other processes may assert clauses
 
     * A message queue for incoming requests
 
