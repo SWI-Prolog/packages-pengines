@@ -132,8 +132,8 @@ solve queries asked by a master.
 
  2. http://www.swi-prolog.org/pldoc/package/http.html
 
- 3. D. Brand and P. Zafiropulo. On communicating finite-state machines. _Journal of the ACM_,
-    30(2):323-342, 1983.
+ 3. D. Brand and P. Zafiropulo. On communicating finite-state machines.
+   _Journal of the ACM_, 30(2):323-342, 1983.
 
  4. http://www.swi-prolog.org/pldoc/package/semweb.html
 
@@ -788,6 +788,21 @@ pengine_create_option(src_url(_)).
 pengine_create_option(probe(_)).
 pengine_create_option(probe_template(_)).
 
+%%	done(+Parent, +Self)
+%
+%	Called  from  the  pengine  thread   =at_exit=  option.  Removes
+%	possible pending alarms and  destroys   _child_  pengines  using
+%	pengine_destroy/1.
+
+:- public
+	done/2.
+
+done(_Parent, Self) :-
+    forall(retract(current_alarm(AlarmId)),
+	   catch(remove_alarm(AlarmId), _, true)),
+    forall(retract(child(Self, Child)),
+	   pengine_destroy(Child)).
+
 
 %%	pengine_main(+Id, +Options)
 %
@@ -822,6 +837,16 @@ pengine_main_loop(ID) :-
 	  )).
 
 
+%%	guarded_main_loop(+Pengine) is det.
+%
+%	Executes state `2' of  the  pengine,   where  it  waits  for two
+%	events:
+%
+%	  - destroy
+%	  Terminate the pengine
+%	  - ask(:Goal, +Options)
+%	  Solve Goal.
+
 guarded_main_loop(ID) :-
     thread_get_message(Event),
     (   Event = request(destroy)
@@ -847,19 +872,21 @@ solve(Template, Goal, ID) :-
         (   var(Error)
         ->  (   var(Det)
             ->  thread_send_message(Parent, success(ID, Template, true)),
-                debug(pengine(event), 'sending to ~q: ~q', [Parent, success(Template, true)]),
+                debug(pengine(event), 'sending to ~q: ~q',
+		      [Parent, success(Template, true)]),
                 interpret2(ID)
             ;   thread_send_message(Parent, success(ID, Template, false)),
-                debug(pengine(event), 'sending to ~q: ~q', [Parent, success(Template, false)]),
-                interpret(ID)
+                debug(pengine(event), 'sending to ~q: ~q',
+		      [Parent, success(Template, false)]),
+                guarded_main_loop(ID)
             )
         ;   thread_send_message(Parent, error(ID, Error)),
             debug(pengine(event), 'sending to ~q: ~q', [Parent, error(Error)]),
-            interpret(ID)
+            guarded_main_loop(ID)
         )
     ;   thread_send_message(Parent, failure(ID)),
         debug(pengine(event), 'sending to ~q: failure', [Parent]),
-        interpret(ID)
+        guarded_main_loop(ID)
     ).
 
 
@@ -870,7 +897,7 @@ interpret2(ID) :-
     ->  debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
         parent(ID, Parent),
         thread_send_message(Parent, stop(ID)),
-        interpret(ID)
+        guarded_main_loop(ID)
     ;   Event = request(next)
     ->  debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
         fail
@@ -900,22 +927,6 @@ ask(ID, Goal, Options) :-
         thread_send_message(Parent, error(ID, Error))
     ).
 
-
-
-%%	done(+Parent, +Self)
-%
-%	Called  from  the  pengine  thread   =at_exit=  option.  Removes
-%	possible pending alarms and  destroys   _child_  pengines  using
-%	pengine_destroy/1.
-
-:- public
-	done/2.
-
-done(_Parent, Self) :-
-    forall(retract(current_alarm(AlarmId)),
-	   catch(remove_alarm(AlarmId), _, true)),
-    forall(retract(child(Self, Child)),
-	   pengine_destroy(Child)).
 
 
 /** pengine_pull_response(+NameOrID) is det
