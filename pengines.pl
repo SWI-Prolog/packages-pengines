@@ -1307,15 +1307,15 @@ in the Prolog contexts of)  the  pengine   servers  listed  in URLs, and
 (subject to an option) locally. Computes the _bag union_ of solutions to
 Query on backtracking.
 
-URLs is a list  where  each  element  is   either  a  URL  (atom)  or  a
-(`-'-delimited) pair of a  URL  and  a   list  of  options  accepted  by
+URLs is a list where each  element  is   either  a  URL (atom) or a pair
+URL-Options,  where  Options  is  a   list    of   options  accepted  by
 pengine_rpc/3. The options in such a   list override the general options
 in Options.
 
 Valid options are:
 
     * use_local(+Boolean)
-      Boolean (`true' or `false') determines if Query is run (at last)
+      Boolean (=true= or =false=) determines if Query is run (at last)
       also in the local Prolog context.
 
 */
@@ -1363,7 +1363,7 @@ options in such a list override the general options in Options.
 Valid options are:
 
     * use_local(+Boolean)
-      Boolean (`true' or `false') determines if Query is run (at last)
+      Boolean (=true= or =false=) determines if Query is run (at last)
       also in the local Prolog context.
 
 */
@@ -1445,7 +1445,8 @@ wait_and_output_result(Parent, To, URL, Format) :-
         ;   ReturnEvent = Event
         ),
         output_result(Format, ReturnEvent, URL)
-    ;   output_result(Format, error(id(Parent, To), error(time_limit_exceeded, _)), URL),
+    ;   output_result(Format, error(id(Parent, To),
+				    error(time_limit_exceeded, _)), URL),
         pengine_abort(To)
     ).
 
@@ -1487,11 +1488,15 @@ thread(_:id(_, Thread), Thread).
 
 
 
-fix_bindings(json, request(ask(Goal, Options)), _ID, Bindings, request(ask(Goal, NewOptions))) :- !,
+fix_bindings(json,
+	     request(ask(Goal, Options)), _ID, Bindings,
+	     request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
     option(paging(Paging), Options, 1),
     NewOptions = [template(Template), paging(Paging)].
-fix_bindings('json-s', request(ask(Goal, Options)), _ID, Bindings, request(ask(Goal, NewOptions))) :- !,
+fix_bindings('json-s',
+	     request(ask(Goal, Options)), _ID, Bindings,
+	     request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
     option(paging(Paging), Options, 1),
     NewOptions = [template(Template), paging(Paging)].
