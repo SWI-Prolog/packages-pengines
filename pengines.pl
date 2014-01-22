@@ -764,6 +764,12 @@ local_pengine_create(Options) :-
     ;   true
     ).
 
+%%	create(+Self, -Child, +Options) is det.
+%
+%	Create a new pengine thread. Self   is  the thread-id or message
+%	queue to report to.  Child  is   the  thread-id  of  the pengine
+%	thread. If an error occurs, this is send to Self.
+
 create(Self, Child, Options) :-
     select_option(probe(Condition), Options, RestOptions0, true),
     partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
