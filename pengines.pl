@@ -40,73 +40,92 @@
 
 ---++ Overview
 
-This package provides a powerful high-level programming abstraction implemented on top of SWI-Prolog's
-thread predicates [1] and its HTTP client and server libraries [2]. The package makes it easy to create
-and query _Prolog engines_ (or _Pengines_ for short), over HTTP, from an ordinary Prolog thread, from a
-pengine, or from JavaScript running in a web client. Querying follows Prolog's default
-one-tuple-at-a-time generation of solutions. I/O is also supported.
+This package provides a  powerful   high-level  programming  abstraction
+implemented on top of SWI-Prolog's thread   predicates  [1] and its HTTP
+client and server libraries [2]. The package makes it easy to create and
+query _Prolog engines_ (or _Pengines_  for   short),  over HTTP, from an
+ordinary Prolog thread, from a pengine, or  from JavaScript running in a
+web  client.  Querying  follows   Prolog's  default  one-tuple-at-a-time
+generation of solutions. I/O is also supported.
 
-Possible applications abound, but in particular three kinds of applications stick out: 1) The package
-provides us with a useful point of departure for the design and implementation of more advanced
-Prolog-based agent programming platforms, 2) it suggests an elegant and very straightforward approach
-to the building of a Semantic Web which is Prolog-based in a very radical sense, and, 3) it constitutes
-an ideal way to interface Prolog with JavaScript, the programming language most commonly available in
-web browsers.
+Possible  applications  abound,  but  in    particular  three  kinds  of
+applications stick out: 1) The package provides   us with a useful point
+of  departure  for  the  design  and  implementation  of  more  advanced
+Prolog-based agent programming platforms, 2) it  suggests an elegant and
+very straightforward approach to the building of a Semantic Web which is
+Prolog-based in a very radical sense, and,   3)  it constitutes an ideal
+way to interface Prolog with JavaScript,   the programming language most
+commonly available in web browsers.
 
 A pengine is comprised of:
 
     * A Prolog thread
 
-    * A dynamic clause database, private to the pengine, into which other processes may assert clauses
+    * A dynamic clause database, private to the pengine, into which
+    other processes may assert clauses
 
     * A message queue for incoming requests
 
     * A message queue for outgoing responses
 
-Everything needed to work with pengines are included in the package, including a JavaScript library for
-creating and interacting with pengines from a web client. However, the web server (in the file
+Everything needed to work with  pengines   are  included in the package,
+including  a  JavaScript  library  for  creating  and  interacting  with
+pengines from a web  client.  However,  the   web  server  (in  the file
 example_server.pl) should only be regarded as a minimal example.
 
-Underlying the design of the package is a careful analysis of the conversations taking place between
-Prolog and a user (which could be a human or another piece of software). Such conversations follow a
-communication protocol that we refer to as the Prolog Transport Protocol (PLTP). The protocol has been
-modelled by means of so called _communicating finite-state machines_ [3]. A slight modification of the
-protocol -- referred to as PLTP(HTTP) -- enables us to synchronize it with HTTP. Figure 1 depicts the
-communicating finite-state machines for PLTP(HTTP) and HTTP. Labels in bold indicate requests, and
-labels with a slash in front indicate responses.
+Underlying the design of the  package  is   a  careful  analysis  of the
+conversations taking place between Prolog and a   user (which could be a
+human or another  piece  of  software).   Such  conversations  follow  a
+communication protocol that we refer to as the Prolog Transport Protocol
+(PLTP).  The  protocol  has  been  modelled    by  means  of  so  called
+_communicating finite-state machines_ [3]. A  slight modification of the
+protocol -- referred to as PLTP(HTTP) --   enables  us to synchronize it
+with HTTP. Figure 1 depicts the  communicating finite-state machines for
+PLTP(HTTP) and HTTP. Labels in bold indicate requests, and labels with a
+slash in front indicate responses.
 
 ![](lptp_synch.png)
 
-As for the relations between pengines, and for the time being, we have opted for a simple _master-slave
-architecture_. Once the master/slave relationships are established, the direction of control is always
-from the master to the slaves. One or more pengines can be _orchestrated_ by a common master which can
-be an ordinary Prolog thread, another pengine, or a JavaScript process. A slave is always a pengine,
-running either locally or remotely with respect to its master. Subject to a setting, slaves are also
-dependent on their masters in the sense that if a master terminates, so do its slaves.
+As for the relations between pengines, and   for the time being, we have
+opted for a simple _master-slave   architecture_.  Once the master/slave
+relationships are established, the direction of   control is always from
+the master to the slaves. One or  more pengines can be _orchestrated_ by
+a common master which can be an ordinary Prolog thread, another pengine,
+or a JavaScript process. A slave  is   always  a pengine, running either
+locally or remotely with respect to its   master.  Subject to a setting,
+slaves are also dependent on their masters in the sense that if a master
+terminates, so do its slaves.
 
 ![](architecture.png)
 
-The transport format is different depending on the nature of the master. If the master is a JavaScript
-process, it will (by default) formulate its requests using Prolog syntax, and get responses back as
-Prologs terms encoded in JSON. If the master is a Prolog process (a Prolog thread or a pengine) it will
-(again only by default) get responses back as Prolog terms.
+The transport format is different depending on the nature of the master.
+If the master is a JavaScript process,   it  will (by default) formulate
+its requests using Prolog syntax,  and   get  responses  back as Prologs
+terms encoded in JSON. If  the  master   is  a  Prolog process (a Prolog
+thread or a pengine) it will (again  only by default) get responses back
+as Prolog terms.
 
-Most of the pengine predicates are deterministic, yet they can control one or more pengines solving
-possibly non-deterministic queries. But the package also offers a number of non-deterministic
-predicates, built on top of the deterministic ones, that can solve queries "the Prolog way", binding
-query variables in the process, backtracking for more solutions. Of these predicates, pengine_rpc/3 is
-the most important. By means of pengine_rpc/3 a pengine running in a pengine server A can call and try
-to solve a query in the context of another pengine server B, taking advantage of the data being offered
-by B, just as if the data was local to A. Thus, in theory, a Prolog program, be it a pure Horn clause
-theory or not, can be as big as the Web. This is something that should make us think about a _Semantic
-Web_, especially when we consider the excellent fit between the Pengine library and SWI-Prolog's
-Semantic Web Library [4]. Adding Pengines functionality to the Cliopatria platform [5] should also be
-straightforward.
+Most of the pengine predicates are   deterministic, yet they can control
+one or more pengines solving possibly non-deterministic queries. But the
+package also offers a number of   non-deterministic predicates, built on
+top of the deterministic ones, that can  solve queries "the Prolog way",
+binding query variables in the process, backtracking for more solutions.
+Of these predicates, pengine_rpc/3 is the   most  important. By means of
+pengine_rpc/3 a pengine running in a pengine   server A can call and try
+to solve a query in the  context   of  another  pengine server B, taking
+advantage of the data being offered by B,  just as if the data was local
+to A. Thus, in theory, a Prolog program, be it a pure Horn clause theory
+or not, can be as big as the Web.  This is something that should make us
+think about a _Semantic Web_, especially  when we consider the excellent
+fit between the Pengine library and   SWI-Prolog's  Semantic Web Library
+[4]. Adding Pengines functionality to the Cliopatria platform [5] should
+also be straightforward.
 
-A note about safety: Because PLTP is layered on top of HTTP, it may utilize any standard HTTP security
-feature, such as HTTP authentication or SSL. Moreover, subject to a setting, the library uses
-safe_goal/1 [6], which determines whether it is safe for a slave pengine to try to solve queries asked
-by a master.
+A note about safety: Because PLTP is  layered   on  top  of HTTP, it may
+utilize any standard HTTP security feature,  such as HTTP authentication
+or SSL. Moreover, subject to  a   setting,  the library uses safe_goal/1
+[6], which determines whether it is safe for   a slave pengine to try to
+solve queries asked by a master.
 
 
 ---++ References
@@ -128,10 +147,13 @@ by a master.
 
 ---++ Examples
 
-In this example we load the pengines library and use pengine_create/1 to create a slave pengine in a
-remote pengine server, and inject a number of clauses in it. We then use pengine_event_loop/1 to start
-an event loop that listens for three kinds of event terms. Running =main/0= will write the terms q(a),
-q(b) and q(c) to standard output. Using pengine_ask/3 with the option template(X) instead of pengine_ask/2 would instead produce the output =a=, =b= and =c=.
+In this example we load the pengines library and use pengine_create/1 to
+create a slave pengine in a remote   pengine server, and inject a number
+of clauses in it. We then  use   pengine_event_loop/1  to start an event
+loop that listens for three kinds of  event terms. Running =main/0= will
+write  the  terms  q(a),  q(b)  and   q(c)  to  standard  output.  Using
+pengine_ask/3 with the option template(X) instead of pengine_ask/2 would
+instead produce the output =a=, =b= and =c=.
 
 ==
 :- use_module(pengines).
@@ -140,7 +162,6 @@ main :-
     pengine_create([
         server('http://pengines.org'),
         src_text("
-
             q(X) :- p(X).
             p(a). p(b). p(c).
         ")
@@ -157,12 +178,14 @@ handle(success(ID, [X], true)) :-
     pengine_next(ID).
 ==
 
-Here is another example, showing how to create and interact with a pengine from JavaScript in a way
-that seems ideal for Prolog programmers and JavaScript programmers/frontend developers alike. Loading
-the page brings up the browser's prompt dialog, waits for the user's input, and writes that input in
-the browser window. If the input was 'stop', it stops there, else it repeats. Note that I/O works as
-expected. All we need to do is to use pengine_input/1 instead of read/1 and pengine_output/1 instead
-of write/1.
+Here is another example, showing  how  to   create  and  interact with a
+pengine from JavaScript in a way that seems ideal for Prolog programmers
+and JavaScript programmers/frontend developers alike.   Loading the page
+brings up the browser's prompt dialog, waits   for the user's input, and
+writes that input in the browser  window.   If  the input was 'stop', it
+stops there, else it repeats. Note that   I/O  works as expected. All we
+need  to  do  is  to   use    pengine_input/1   instead  of  read/1  and
+pengine_output/1 instead of write/1.
 
 ==
 <html lang="en">
@@ -201,8 +224,9 @@ of write/1.
 </html>
 ==
 
-Our third example shows that a non-deterministic predicate can be called remotely by means of
-pengine_rpc/2, yet behave exactly as if called locally:
+Our third example shows that a non-deterministic predicate can be called
+remotely by means of pengine_rpc/2,  yet   behave  exactly  as if called
+locally:
 
 ==
 ?- use_module(pengines).
@@ -217,7 +241,11 @@ X = d.
 ?-
 ==
 
-In our fourth and final (and admittedly most complicated) example we show how elegantly pengine_rpc/3, used in the previous example, can been implemented using the Pengines core predicates -- pengine_create/1, pengine_event/2, pengine_ask/3, pengine_output/1, pengine_pull_response/2 and pengine_next/2.
+In our fourth and final  (and   admittedly  most complicated) example we
+show how elegantly pengine_rpc/3, used in the previous example, can been
+implemented using the Pengines  core   predicates  --  pengine_create/1,
+pengine_event/2,            pengine_ask/3,             pengine_output/1,
+pengine_pull_response/2 and pengine_next/2.
 
 ==
 
@@ -260,25 +288,30 @@ process_event(success(ID, _Query, true), Query, Options) :-
 
 ---++ Mapping Prolog terms into JSON
 
-In Prolog, solutions to queries are given as bindings which map variable names into Prolog terms. A
-programmer using Pengines in a JavaScript evironment needs to understand how bindings are converted
-into JSON. For example, the programmer needs to understand that the second solution to =|append(Xs,
-Ys, [a,b,c])|= is given by the bindings =|['Xs'=[a],'Ys'=[b,c]]|= and that these binding can be
-represented in JSON as =|{"Xs":["a"], "Ys":["b","c"]}|=.
+In Prolog, solutions to queries are given as bindings which map variable
+names into Prolog terms. A  programmer   using  Pengines in a JavaScript
+evironment needs to understand how bindings are converted into JSON. For
+example, the programmer needs to understand  that the second solution to
+=|append(Xs,   Ys,   [a,b,c])|=    is    given     by    the    bindings
+=|['Xs'=[a],'Ys'=[b,c]]|= and that these binding   can be represented in
+JSON as =|{"Xs":["a"], "Ys":["b","c"]}|=.
 
-Pengines defines the following mapping between ground Prolog terms and JSON.
+Pengines defines the following mapping between   ground Prolog terms and
+JSON.
 
     * A Prolog atom is mapped to a JSON string.
     * A Prolog number is mapped to a JSON number.
     * A Prolog list is mapped to a JSON array.
-    * The Prolog terms =|@(true)|= and =|@(false)|= are mapped to the JSON constants =true= and =false=,
-      respectively.
+    * The Prolog terms =|@(true)|= and =|@(false)|= are mapped to the
+      JSON constants =true= and =false=, respectively.
     * The Prolog term =|@(null)|= is mapped to the JSON constant =null=.
-    * A Prolog term json(NameValueList), where =NameValueList= is a list of =|Name=Value|= pairs, is mapped
-      to a JSON object.
-    * Any other complex Prolog term =T= is mapped to a JSON object of the form =|{"functor": F, "args": A}|=
-      where =F= is a string representing the functor of =T= and =A= is the list of JSON values representing
-      =T='s arguments.
+    * A Prolog term json(NameValueList), where `NameValueList` is a
+    list of `Name=Value` pairs, is mapped to a JSON object.
+
+    * Any other complex Prolog term `T` is mapped to a JSON object of
+    the form =|{"functor": F, "args": A}|= where `F` is a string
+    representing the functor of `T` and `A` is the list of JSON values
+    representing `T`s arguments.
 
 
 ---++ Settings
@@ -298,7 +331,6 @@ Settings currently recognized by the Pengines library:
 */
 
 
-
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/http_session)).
@@ -316,8 +348,6 @@ Settings currently recognized by the Pengines library:
 
 :- meta_predicate
 	pengine_event_loop(1).
-
-:- style_check(-atom).
 
 % :- debug(pengine(transition)).
 
@@ -359,16 +389,19 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
     Creates a new pengine. Valid options are:
 
     * id(-ID)
-      ID gets instantiated to the id of the pengine. The id is a complex term, its structure
-      will remain undocumented and should not be relied on.
+      ID gets instantiated to the id of the pengine. The id is a complex
+      term, its structure will remain undocumented and should not be
+      relied on.
 
     * name(+Name)
-      The pengine is named Name (an atom). A slave pengine (child) can subsequently be referred
-      to by this name, but only by its master (parent). The atoms ‘parent’ and ‘self’ are reserved
-      names and must not be used here.
+      The pengine is named Name (an atom). A slave pengine (child) can
+      subsequently be referred to by this name, but only by its master
+      (parent). The atoms ‘parent’ and ‘self’ are reserved names and
+      must not be used here.
 
     * server(+URL)
-      The pengine will run in (and in the Prolog context of) the pengine server located at URL.
+      The pengine will run in (and in the Prolog context of) the pengine
+      server located at URL.
 
     * src_list(+List_of_clauses)
       Inject a list of Prolog clauses in the pengine.
@@ -377,26 +410,33 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
       Inject the clauses specified by a source text in the pengine.
 
     * src_url(+URL)
-      Inject the clauses specified in the file located at URL in the pengine.
+      Inject the clauses specified in the file located at URL in the
+      pengine.
 
     * probe(+Query)
-      Run Query before creating the pengine. If the query fails, the pengine is not created.
-      Makes sense only if the pengine is to be run remotely. Query is `true' by default.
+      Run Query before creating the pengine. If the query fails, the
+      pengine is not created. Makes sense only if the pengine is to be
+      run remotely. Query is `true' by default.
 
     * probe_template(+Template)
-      Template is a term possibly containing variables shared with the probe query. By default,
-      the template is identical to the probe query. The second argument of the `create' event
-      will be bound to an instance of this term, which makes it useful for getting information
-      about the environment in which the pengine is to be run.
+      Template is a term possibly containing variables shared with the
+      probe query. By default, the template is identical to the probe
+      query. The second argument of the `create' event will be bound to
+      an instance of this term, which makes it useful for getting
+      information about the environment in which the pengine is to be
+      run.
 
     * format(+Format)
-      Determines the format of event responses. Format is an atom, either `prolog' (default), `json', or `json-s'.
+      Determines the format of event responses. Format is an atom,
+      either `prolog' (default), `json', or `json-s'.
 
-Remaining options are passed to http_open/3 (meaningful only for non-local pengines) and
-thread_create/3. Note that for thread_create/3 only options changing the stack-sizes can be used. In
-particular, do not pass the detached or alias options..
+Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
+non-local pengines) and thread_create/3. Note   that for thread_create/3
+only options changing the stack-sizes can be used. In particular, do not
+pass the detached or alias options..
 
-Successful creation of a pengine will return an _event term_ of the following form:
+Successful creation of a pengine will return an _event term_ of the
+following form:
 
     * create(ID, Term)
       ID is the id of the pengine that was created.
@@ -407,7 +447,6 @@ An error will be returned if the pengine could not be created:
     * error(ID, Term)
       ID is invalid, since no pengine was created.
       Term is the exception's error term.
-
 */
 
 
@@ -421,7 +460,6 @@ pengine_create(Options) :-
 /**  pengine_send(+NameOrID, +Term) is det
 
 Same as pengine_send(NameOrID, Term, []).
-
 */
 
 pengine_send(Target, Event) :-
@@ -432,14 +470,14 @@ pengine_send(Target, Event) :-
 
 /**  pengine_send(+NameOrID, +Term, +Options) is det
 
-Succeeds immediately and places Term in the queue of the pengine NameOrID.
-Options is a list of options:
+Succeeds immediately and  places  Term  in   the  queue  of  the pengine
+NameOrID. Options is a list of options:
 
    * delay(+Time)
-     The actual sending is delayed by Time seconds. Time is an integer or a float.
+     The actual sending is delayed by Time seconds. Time is an integer
+     or a float.
 
 Any remaining options are passed to http_open/3.
-
 */
 
 pengine_send(Target0, Event0, Options) :-
@@ -494,19 +532,21 @@ Asks pengine NameOrID a query Query.
 Options is a list of options:
 
     * template(+Template)
-      Template is a variable (or a term containing variables) shared with the
-      query. By default, the template is identical to the query.
+      Template is a variable (or a term containing variables) shared
+      with the query. By default, the template is identical to the
+      query.
 
     * paging(+Integer)
-      Retrieve solutions in chunks of Integer rather than one by one. 0 means no paging
-      (default). Other integers indicate the maximum number of solutions to
-      retrieve in one chunk.
+      Retrieve solutions in chunks of Integer rather than one by one. 0
+      means no paging (default). Other integers indicate the maximum
+      number of solutions to retrieve in one chunk.
 
 Any remaining options are passed to pengine_send/3.
 
-Note that the predicate pengine_ask/3 is deterministic, even for queries that have more than one
-solution. Also, the variables in Query will not be bound. Instead, results will be returned in the form
-of _event terms_.
+Note that the predicate pengine_ask/3 is deterministic, even for queries
+that have more than one solution. Also,  the variables in Query will not
+be bound. Instead, results will  be  returned   in  the  form  of _event
+terms_.
 
     * success(ID, Terms, More)
       ID is the id of the pengine that succeeded in solving the query.
@@ -524,7 +564,8 @@ of _event terms_.
 
     * output(ID, Term)
       ID is the id of a pengine running the query that called pengine_output/1.
-      Term is the term that was passed in the first argument of pengine_output/1 when it was called.
+      Term is the term that was passed in the first argument of
+      pengine_output/1 when it was called.
 
     * prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/1.
@@ -537,7 +578,6 @@ pengine_ask(ID, Query, Options) :-
     partition(pengine_ask_option, Options, AskOptions, SendOptions),
     pengine_send(ID, request(ask(Query, AskOptions)), SendOptions).
 ==
-
 */
 
 pengine_ask(ID, Query, Options) :-
@@ -552,7 +592,6 @@ pengine_ask_option(paging(_)).
 /** pengine_next(+NameOrID) is det
 
 Same as pengine_next(NameOrID, []).
-
 */
 
 pengine_next(ID) :- pengine_send(ID, request(next)).
@@ -580,8 +619,9 @@ Here too, results will be returned in the form of _event terms_.
       Term is the exception's error term.
 
     * output(ID, Term)
-      ID is the id of a pengine running the query that called pengine_output/1.
-      Term is the term that was passed in the first argument of pengine_output/1 when it was called.
+      ID is the id of a pengine running the query that called
+      pengine_output/1. Term is the term that was passed in the first
+      argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/1.
@@ -609,8 +649,8 @@ pengine_stop(ID) :- pengine_send(ID, request(stop)).
 
 /** pengine_stop(+NameOrID, +Options) is det
 
-Tells pengine NameOrID to stop looking for more solutions to a query started by pengine_ask/3.
-Options are passed to pengine_send/3.
+Tells pengine NameOrID to stop looking  for   more  solutions to a query
+started by pengine_ask/3. Options are passed to pengine_send/3.
 
 Defined in terms of pengine_send/3, like so:
 
@@ -618,7 +658,6 @@ Defined in terms of pengine_send/3, like so:
 pengine_stop(ID, Options) :-
     pengine_send(ID, request(stop), Options).
 ==
-
 */
 
 pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
@@ -626,7 +665,7 @@ pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
 
 /** pengine_abort(+NameOrID) is det
 
-Aborts the running query.  The pengine goes back to state `2', waiting
+Aborts the running query. The pengine goes   back  to state `2', waiting
 for new queries.
 
 @see pengine_destroy/1.
@@ -685,15 +724,13 @@ pengine_output(Term) :- pengine_output(Term, []).
 
 /** pengine_output(+Term, Options) is det
 
-Sends Term to the parent pengine or thread.
-
-Defined in terms of pengine_send/3, like so:
+Sends Term to the  parent  pengine  or   thread.  Defined  in  terms  of
+pengine_send/3, like so:
 
 ==
 pengine_output(Term, Options) :-
     pengine_send(parent, Term, Options).
 ==
-
 */
 
 pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
@@ -888,8 +925,8 @@ pengine_pull_response(ID) :-
 
 /** pengine_pull_response(+NameOrID, +Options) is det
 
-Pulls a response (an event term) from the slave process NameOrID if NameOrID is a remote process, else
-does nothing at all.
+Pulls a response (an event term)  from   the  slave  process NameOrID if
+NameOrID is a remote process, else does nothing at all.
 
 */
 
@@ -901,7 +938,8 @@ pengine_pull_response(_ID, _Options).
 
 /** pengine_input(-Term) is det
 
-Sends a prompt (as set by pengine_set_prompt/1) to the parent pengine and waits for input.
+Sends a prompt (as set by   pengine_set_prompt/1)  to the parent pengine
+and waits for input.
 
 */
 
@@ -916,7 +954,8 @@ pengine_input(Term) :-
 
 /** pengine_set_prompt(+Term) is det
 
-Sets the prompt associated with pengine_input/1. Note that Term may be any complex term.
+Sets the prompt associated with pengine_input/1.   Note that Term may be
+any complex term.
 
 */
 
@@ -1012,15 +1051,17 @@ pengine_event(Event) :-
 
 /** pengine_event(?EventTerm, +Options) is det
 
-Examines the pengine's event queue and if necessary blocks execution until a term that unifies to Term
-arrives in the queue. After a term from the queue has been unified to Term, the term is deleted from the
+Examines the pengine's event queue  and   if  necessary blocks execution
+until a term that unifies to Term  arrives   in  the queue. After a term
+from the queue has been unified to Term,   the  term is deleted from the
 queue.
 
    Valid options are:
 
    * timeout(+Time)
-     Time is a float or integer and specifies the maximum time to wait in seconds.
-     If no event has arrived before the time is up EventTerm is bound to the atom `timeout'.
+     Time is a float or integer and specifies the maximum time to wait
+     in seconds. If no event has arrived before the time is up EventTerm
+     is bound to the atom `timeout'.
 
 */
 
@@ -1044,15 +1085,17 @@ pengine_event_loop(Closure) :-
 
 /** pengine_event_loop(:Closure, +Options) is det
 
-Starts an event loop accepting event terms sent to the current pengine or thread. For each such event E,
-calls ignore(call(Closure, E)). A closure thus acts as a _handler_ for the event. Some events are also
+Starts an event loop accepting event terms   sent to the current pengine
+or thread. For each such  event   E,  calls  ignore(call(Closure, E)). A
+closure thus acts as a _handler_  for   the  event. Some events are also
 treated specially:
 
    * create(ID, Term)
      The ID is placed in a list of active pengines.
 
    * destroy(ID)
-     The ID is removed from the list of active pengines. When the last pengine ID is removed, the loop terminates.
+     The ID is removed from the list of active pengines. When the last
+     pengine ID is removed, the loop terminates.
 
    * output(ID, Term)
      The predicate pengine_pull_response/2 is called.
@@ -1060,8 +1103,9 @@ treated specially:
 Valid options are:
 
    * autoforward(+To)
-     Forwards received event terms to slaves. To is either =all=, =all_but_sender= or a Prolog list of NameOrIDs.
-     [not yet implemented]
+     Forwards received event terms to slaves. To is either =all=,
+     =all_but_sender= or a Prolog list of NameOrIDs. [not yet
+     implemented]
 
 */
 
@@ -1197,18 +1241,21 @@ pengine_ask_around(URLs, Goal) :-
 
 /** pengine_ask_around(+URLs, +Query, +Options) is nondet
 
-Semantically equivalent to Query, except that the query is run in (and in the Prolog contexts of) the
-pengine servers listed in URLs, and (subject to an option) locally. Computes the _bag union_ of
-solutions to Query on backtracking.
+Semantically equivalent to Query, except that the   query is run in (and
+in the Prolog contexts of)  the  pengine   servers  listed  in URLs, and
+(subject to an option) locally. Computes the _bag union_ of solutions to
+Query on backtracking.
 
-URLs is a list where each element is either a URL (atom) or a (`-'-delimited) pair of a URL and a list
-of options accepted by pengine_rpc/3. The options in such a list override the general options in
-Options.
+URLs is a list  where  each  element  is   either  a  URL  (atom)  or  a
+(`-'-delimited) pair of a  URL  and  a   list  of  options  accepted  by
+pengine_rpc/3. The options in such a   list override the general options
+in Options.
 
 Valid options are:
 
     * use_local(+Boolean)
-      Boolean (`true' or `false') determines if Query is run (at last) also in the local Prolog context.
+      Boolean (`true' or `false') determines if Query is run (at last)
+      also in the local Prolog context.
 
 */
 
@@ -1243,18 +1290,20 @@ pengine_seek_agreement(URLs, Goal) :-
 
 /** pengine_seek_agreement(+URLs, +Query, +Options) is nondet
 
-Semantically equivalent to Query, except that the query is run in (and in the Prolog contexts of) the
-pengine servers listed in URLs, and (subject to an option) locally. Computes the _bag intersection_
-of solutions to Query on backtracking.
+Semantically equivalent to Query, except that the   query is run in (and
+in the Prolog contexts of)  the  pengine   servers  listed  in URLs, and
+(subject to an option)  locally.  Computes   the  _bag  intersection_ of
+solutions to Query on backtracking.
 
-URLs is a list where each element is either a URL or a `-'-delimited pair of a URL and a list
-of options accepted by pengine_rpc/3. The options in such a list override the general options in
-Options.
+URLs is a list where each element  is   either  a URL or a `-'-delimited
+pair of a URL and  a  list   of  options  accepted by pengine_rpc/3. The
+options in such a list override the general options in Options.
 
 Valid options are:
 
     * use_local(+Boolean)
-      Boolean (`true' or `false') determines if Query is run (at last) also in the local Prolog context.
+      Boolean (`true' or `false') determines if Query is run (at last)
+      also in the local Prolog context.
 
 */
 
@@ -1520,9 +1569,9 @@ swap(N=V, N=A) :- term_to_atom(V, A).
 
 /** pengine_src_list(+ClauseList) is det
 
-Asserts the list of clauses ClauseList in the private dynamic database of the current Pengine. See also
-the `src_list' option of pengine_create/1.
-
+Asserts the list of clauses ClauseList   in the private dynamic database
+of  the  current  Pengine.   See   also    the   `src_list'   option  of
+pengine_create/1.
 */
 
 pengine_src_list(ClauseList) :-
@@ -1531,30 +1580,30 @@ pengine_src_list(ClauseList) :-
 
 /** pengine_src_text(+SrcText) is det
 
-Asserts the clauses defined in SrcText in the private dynamic database of the current Pengine. See also
-the `src_text' option of pengine_create/1.
+Asserts the clauses defined in SrcText   in the private dynamic database
+of  the  current  Pengine.   See   also    the   `src_text'   option  of
+pengine_create/1.
 
 */
 
 pengine_src_text(Src) :-
-    setup_call_cleanup( open_chars_stream(Src, Stream),
-                        read_source(Stream),
-                        close(Stream)
-    ).
+    setup_call_cleanup(
+	open_chars_stream(Src, Stream),
+	read_source(Stream),
+	close(Stream)).
 
 
 /** pengine_src_url(+URL) is det
 
-Asserts the clauses defined in URL in the private dynamic database of the current Pengine. See also the
-`src_url' option of pengine_create/1.
-
+Asserts the clauses defined in URL in   the  private dynamic database of
+the current Pengine. See also the `src_url' option of pengine_create/1.
 */
 
 pengine_src_url(URL) :-
-    setup_call_cleanup( http_open(URL, Stream, []),
-                        read_source(Stream),
-                        close(Stream)
-    ).
+    setup_call_cleanup(
+	http_open(URL, Stream, []),
+	read_source(Stream),
+	close(Stream)).
 
 
 % Short versions
@@ -1604,9 +1653,8 @@ assert_local(Fact) :-
 
 /** pengine_find_n(+N, ?Template, +Goal, ?List) is nondet
 
-Acts as findall/3 but returns only the first N bindings of Template to List, on backtracking another
-batch of N bindings, and so on.
-
+Acts as findall/3 but returns only the   first N bindings of Template to
+List, on backtracking another batch of N bindings, and so on.
 */
 
 pengine_find_n(N, Template, Goal, List) :-
