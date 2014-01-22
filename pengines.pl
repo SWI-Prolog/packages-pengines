@@ -19,7 +19,6 @@
             pengine_pull_response/2,
             pengine_destroy/1,
             pengine_abort/1,
-            pengine_exit/1,
             pengine_property/2,
             pengine_event_loop/1,
             pengine_event_loop/2,
@@ -700,16 +699,6 @@ pengine_property(id(Thread, _), Property) :-
     (   thread_property(Thread, Property)
     ;   message_queue_property(Thread, Property)
     ).
-
-
-/** pengine_exit(+Term) is det
-
-Terminates the pengine immediately, leaving exited(Term) as result state....
-
-*/
-
-pengine_exit(Term) :-
-    thread_exit(Term).
 
 
 /** pengine_output(+Term) is det
@@ -1670,11 +1659,3 @@ pengine_find_n(N, Template, Goal, List) :-
     ),
     findall(Row, (recorded(sols, Row, Ref), erase(Ref)), List),
     List \= [].
-
-
-
-
-
-
-
-
