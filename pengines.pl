@@ -1228,18 +1228,8 @@ pengine_event_loop(destroy(ID), Closure, Created, Options) :-
     ).
 
 
-
-/** pengine_rpc(+URL, +Query) is nondet
-
-Same as pengine_rpc(URL, Query, []).
-
-*/
-
-pengine_rpc(URL, Query) :-
-    pengine_rpc(URL, Query, []).
-
-
-/** pengine_rpc(+URL, +Query, +Options) is nondet
+/** pengine_rpc(+URL, +Query) is nondet.
+    pengine_rpc(+URL, +Query, +Options) is nondet.
 
 Semantically equivalent to Query, except that the   query is run in (and
 in the Prolog context of) the pengine  server referred to by URL, rather
@@ -1260,6 +1250,9 @@ Valid options are:
 Remaining  options  (except   the   server    option)   are   passed  to
 pengine_create/1.
 */
+
+pengine_rpc(URL, Query) :-
+    pengine_rpc(URL, Query, []).
 
 pengine_rpc(URL, Query, Options) :-
     setup_call_cleanup(
