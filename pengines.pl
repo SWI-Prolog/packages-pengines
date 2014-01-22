@@ -333,6 +333,7 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(http/http_session)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
+:- use_module(library(http/http_host)).
 :- use_module(library(time)).
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
@@ -1429,15 +1430,24 @@ http_pengine_create(Request) :-
     ),
     wait_and_output_result(From, To, URL, Format).
 
+%%	request_to_url(+Request, -BaseURL)
+%
+%	True when BaseURL is the base url of the pengines server.
+%
+%	@tbd	We might wish to be able to `mount' a pengine server
+%		on another address then =/pengine/=.  Need to find a
+%		solution for that.
 
-
+:- if(current_predicate(http_public_host_url/2)).
+request_to_url(Request, BaseURL) :-
+	http_public_host_url(Request, BaseURL).
+:- else.
 request_to_url(Request, BaseURL) :-
     memberchk(protocol(Protocol), Request),
     memberchk(host(Host), Request),
     memberchk(port(Port), Request),
     atomic_list_concat([Protocol, '://', Host, ':', Port], BaseURL).
-
-
+:- endif.
 
 wait_and_output_result(Parent, To, URL, Format) :-
     setting(time_limit, TimeLimit),
