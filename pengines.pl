@@ -328,13 +328,13 @@ Settings currently recognized by the Pengines library:
 
 */
 
-
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/http_session)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(time)).
+:- use_module(library(lists)).
 :- use_module(library(charsio)).
 :- use_module(library(apply)).
 :- use_module(library(option)).
