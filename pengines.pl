@@ -736,10 +736,17 @@ pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 /*================= Local pengine =======================
 */
 
-:- dynamic child/2.
+:- dynamic      child/2.		% Pengine, Child
+:- thread_local id/2.			% Name, Child
 
-:- thread_local id/2.
-
+%%	local_pengine_create(+Options)
+%
+%	Creates  a  local   Pengine,   which    is   a   thread  running
+%	pengine_main/2.  It maintains two predicates:
+%
+%	  - The global dynamic predicate id/2 relates Pengines to their
+%	    childs.
+%	  - The local predicate id/2 maps named childs to their ids.
 
 local_pengine_create(Options) :-
     thread_self(Self),
@@ -750,18 +757,26 @@ local_pengine_create(Options) :-
     ;   true
     ).
 
-
-
 create(Self, Child, Options) :-
     select_option(probe(Condition), Options, RestOptions0, true),
     partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
-    (   call(Condition)
-    ->  thread_create(solve(id(Self, Child), PengineOptions), Child,
-            [detached(false), at_exit(done(Self, Child))|RestOptions]
-        ),
-        ignore(option(id(id(Self, Child)), Options))
-    ;   thread_send_message(Self, error(id(null, null), error(probe_failure(Condition), _)))
+    (   catch(Condition, E, true)
+    ->  (   var(E)
+	->  thread_create(pengine_main(id(Self, Child), PengineOptions), Child,
+			  [ at_exit(done(Self, Child))
+			  | RestOptions
+			  ]),
+	    (	option(id(Id), Options)
+	    ->	Id = id(Self, Child)
+	    ;	true
+	    )
+	;   probe_failure(Self, E)
+	)
+    ;   probe_failure(Self, error(probe_failure(Condition), _))
     ).
+
+probe_failure(Self, Term) :-
+	thread_send_message(Self, error(id(null, null), Term)).
 
 
 pengine_create_option(src_text(_)).
@@ -771,49 +786,40 @@ pengine_create_option(probe(_)).
 pengine_create_option(probe_template(_)).
 
 
-/*
-solve0(ID, Options) :-
-    setting(pengine_alive_time_limit, Time),
-    catch(call_with_time_limit(Time, solve(ID, Options)), Error, true).
-*/
+%%	pengine_main(+Id, +Options)
+%
+%	Run a pengine main loop. First acknowledges its creation and run
+%	pengine_main_loop/1.
 
-
-solve(ID, Options) :-
+pengine_main(ID, Options) :-
     parent(ID, Parent),
     nb_setval(parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
     (   call_options_as_goals(RestOptions, ID)
     ->  thread_send_message(Parent, create(ID, Template)),
-        interpret0(ID)
+        pengine_main_loop(ID)
     ;   true
     ).
 
 
 call_options_as_goals([], _).
 call_options_as_goals([Option|Options], ID) :-
-    catch(Option, Error0, true),
-    (   var(Error0)
+    catch(Option, Error, true),
+    (   var(Error)
     ->  call_options_as_goals(Options, ID)
-    ;   parent(ID, Parent),
-        replace_stream(Error0, Error),
-        thread_send_message(Parent, error(ID, Error)),
-        fail
+    ;   send_error(ID, Error),
+	fail
     ).
 
-replace_stream(error(Err, stream(_Stream, A, B, C)), error(Err, stream(stream, A, B, C))) :- !.
-replace_stream(Error, Error).
-
-
-
-interpret0(ID) :-
-    catch(interpret(ID), abort_query,
+pengine_main_loop(ID) :-
+    catch(guarded_main_loop(ID), abort_query,
 	  ( parent(ID, Parent),
 	    thread_send_message(Parent, abort(ID)),
-	    interpret0(ID)
+	    pengine_main_loop(ID)
 	  )).
 
 
-interpret(ID) :-
+guarded_main_loop(ID) :-
     thread_get_message(Event),
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
@@ -827,7 +833,7 @@ interpret(ID) :-
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
-        interpret(ID)
+        guarded_main_loop(ID)
     ).
 
 
@@ -975,6 +981,31 @@ pengine_get_prompt(Prompt) :-
     ).
 
 
+%%	send_error(+Pengine, +Error) is det.
+%
+%	Send an error to my parent.   Remove non-readable blobs from the
+%	error term first using replace_blobs/2.
+
+send_error(Pengine, Error) :-
+	replace_blobs(Error, Error1),
+	parent(Pengine, Parent),
+	thread_send_message(Parent, error(Pengine, Error1)).
+
+%%	replace_blobs(Term0, Term) is det.
+%
+%	Copy Term0 to Term, replacing non-text   blobs. This is required
+%	for error messages that may hold   streams  and other handles to
+%	non-readable objects.
+
+replace_blobs(Blob, Atom) :-
+	blob(Blob, Type), Type \== text, !,
+	format(atom(Atom), '~p', [Blob]).
+replace_blobs(Term0, Term) :-
+	compound(Term0), !,
+	compound_name_arguments(Term0, Name, Args0),
+	maplist(replace_blobs, Args0, Args),
+	compound_name_arguments(Term, Name, Args).
+replace_blobs(Term, Term).
 
 
 /*================= Remote pengines =======================
