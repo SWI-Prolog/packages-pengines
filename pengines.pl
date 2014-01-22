@@ -375,11 +375,14 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 
 /* Settings */
 
-:- setting(allow_multiple_session_pengines, atom, false, 'Allow a HTTP session to run more than one top level pengine at a time').
+:- setting(allow_multiple_session_pengines, atom, false,
+	   'Allow a HTTP session to run more than one top \c
+	   level pengine at a time').
 
 :- setting(time_limit, number, 60, 'Maximum time between output').
 
-:- setting(pengine_alive_time_limit, number, 60, 'Maximum time to allow a pengine to live').
+:- setting(pengine_alive_time_limit, number, 60,
+	   'Maximum time to allow a pengine to live').
 
 
 
@@ -395,7 +398,7 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
     * name(+Name)
       The pengine is named Name (an atom). A slave pengine (child) can
       subsequently be referred to by this name, but only by its master
-      (parent). The atoms ‘parent’ and ‘self’ are reserved names and
+      (parent). The atoms =parent= and =self= are reserved names and
       must not be used here.
 
     * server(+URL)
@@ -420,14 +423,14 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
     * probe_template(+Template)
       Template is a term possibly containing variables shared with the
       probe query. By default, the template is identical to the probe
-      query. The second argument of the `create' event will be bound to
+      query. The second argument of the =create= event will be bound to
       an instance of this term, which makes it useful for getting
       information about the environment in which the pengine is to be
       run.
 
     * format(+Format)
       Determines the format of event responses. Format is an atom,
-      either `prolog' (default), `json', or `json-s'.
+      either =prolog= (default), =json=, or =json-s=.
 
 Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
 non-local pengines) and thread_create/3. Note   that for thread_create/3
@@ -562,9 +565,9 @@ terms_.
       Term is the exception's error term.
 
     * output(ID, Term)
-      ID is the id of a pengine running the query that called pengine_output/1.
-      Term is the term that was passed in the first argument of
-      pengine_output/1 when it was called.
+      ID is the id of a pengine running the query that called
+      pengine_output/1. Term is the term that was passed in the first
+      argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/1.
