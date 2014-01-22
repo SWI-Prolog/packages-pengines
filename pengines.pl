@@ -687,8 +687,16 @@ pengine_destroy(ID) :- pengine_send(ID, request(destroy)).
 
 
 
-/** pengine_property(+NameOrID, ?Property) is det
+/** pengine_property(+NameOrID, ?Property) is nondet.
 
+True  when  Property  is  a  property  of  the  given  Pengine.  Defined
+properties are properties of the associated   thread  and message queue,
+with the following additional properties:
+
+  * parent(Thread)
+  Thread id for the parent (local) pengine.
+  * self(Thread)
+  Thread id of the running pengine.
 */
 
 pengine_property(id(Thread, _), parent(Thread)).
