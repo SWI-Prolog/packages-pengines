@@ -35,8 +35,7 @@
             pengine_find_n/4
         ]).
 
-/** <module>
----+ Web Logic Programming Made Easy
+/** <module> Pengines: Web Logic Programming Made Easy
 
 ---++ Overview
 
