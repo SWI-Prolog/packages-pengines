@@ -1392,29 +1392,36 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 
 %   Declare HTTP locations we serve and how.
 
-:- http_handler(root(pengine/create), http_pengine_create, []).
-:- http_handler(root(pengine/send), http_pengine_send, []).
+:- http_handler(root(pengine/create),	     http_pengine_create,	 []).
+:- http_handler(root(pengine/send),	     http_pengine_send,		 []).
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response, []).
-:- http_handler(root(pengine/abort), http_pengine_abort, []).
-
+:- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
 
 
 http_pengine_create(Request) :-
     http_parameters(Request,
-            [   options(OptionsAtom, [default([])]),
-                format(Format, [default(prolog)])
-            ]),
-    style_check(-atom),
-    atom_to_term(OptionsAtom, Options, _),
+		    [ options(OptionsAtom,
+			      [ optional(true)
+			      ]),
+		      format(Format,
+			     [ oneof([prolog, json, 'json-s']),
+			       default(prolog)
+			     ])
+		    ]),
+    (	var(OptionsAtom)
+    ->	Options = []
+    ;	atom_to_term(OptionsAtom, Options, _)
+    ),
     request_to_url(Request, URL),
     (   setting(allow_multiple_session_pengines, false)
-    ->  forall(http_session_retract(current_thread(ID)), pengine_abort(ID))
+    ->  forall(http_session_retract(pengine(ID)),
+	       pengine_destroy(ID))
     ;   true
     ),
     message_queue_create(From, []),
     create(From, To, Options),
     (   setting(allow_multiple_session_pengines, false)
-    ->  http_session_assert(current_thread(id(From, To)))
+    ->  http_session_assert(pengine(id(From, To)))
     ;   true
     ),
     wait_and_output_result(From, To, URL, Format).
