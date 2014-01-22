@@ -816,21 +816,24 @@ pengine_main(ID, Options) :-
     parent(ID, Parent),
     nb_setval(parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
-    (   call_options_as_goals(RestOptions, ID)
+    (   catch(maplist(process_create_option, RestOptions), Error,
+	      ( send_error(ID, Error),
+		fail
+	      ))
     ->  thread_send_message(Parent, create(ID, Template)),
         pengine_main_loop(ID)
     ;   true
     ).
 
 
-call_options_as_goals([], _).
-call_options_as_goals([Option|Options], ID) :-
-    catch(Option, Error, true),
-    (   var(Error)
-    ->  call_options_as_goals(Options, ID)
-    ;   send_error(ID, Error),
-	fail
-    ).
+process_create_option(src_list(ClauseList)) :- !,
+	pengine_src_list(ClauseList).
+process_create_option(src_text(Text)) :- !,
+	pengine_src_text(Text).
+process_create_option(src_url(URL)) :- !,
+	pengine_src_url(URL).
+process_create_option(_).
+
 
 pengine_main_loop(ID) :-
     catch(guarded_main_loop(ID), abort_query,
@@ -1677,16 +1680,6 @@ pengine_src_url(URL) :-
 	http_open(URL, Stream, []),
 	read_source(Stream),
 	close(Stream)).
-
-
-% Short versions
-
-src_list(ClauseList) :- pengine_src_list(ClauseList).
-
-src_text(Src) :- pengine_src_text(Src).
-
-src_url(URL) :- pengine_src_url(URL).
-
 
 read_source(Stream) :-
     read(Stream, Term),
