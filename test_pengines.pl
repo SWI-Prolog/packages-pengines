@@ -17,13 +17,29 @@ test(simple, Results = [a,b,c]) :-
     pengine_create(
 	[ src_text("p(a). p(b). p(c).")
 	]),
-    collect(X, p(X), Results, all, []),
+    collect(X, p(X), Results, []),
     assertion(no_more_pengines).
-test(paging, Results = [b,a,c]) :-
+test(paging, Results = [a,b,c]) :-
     pengine_create(
 	[ src_text("p(a). p(b). p(c).")
 	]),
-    collect(X, p(X), Results, all, [paging(2)]),
+    collect(X, p(X), Results, [paging(2)]),
+    assertion(no_more_pengines).
+test(stop, Results = [a,b]) :-
+    pengine_create(
+	[ src_text("p(a). p(b). p(c).")
+	]),
+    collect(X, p(X), Results, [stop_after(2)]),
+    assertion(no_more_pengines).
+test(two, Sorted = [a,b,c,d,e,f]) :-
+    pengine_create(
+	[ src_text("p(a). p(b). p(c).")
+	]),
+    pengine_create(
+	[ src_text("p(d). p(e). p(f).")
+	]),
+    collect(X, p(X), Results, []),
+    msort(Results, Sorted),
     assertion(no_more_pengines).
 
 :- end_tests(local_pengines).
@@ -33,27 +49,27 @@ test(paging, Results = [b,a,c]) :-
 		 *	     UTILITIES		*
 		 *******************************/
 
-%%	collect(+Template, :Goal, -Results, +StopAfter, +Options)
+%%	collect(+Template, :Goal, -Results, +Options)
 %
-%	Collect answers from all pengines in Results. If StopAfter is an
-%	integer,  collection  is  stopped  after  collecting  this  many
-%	results.
+%	Collect answers from all pengines in Results.  Options:
+%
+%	  * stop_after(N)
+%	  Stop collecting results after N answers
 
-collect(Template, Goal, Results, StopAfter, Options) :-
-    State = results([], StopAfter, Options),
+collect(Template, Goal, Results, Options) :-
+    (	select_option(stop_after(StopAfter), Options, Options1)
+    ->	State = _{results:[], stop_after:StopAfter, options:Options1}
+    ;	State = _{results:[], options:Options}
+    ),
     pengine_event_loop(collect_handler(Template, Goal, State)),
-    arg(1, State, R0),
-    reverse(R0, Results).
+    Results = State.results.
 
 collect_handler(Template, Goal, State, create(Id, _)) :-
-    arg(3, State, Options),
-    pengine_ask(Id, Goal, [template(Template)|Options]).
-collect_handler(_, _, State, success(Id, Value, More)) :-
-    arg(1, State, R0),
-    append(Value, R0, R1),
-    setarg(1, State, R1),
-    (	arg(2, State, StopAfter),
-	integer(StopAfter),
+    pengine_ask(Id, Goal, [template(Template)|State.options]).
+collect_handler(_, _, State, success(Id, Values, More)) :-
+    append(State.results, Values, R1),
+    b_set_dict(results, State, R1),
+    (	StopAfter = State.get(stop_after),
 	length(R1, Collected),
 	Collected >= StopAfter
     ->	pengine_destroy(Id)
