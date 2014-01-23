@@ -525,6 +525,16 @@ send_message(pengine(Pengine), Event, Options) :-
 	thread_send_message(Thread, Event)
     ).
 
+%%	penguine_reply(+Event) is det.
+%
+%	Reply Event to the parent of the current Pengine.
+
+pengine_reply(Event) :-
+    nb_getval(parent, Queue),
+    debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
+    thread_send_message(Queue, Event).
+
+
 %%	pengine_queue_message(+Event) is det.
 %%	pengine_queue_message(+Pengine, +Event) is det.
 
@@ -856,7 +866,7 @@ pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 %	  - The local predicate id/2 maps named childs to their ids.
 
 local_pengine_create(Options) :-
-    pengine_self(Self),
+    thread_self(Self),
     create(Self, Child, Options, local),
     assert(child(Child)),
     (   option(name(Name), Options)
@@ -929,7 +939,7 @@ pengine_main(Parent, Options) :-
 	      ( send_error(Parent, Error),
 		fail
 	      ))
-    ->  pengine_queue_message(Parent, create(Parent, Template)),
+    ->  pengine_reply(create(Self, Template)),
         pengine_main_loop(Self)
     ;   true
     ).
@@ -946,8 +956,7 @@ process_create_option(_).
 
 pengine_main_loop(ID) :-
     catch(guarded_main_loop(ID), abort_query,
-	  ( pengine_parent(ID, Parent),
-	    pengine_queue_message(Parent, abort(ID)),
+	  ( pengine_reply(abort(ID)),
 	    pengine_main_loop(ID)
 	  )).
 
@@ -970,16 +979,14 @@ guarded_main_loop(ID) :-
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
-    ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
-        pengine_parent(ID, Parent),
-        %pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
+    ;   debug(pengine(transition), '~q: 2 = ~q => 2', [ID, protocol_error]),
+        %pengine_reply(error(ID, error(protocol_error, _))),
         guarded_main_loop(ID)
     ).
 
 
 pengine_terminate(ID) :-
-    pengine_parent(ID, Parent),
-    pengine_queue_message(Parent, destroy(ID)),
+    pengine_reply(destroy(ID)),
     thread_self(Me),		% Make the thread silently disappear
     thread_detach(Me).
 
@@ -993,29 +1000,22 @@ pengine_terminate(ID) :-
 %	has two clauses.
 
 solve(Template, Goal, ID) :-
-    pengine_parent(ID, Parent),
     prolog_current_choice(Choice),
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
-            ->  pengine_queue_message(Parent, success(ID, Template, true)),
-                debug(pengine(event), 'sending to ~q: ~q',
-		      [Parent, success(Template, true)]),
+            ->  pengine_reply(success(ID, Template, true)),
                 more_solutions(ID, Choice)
             ;   !,			% commit
-		pengine_queue_message(Parent, success(ID, Template, false)),
-                debug(pengine(event), 'sending to ~q: ~q',
-		      [Parent, success(Template, false)]),
+		pengine_reply(success(ID, Template, false)),
                 guarded_main_loop(ID)
             )
         ;   !,				% commit
-	    pengine_queue_message(Parent, error(ID, Error)),
-            debug(pengine(event), 'sending to ~q: ~q', [Parent, error(Error)]),
+	    pengine_reply(error(ID, Error)),
             guarded_main_loop(ID)
         )
     ;   !,				% commit
-	pengine_queue_message(Parent, failure(ID)),
-        debug(pengine(event), 'sending to ~q: failure', [Parent]),
+	pengine_reply(failure(ID)),
         guarded_main_loop(ID)
     ).
 solve(_, _, _).				% leave a choice point
@@ -1034,27 +1034,27 @@ solve(_, _, _).				% leave a choice point
 %	  of the previous goal asked for.
 
 more_solutions(ID, Choice) :-
-    pengine_event(Event),
-    (   Event = request(stop)
-    ->  debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
-        pengine_parent(ID, Parent),
-        pengine_queue_message(Parent, stop(ID)),
-        guarded_main_loop(ID)
-    ;   Event = request(next)
-    ->  debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
-        fail
-    ;   Event = request(ask(Goal, Options))
-    ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
-	prolog_cut_to(Choice),
-        ask(ID, Goal, Options)
-    ;	Event = request(destroy)
-    ->	debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
-        pengine_terminate(ID)
-    ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
-        pengine_parent(ID, Parent),
-        pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
-        more_solutions(ID, Choice)
-    ).
+    pengine_event(request(Event)),
+    more_solutions(Event, ID, Choice).
+
+more_solutions(stop, ID, _Choice) :- !,
+    debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
+    pengine_reply(stop(ID)),
+    guarded_main_loop(ID).
+more_solutions(next, ID, _Choice) :- !,
+    debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
+    fail.
+more_solutions(ask(Goal, Options), ID, Choice) :- !,
+    debug(pengine(transition), '~q: 6 = ~q => 3', [ID, ask(Goal)]),
+    prolog_cut_to(Choice),
+    ask(ID, Goal, Options).
+more_solutions(destroy, ID, _Choice) :- !,
+    debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
+    pengine_terminate(ID).
+more_solutions(Event, ID, Choice) :-
+    debug(pengine(transition), '~q: 6 = ~q => 6', [ID, protocol_error(Event)]),
+    pengine_reply(error(ID, error(protocol_error, _))),
+    more_solutions(ID, Choice).
 
 %%	ask(+Pengine, :Goal, +Options)
 %
@@ -1071,8 +1071,7 @@ ask(ID, Goal, Options) :-
         ->  solve([Template], Goal, ID)
         ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID)
         )
-    ;   pengine_parent(ID, Parent),
-        pengine_queue_message(Parent, error(ID, Error))
+    ;   pengine_reply(error(ID, Error))
     ).
 
 
@@ -1149,9 +1148,9 @@ pengine_get_prompt(Prompt) :-
 %	error term first using replace_blobs/2.
 
 send_error(Pengine, Error) :-
-	replace_blobs(Error, Error1),
-	pengine_parent(Pengine, Parent),
-	pengine_queue_message(Parent, error(Pengine, Error1)).
+    replace_blobs(Error, Error1),
+    pengine_parent(Pengine, Parent),
+    pengine_queue_message(Parent, error(Pengine, Error1)).
 
 %%	replace_blobs(Term0, Term) is det.
 %
@@ -1160,13 +1159,13 @@ send_error(Pengine, Error) :-
 %	non-readable objects.
 
 replace_blobs(Blob, Atom) :-
-	blob(Blob, Type), Type \== text, !,
-	format(atom(Atom), '~p', [Blob]).
+    blob(Blob, Type), Type \== text, !,
+    format(atom(Atom), '~p', [Blob]).
 replace_blobs(Term0, Term) :-
-	compound(Term0), !,
-	compound_name_arguments(Term0, Name, Args0),
-	maplist(replace_blobs, Args0, Args),
-	compound_name_arguments(Term, Name, Args).
+    compound(Term0), !,
+    compound_name_arguments(Term0, Name, Args0),
+    maplist(replace_blobs, Args0, Args),
+    compound_name_arguments(Term, Name, Args).
 replace_blobs(Term, Term).
 
 
