@@ -537,25 +537,18 @@ send_message(pengine(Pengine), Event, Options) :-
 	thread_send_message(Thread, Event)
     ).
 
-%%	penguine_reply(+Event) is det.
+%%	pengine_reply(+Event) is det.
+%%	pengine_reply(+Queue, +Event) is det.
 %
-%	Reply Event to the parent of the current Pengine.
+%	Reply Event to the parent of the   current  Pengine or the given
+%	Queue.
 
 pengine_reply(Event) :-
     nb_getval(parent, Queue),
+    pengine_reply(Queue, Event).
+
+pengine_reply(Queue, Event) :-
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
-    thread_send_message(Queue, Event).
-
-
-%%	pengine_queue_message(+Event) is det.
-%%	pengine_queue_message(+Pengine, +Event) is det.
-
-pengine_queue_message(Event) :-
-    thread_self(Queue),
-    pengine_queue_message(Queue, Event).
-
-pengine_queue_message(Pengine, Event) :-
-    pengine_queue(Pengine, Queue),
     thread_send_message(Queue, Event).
 
 
@@ -789,29 +782,6 @@ pengine_url(Pengine, URL) :-
     URL \== local.
 
 
-%%	pengine_queue(+Pengine, -Queue) is det.
-%
-%	True if Queue  is  the  thread-id   or  message  queue  to  send
-%	information to Pengine.
-%
-%	@error	existence_error(pengine, Pengine)
-
-pengine_queue(Pengine, Thread) :-
-    current_pengine(Pengine, _, Thread, local), !.
-pengine_queue(Queue, Queue) :-
-    is_message_queue(Queue), !.
-pengine_queue(Pengine, _) :-
-    existence_error(pengine, Pengine).
-
-:- if(\+current_predicate(is_message_queue/1)).
-is_message_queued(Id) :-
-    integer(Id), !.			% assume it is a thread
-is_message_queued(Id) :-
-    nonvar(Id),
-    Id = '$message_queue'(_).
-:- endif.
-
-
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
 uuid(Id) :-
@@ -914,7 +884,7 @@ create(Queue, Child, Options, URL) :-
     ).
 
 probe_failure(Queue, Term) :-
-    pengine_queue_message(Queue, error(id(null, null), Term)).
+    pengine_reply(Queue, error(id(null, null), Term)).
 
 
 pengine_create_option(src_text(_)).
@@ -948,7 +918,7 @@ pengine_main(Parent, Options) :-
     nb_setval(parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
     (   catch(maplist(process_create_option, RestOptions), Error,
-	      ( send_error(Parent, Error),
+	      ( send_error(Error),
 		fail
 	      ))
     ->  pengine_reply(create(Self, Template)),
@@ -1119,10 +1089,10 @@ and waits for input.
 */
 
 pengine_input(Term) :-
-    thread_self(Self),
+    pengine_self(Self),
     nb_getval(parent, Parent),
     pengine_get_prompt(Prompt),
-    pengine_queue_message(Parent, prompt(id(Parent, Self), Prompt)),
+    pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_event(input(Term)).
 
 
@@ -1154,15 +1124,15 @@ pengine_get_prompt(Prompt) :-
     ).
 
 
-%%	send_error(+Pengine, +Error) is det.
+%%	send_error(+Error) is det.
 %
 %	Send an error to my parent.   Remove non-readable blobs from the
 %	error term first using replace_blobs/2.
 
-send_error(Pengine, Error) :-
+send_error(Error) :-
+    pengine_self(Self),
     replace_blobs(Error, Error1),
-    pengine_parent(Pengine, Parent),
-    pengine_queue_message(Parent, error(Pengine, Error1)).
+    pengine_reply(error(Self, Error1)).
 
 %%	replace_blobs(Term0, Term) is det.
 %
@@ -1199,26 +1169,31 @@ remote_pengine_create(BaseURL, Options) :-
     ;   true
     ),
     pengine_register_remote(ID, BaseURL),
-    pengine_queue_message(Reply).
+    thread_self(Queue),
+    pengine_reply(Queue, Reply).
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
     term_to_atom(Event, EventAtom),
     remote_send_rec(BaseURL, send, [id=ID, event=EventAtom], Reply, Options),
-    pengine_queue_message(Reply).
+    thread_self(Queue),
+    pengine_reply(Queue, Reply).
 
 remote_pengine_pull_response(BaseURL, ID, Options) :-
     remote_send_rec(BaseURL, pull_response, [id=ID], Reply, Options),
-    pengine_queue_message(Reply).
+    thread_self(Queue),
+    pengine_reply(Queue, Reply).
 
 remote_pengine_abort(BaseURL, ID, Options) :-
     remote_send_rec(BaseURL, abort, [id=ID], Reply, Options),
-    pengine_queue_message(Reply).
+    thread_self(Queue),
+    pengine_reply(Queue, Reply).
 
 remote_send_rec(Server, Action, Params, Reply, Options) :-
     uri_components(Server, Components0),
     uri_query_components(Query, Params),
     uri_data(path, Components0, Path0),
-    directory_file_path(Path0, Action, Path),
+    atom_concat('pengine/', Action, PAction),
+    directory_file_path(Path0, PAction, Path),
     uri_data(path, Components0, Path, Components),
     uri_data(search, Components, Query),
     uri_components(URL, Components),
@@ -1526,9 +1501,7 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 
 http_pengine_create(Request) :-
     http_parameters(Request,
-		    [ options(OptionsAtom,
-			      [ optional(true)
-			      ]),
+		    [ options(OptionsAtom, [optional(true)]),
 		      format(Format,
 			     [ oneof([prolog, json, 'json-s']),
 			       default(prolog)
@@ -1538,38 +1511,18 @@ http_pengine_create(Request) :-
     ->	Options = []
     ;	atom_to_term(OptionsAtom, Options, _)
     ),
-    request_to_url(Request, URL),
     (   setting(allow_multiple_session_pengines, false)
     ->  forall(http_session_retract(pengine(ID)),
 	       pengine_destroy(ID))
     ;   true
     ),
     message_queue_create(From, []),
-    create(From, Pengine, Options, URL),
+    create(From, Pengine, Options, http),
     (   setting(allow_multiple_session_pengines, false)
     ->  http_session_assert(pengine(Pengine))
     ;   true
     ),
     wait_and_output_result(Pengine, Format).
-
-%%	request_to_url(+Request, -BaseURL)
-%
-%	True when BaseURL is the base url of the pengines server.
-%
-%	@tbd	We might wish to be able to `mount' a pengine server
-%		on another address then =/pengine/=.  Need to find a
-%		solution for that.
-
-:- if(current_predicate(http_public_host_url/2)).
-request_to_url(Request, BaseURL) :-
-	http_public_host_url(Request, BaseURL).
-:- else.
-request_to_url(Request, BaseURL) :-
-    memberchk(protocol(Protocol), Request),
-    memberchk(host(Host), Request),
-    memberchk(port(Port), Request),
-    atomic_list_concat([Protocol, '://', Host, ':', Port], BaseURL).
-:- endif.
 
 %%	wait_and_output_result(+Pengine, +Format)
 %
@@ -1578,7 +1531,6 @@ request_to_url(Request, BaseURL) :-
 wait_and_output_result(Pengine, Format) :-
     setting(time_limit, TimeLimit),
     pengine_parent(Pengine, Parent),
-    pengine_url(Pengine, URL),
     (   thread_get_message(Parent, Event,
 			   [ timeout(TimeLimit)
 			   ])
@@ -1587,9 +1539,9 @@ wait_and_output_result(Pengine, Format) :-
             ReturnEvent = destroy(Id)
         ;   ReturnEvent = Event
         ),
-        output_result(Format, ReturnEvent, URL)
+        output_result(Format, ReturnEvent)
     ;   output_result(Format, error(Pengine,
-				    error(time_limit_exceeded, _)), URL),
+				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
     ).
 
@@ -1606,7 +1558,8 @@ http_pengine_send(Request) :-
 	  ),
 	  Error,
 	  Event1 = error(ID, Error)),
-    pengine_queue_message(ID, Event1),
+    pengine_thread(ID, Thread),
+    thread_send_message(Thread, Event1),
     wait_and_output_result(ID, Format).
 
 
@@ -1645,27 +1598,12 @@ http_pengine_abort(Request) :-
 
 % Output
 
-output_result(prolog, Term0, BaseURL) :-
-    add_URL_to_ID(Term0, BaseURL, Term),
+output_result(prolog, Term) :-
     to_prolog(Term).
-output_result(json, Term0, BaseURL) :-
-    add_URL_to_ID(Term0, BaseURL, Term),
+output_result(json, Term) :-
     to_json(Term).
-output_result('json-s', Term0, BaseURL) :-
-    add_URL_to_ID(Term0, BaseURL, Term),
+output_result('json-s', Term) :-
     to_json_s(Term).
-
-
-add_URL_to_ID(create(ID, Term), Base, create(Base:ID, Term)).
-add_URL_to_ID(success(ID, Bindings, More), Base, success(Base:ID, Bindings, More)).
-add_URL_to_ID(failure(ID), Base, failure(Base:ID)).
-add_URL_to_ID(error(ID, Error), Base, error(Base:ID, Error)).
-add_URL_to_ID(output(ID, Term), Base, output(Base:ID, Term)).
-add_URL_to_ID(prompt(ID, Term), Base, prompt(Base:ID, Term)).
-add_URL_to_ID(stop(ID), Base, stop(Base:ID)).
-add_URL_to_ID(abort(ID), Base, abort(Base:ID)).
-add_URL_to_ID(destroy(ID), Base, destroy(Base:ID)).
-
 
 
 to_prolog(Term) :-
