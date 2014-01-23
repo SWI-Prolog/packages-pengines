@@ -44,6 +44,18 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
 
 :- end_tests(local_pengines).
 
+:- begin_tests(remote_pengines).
+
+test(simple, Results = [a,b,c]) :-
+    pengine_create(
+	[ server('http://localhost:4040'),
+	  src_text("p(a). p(b). p(c).")
+	]),
+    collect(X, p(X), Results, []),
+    assertion(no_more_pengines).
+
+:- end_tests(remote_pengines).
+
 
 		 /*******************************
 		 *	     UTILITIES		*
@@ -85,4 +97,4 @@ collect_handler(_, _, _, failure(Id)) :-
 %	True if there are no more living pengines.
 
 no_more_pengines :-
-	\+ pengine:current_pengine(_,_,_,_).
+    \+ pengine:current_pengine(_,_,_,_).
