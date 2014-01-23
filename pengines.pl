@@ -1,5 +1,5 @@
 :- module(pengine,
-	  [ pengine_create/1,
+	  [ pengine_create/1,			% +Options
             pengine_send/2,
             pengine_send/3,
             pengine_ask/2,
@@ -334,6 +334,8 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_host)).
+:- use_module(library(uri)).
+:- use_module(library(filesex)).
 :- use_module(library(time)).
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
@@ -343,6 +345,9 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(debug)).
 :- use_module(library(sandbox)).
 :- use_module(library(term_to_json)).
+:- if(exists_source(library(uuid))).
+:- use_module(library(uuid)).
+:- endif.
 
 
 :- meta_predicate
@@ -481,41 +486,55 @@ NameOrID. Options is a list of options:
 Any remaining options are passed to http_open/3.
 */
 
-pengine_send(Target0, Event0, Options) :-
-    (   Target0 = self
-    ->  thread_self(Target),
-        Event = Event0
-    ;   Target0 = parent
-    ->  nb_getval(parent, Target),
-        (   Event0 = output(_, _)
-        ->  Event = Event0
-        ;   thread_self(ID),
-            Event = output(id(Target, ID), Event0)
-        )
-    ;   atom(Target0)
-    ->  id(Target0, Target),
-        Event = Event0
-    ;   Target = Target0,
-        Event = Event0
+pengine_send(Target, Event, Options) :-
+    must_be(atom, Target),
+    pengine_send2(Target, Event, Options).
+
+pengine_send2(parent, Event0, Options) :- !,
+    pengine_parent(Queue),
+    (   Event0 = output(_, _)
+    ->  Event = Event0
+    ;   pengine_self(Self),
+	Event = output(Self, Event0)
     ),
-    (   option(delay(Delay), Options)
-    ->  alarm(Delay,
-	      pengine_send_message(Target, Event, Options),
-	      _AlarmID,
-	      [remove(true)])
-    ;   pengine_send_message(Target, Event, Options)
+    delay_message(queue(Queue), Event, Options).
+pengine_send2(self, Event, Options) :- !,
+    thread_self(Queue),
+    delay_message(queue(Queue), Event, Options).
+pengine_send2(Name, Event, Options) :-
+    named_child(Name, Target), !,
+    delay_message(pengine(Target), Event, Options).
+pengine_send2(Target, Event, Options) :-
+    delay_message(pengine(Target), Event, Options).
+
+delay_message(Target, Event, Options) :-
+    option(delay(Delay), Options), !,
+    alarm(Delay,
+	  send_message(Target, Event, Options),
+	  _AlarmID,
+	  [remove(true)]).
+delay_message(Target, Event, Options) :-
+    send_message(Target, Event, Options).
+
+send_message(queue(Queue), Event, _) :-
+    thread_send_message(Queue, Event).
+send_message(pengine(Pengine), Event, Options) :-
+    (	pengine_remote(Pengine, Server)
+    ->	remote_pengine_send(Server, Pengine, Event, Options)
+    ;	pengine_thread(Pengine, Thread),
+	thread_send_message(Thread, Event)
     ).
 
+%%	pengine_queue_message(+Event) is det.
+%%	pengine_queue_message(+Pengine, +Event) is det.
 
-pengine_send_message(BaseURL:ID, Event, Options) :- !,
-    remote_pengine_send(BaseURL, BaseURL:ID, Event, Options).
-pengine_send_message(id(_From, To), Event, _Options) :- !,
-    pengine_queue_message(To, Event).
-pengine_send_message(RealID, Event, _Options) :-
-    pengine_queue_message(RealID, Event).
+pengine_queue_message(Event) :-
+    thread_self(Queue),
+    pengine_queue_message(Queue, Event).
 
-pengine_queue_message(To, Event) :-
-    thread_send_message(To, Event).
+pengine_queue_message(Pengine, Event) :-
+    pengine_queue(Pengine, Queue),
+    thread_send_message(Queue, Event).
 
 
 /** pengine_ask(+NameOrID, @Query) is det
@@ -673,12 +692,12 @@ for new queries.
 @see pengine_destroy/1.
 */
 
-pengine_abort(BaseURL:ID) :- !,
-    remote_pengine_abort(BaseURL, BaseURL:ID, []).
-pengine_abort(id(_F,T)) :- !,
-    pengine_abort(T).
-pengine_abort(ID) :-
-    catch(thread_signal(ID, throw(abort_query)), _, true).
+pengine_abort(Pengine) :- !,
+    pengine_remote(Pengine, Server), !,
+    remote_pengine_abort(Server, Pengine, []).
+pengine_abort(Pengine) :-
+    pengine_thread(Pengine, Thread),
+    catch(thread_signal(Thread, throw(abort_query)), _, true).
 
 
 /** pengine_destroy(+NameOrID) is det
@@ -692,27 +711,112 @@ pengine_destroy(ID) :-
     pengine_send(ID, request(destroy)).
 
 
+/*================= pengines administration =======================
+*/
+
+%%	current_pengine(?Id, ?Parent, ?Location)
+%
+%	Dynamic predicate that registers our known pengines.  Id is
+%	an atomic unique datatype.  Parent is the id of our parent
+%	pengine.  Location is one of
+%
+%	  - thread(ThreadId)
+%	  - remote(URL)
+
+:- dynamic
+	current_pengine/4.		% Id, ParentId, Thread, URL
+:- volatile
+	current_pengine/4.
+
+:- thread_local
+	child/1,			% ?Child
+	named_child/2.			% ?Name, ?Child
+
+%%	pengine_register_local(-Id, +Thread, +Queue, +URL) is det.
+%%	pengine_register_remote(+Id, +URL, +Queue) is det.
+%%	pengine_unregister(+Id) is det.
+
+pengine_register_local(Id, Thread, Queue, URL) :-
+    uuid(Id),
+    asserta(current_pengine(Id, Queue, Thread, URL)).
+
+pengine_register_remote(Id, URL) :-
+    thread_self(Queue),
+    asserta(current_pengine(Id, Queue, 0, URL)).
+
+pengine_unregister(Id) :-
+    retractall(current_pengine(Id, _, _, _)).
+
+pengine_self(Id) :-
+    thread_self(Thread),
+    current_pengine(Id, _Parent, Thread, _URL).
+
+pengine_parent(Parent) :-
+    nb_getval(pengine_parent, Parent).
+pengine_parent(Pengine, Parent) :-
+    current_pengine(Pengine, Parent, _Thread, _URL).
+
+pengine_thread(Pengine, Thread) :-
+    current_pengine(Pengine, _Parent, Thread, _URL).
+
+pengine_remote(Pengine, URL) :-
+    current_pengine(Pengine, _Parent, 0, URL).
+
+pengine_url(Pengine, URL) :-
+    current_pengine(Pengine, _Parent, _Thread, URL),
+    URL \== local.
+
+
+%%	pengine_queue(+Pengine, -Queue) is det.
+%
+%	True if Queue  is  the  thread-id   or  message  queue  to  send
+%	information to Pengine.
+%
+%	@error	existence_error(pengine, Pengine)
+
+pengine_queue(Pengine, Thread) :-
+    current_pengine(Pengine, _, Thread, local), !.
+pengine_queue(Queue, Queue) :-
+    is_message_queue(Queue), !.
+pengine_queue(Pengine, _) :-
+    existence_error(pengine, Pengine).
+
+:- if(\+current_predicate(is_message_queue/1)).
+is_message_queued(Id) :-
+    integer(Id), !.			% assume it is a thread
+is_message_queued(Id) :-
+    nonvar(Id),
+    Id = '$message_queue'(_).
+:- endif.
+
+
+:- if(\+current_predicate(uuid/1)).
+:- use_module(library(random)).
+uuid(Id) :-
+    Max is 1<<128,
+    random_between(0, Max, Num),
+    atom_number(Id, Num).
+:- endif.
+
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
 
 True  when  Property  is  a  property  of  the  given  Pengine.  Defined
-properties are properties of the associated   thread  and message queue,
-with the following additional properties:
+properties are:
 
   * parent(Thread)
-  Thread id for the parent (local) pengine.
+    Thread id for the parent (local) pengine.
   * self(Thread)
-  Thread id of the running pengine.
+    Thread id of the running pengine.
 */
 
-pengine_property(id(Thread, _), parent(Thread)).
-pengine_property(id(_, Thread), self(Thread)).
-pengine_property(id(_, Thread), Property) :-
-    thread_property(Thread, Property).
-pengine_property(id(Thread, _), Property) :-
-    (   thread_property(Thread, Property)
-    ;   message_queue_property(Thread, Property)
-    ).
+
+pengine_property(Id, parent(Parent)) :-
+    current_pengine(Id, Parent, _Thread, _URL).
+pengine_property(Id, self(Id)) :-
+    current_pengine(Id, _Parent, _Thread, _URL).
+pengine_property(Id, remote(Server)) :-
+    current_pengine(Id, _Parent, 0, Server).
 
 
 /** pengine_output(+Term) is det
@@ -742,9 +846,6 @@ pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 /*================= Local pengine =======================
 */
 
-:- dynamic      child/2.		% Pengine, Child
-:- thread_local id/2.			% Name, Child
-
 %%	local_pengine_create(+Options)
 %
 %	Creates  a  local   Pengine,   which    is   a   thread  running
@@ -755,40 +856,43 @@ pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 %	  - The local predicate id/2 maps named childs to their ids.
 
 local_pengine_create(Options) :-
-    thread_self(Self),
-    create(Self, Child, Options),
-    assert(child(Self, Child)),
+    pengine_self(Self),
+    create(Self, Child, Options, local),
+    assert(child(Child)),
     (   option(name(Name), Options)
-    ->  assert(id(Name, id(Self, Child)))
+    ->  assert(named_child(Name, Child))
     ;   true
     ).
 
-%%	create(+Self, -Child, +Options) is det.
+%%	create(+Queue, -Child, +Options, +URL) is det.
 %
-%	Create a new pengine thread. Self   is  the thread-id or message
-%	queue to report to.  Child  is   the  thread-id  of  the pengine
-%	thread. If an error occurs, this is send to Self.
+%	Create a new pengine thread.
+%
+%	@arg Queue is the queue (or thread handle) to report to
+%	@arg Child is the identifier of the created pengine.
 
-create(Self, Child, Options) :-
+create(Queue, Child, Options, URL) :-
     select_option(probe(Condition), Options, RestOptions0, true),
     partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
     (   catch(Condition, E, true)
     ->  (   var(E)
-	->  thread_create(pengine_main(id(Self, Child), PengineOptions), Child,
-			  [ at_exit(done(Self, Child))
+	->  thread_create(pengine_main(Queue, PengineOptions), ChildThread,
+			  [ at_exit(pengine_done)
 			  | RestOptions
 			  ]),
+	    pengine_register_local(Child, ChildThread, Queue, URL),
+	    thread_send_message(ChildThread, pengine_registered(Child)),
 	    (	option(id(Id), Options)
-	    ->	Id = id(Self, Child)
+	    ->	Id = Child
 	    ;	true
 	    )
-	;   probe_failure(Self, E)
+	;   probe_failure(Queue, E)
 	)
-    ;   probe_failure(Self, error(probe_failure(Condition), _))
+    ;   probe_failure(Queue, error(probe_failure(Condition), _))
     ).
 
-probe_failure(Self, Term) :-
-	pengine_queue_message(Self, error(id(null, null), Term)).
+probe_failure(Queue, Term) :-
+    pengine_queue_message(Queue, error(id(null, null), Term)).
 
 
 pengine_create_option(src_text(_)).
@@ -797,35 +901,36 @@ pengine_create_option(src_url(_)).
 pengine_create_option(probe(_)).
 pengine_create_option(probe_template(_)).
 
-%%	done(+Parent, +Self)
+%%	pengine_done is det.
 %
-%	Called  from  the  pengine  thread   =at_exit=  option.  Removes
-%	possible pending alarms and  destroys   _child_  pengines  using
-%	pengine_destroy/1.
+%	Called  from  the  pengine  thread  =at_exit=  option.  Destroys
+%	_child_ pengines using pengine_destroy/1.
 
 :- public
-	done/2.
+	pengine_done/0.
 
-done(_Parent, Self) :-
-    forall(retract(child(Self, Child)),
-	   pengine_destroy(Child)).
+pengine_done :-
+    forall(retract(child(Child)),
+	   pengine_destroy(Child)),
+    pengine_self(Id),
+    pengine_unregister(Id).
 
 
-%%	pengine_main(+Id, +Options)
+%%	pengine_main(+Parent, +Options)
 %
 %	Run a pengine main loop. First acknowledges its creation and run
 %	pengine_main_loop/1.
 
-pengine_main(ID, Options) :-
-    parent(ID, Parent),
+pengine_main(Parent, Options) :-
+    thread_get_message(pengine_registered(Self)),
     nb_setval(parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
     (   catch(maplist(process_create_option, RestOptions), Error,
-	      ( send_error(ID, Error),
+	      ( send_error(Parent, Error),
 		fail
 	      ))
-    ->  pengine_queue_message(Parent, create(ID, Template)),
-        pengine_main_loop(ID)
+    ->  pengine_queue_message(Parent, create(Parent, Template)),
+        pengine_main_loop(Self)
     ;   true
     ).
 
@@ -841,7 +946,7 @@ process_create_option(_).
 
 pengine_main_loop(ID) :-
     catch(guarded_main_loop(ID), abort_query,
-	  ( parent(ID, Parent),
+	  ( pengine_parent(ID, Parent),
 	    pengine_queue_message(Parent, abort(ID)),
 	    pengine_main_loop(ID)
 	  )).
@@ -866,14 +971,14 @@ guarded_main_loop(ID) :-
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
-        parent(ID, Parent),
+        pengine_parent(ID, Parent),
         %pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
         guarded_main_loop(ID)
     ).
 
 
 pengine_terminate(ID) :-
-    parent(ID, Parent),
+    pengine_parent(ID, Parent),
     pengine_queue_message(Parent, destroy(ID)),
     thread_self(Me),		% Make the thread silently disappear
     thread_detach(Me).
@@ -888,7 +993,7 @@ pengine_terminate(ID) :-
 %	has two clauses.
 
 solve(Template, Goal, ID) :-
-    parent(ID, Parent),
+    pengine_parent(ID, Parent),
     prolog_current_choice(Choice),
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
@@ -932,7 +1037,7 @@ more_solutions(ID, Choice) :-
     pengine_event(Event),
     (   Event = request(stop)
     ->  debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
-        parent(ID, Parent),
+        pengine_parent(ID, Parent),
         pengine_queue_message(Parent, stop(ID)),
         guarded_main_loop(ID)
     ;   Event = request(next)
@@ -946,7 +1051,7 @@ more_solutions(ID, Choice) :-
     ->	debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
         pengine_terminate(ID)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
-        parent(ID, Parent),
+        pengine_parent(ID, Parent),
         pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
         more_solutions(ID, Choice)
     ).
@@ -966,7 +1071,7 @@ ask(ID, Goal, Options) :-
         ->  solve([Template], Goal, ID)
         ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID)
         )
-    ;   parent(ID, Parent),
+    ;   pengine_parent(ID, Parent),
         pengine_queue_message(Parent, error(ID, Error))
     ).
 
@@ -1045,7 +1150,7 @@ pengine_get_prompt(Prompt) :-
 
 send_error(Pengine, Error) :-
 	replace_blobs(Error, Error1),
-	parent(Pengine, Parent),
+	pengine_parent(Pengine, Parent),
 	pengine_queue_message(Parent, error(Pengine, Error1)).
 
 %%	replace_blobs(Term0, Term) is det.
@@ -1071,54 +1176,46 @@ replace_blobs(Term, Term).
 
 remote_pengine_create(BaseURL, Options) :-
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
-    term_to_atom(PengineOptions, PengineOptionsAtom),
-    uri_encoded(query_value, PengineOptionsAtom, PengineOptionsAtomEncoded),
-    atomic_list_concat([BaseURL, '/pengine/create?options=', PengineOptionsAtomEncoded], URL),
-    url_message(URL, Event, RestOptions),
-    arg(1, Event, ID),
-    ignore(option(id(ID), Options)),
+    term_to_atom(PengineOptions, OptionsAtom),
+    remote_send_rec(BaseURL, create, [options=OptionsAtom], Reply, RestOptions),
+    arg(1, Reply, ID),
+    (	option(id(ID2), Options)
+    ->	ID = ID2
+    ;	true
+    ),
     (   option(name(Name), Options)
-    ->  assert(id(Name, ID))
+    ->  assert(named_child(Name, ID))
     ;   true
     ),
-    thread_self(Self),
-    pengine_queue_message(Self, Event).
-
+    pengine_register_remote(ID, BaseURL),
+    pengine_queue_message(Reply).
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
-    term_to_atom(ID, IdAtom),
     term_to_atom(Event, EventAtom),
-    uri_encoded(query_value, IdAtom, IdAtomEncoded),
-    uri_encoded(query_value, EventAtom, EventAtomEncoded),
-    atomic_list_concat([BaseURL, '/pengine/send?id=', IdAtomEncoded, '&event=', EventAtomEncoded], URL),
-    url_message(URL, Message, Options),
-    thread_self(Self),
-    pengine_queue_message(Self, Message).
-
+    remote_send_rec(BaseURL, send, [id=ID, event=EventAtom], Reply, Options),
+    pengine_queue_message(Reply).
 
 remote_pengine_pull_response(BaseURL, ID, Options) :-
-    term_to_atom(ID, IdAtom),
-    uri_encoded(query_value, IdAtom, IdAtomEncoded),
-    atomic_list_concat([BaseURL, '/pengine/pull_response?id=', IdAtomEncoded], URL),
-    url_message(URL, Event, Options),
-    thread_self(Self),
-    pengine_queue_message(Self, Event).
-
+    remote_send_rec(BaseURL, pull_response, [id=ID], Reply, Options),
+    pengine_queue_message(Reply).
 
 remote_pengine_abort(BaseURL, ID, Options) :-
-    term_to_atom(ID, IdAtom),
-    uri_encoded(query_value, IdAtom, IdAtomEncoded),
-    atomic_list_concat([BaseURL, '/pengine/abort?id=', IdAtomEncoded], URL),
-    url_message(URL, Event, Options),
-    thread_self(Self),
-    pengine_queue_message(Self, Event).
+    remote_send_rec(BaseURL, abort, [id=ID], Reply, Options),
+    pengine_queue_message(Reply).
 
-
-url_message(URL, Message, Options) :-
+remote_send_rec(Server, Action, Params, Reply, Options) :-
+    uri_components(Server, Components0),
+    uri_query_components(Query, Params),
+    uri_data(path, Components0, Path0),
+    directory_file_path(Path0, Action, Path),
+    uri_data(path, Components0, Path, Components),
+    uri_data(search, Components, Query),
+    uri_components(URL, Components),
     setup_call_cleanup(
 	http_open(URL, Stream, Options),
-	read(Stream, Message),
+	read(Stream, Reply),
 	close(Stream)).
+
 
 
 /** pengine_event(?EventTerm) is det
@@ -1437,12 +1534,12 @@ http_pengine_create(Request) :-
     ;   true
     ),
     message_queue_create(From, []),
-    create(From, To, Options),
+    create(From, Pengine, Options, URL),
     (   setting(allow_multiple_session_pengines, false)
-    ->  http_session_assert(pengine(id(From, To)))
+    ->  http_session_assert(pengine(Pengine))
     ;   true
     ),
-    wait_and_output_result(From, To, URL, Format).
+    wait_and_output_result(Pengine, Format).
 
 %%	request_to_url(+Request, -BaseURL)
 %
@@ -1463,52 +1560,43 @@ request_to_url(Request, BaseURL) :-
     atomic_list_concat([Protocol, '://', Host, ':', Port], BaseURL).
 :- endif.
 
-wait_and_output_result(Parent, To, URL, Format) :-
+%%	wait_and_output_result(+Pengine, +Format)
+%
+%
+
+wait_and_output_result(Pengine, Format) :-
     setting(time_limit, TimeLimit),
+    pengine_parent(Pengine, Parent),
+    pengine_url(Pengine, URL),
     (   thread_get_message(Parent, Event,
 			   [ timeout(TimeLimit)
 			   ])
     ->  (   Event = done(Id)
-        ->  thread_join(Id, _Message),
+        ->  thread_join(Id, _Message),		% FIXME: Ok?
             ReturnEvent = destroy(Id)
         ;   ReturnEvent = Event
         ),
         output_result(Format, ReturnEvent, URL)
-    ;   output_result(Format, error(id(Parent, To),
+    ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _)), URL),
-        pengine_abort(To)
+        pengine_abort(Pengine)
     ).
 
 
 
 http_pengine_send(Request) :-
     http_parameters(Request,
-            [   id(IdAtom, []),
+            [   id(ID, [ type(atom) ]),
                 event(EventAtom, []),
                 format(Format, [default(prolog)])
             ]),
-    atom_to_term(IdAtom, ID, _),
-    parent(ID, Parent),
-    thread(ID, Thread),
-    url(ID, URL),
     catch(( atom_to_term(EventAtom, Event0, Bindings),
 	    fix_bindings(Format, Event0, ID, Bindings, Event1)
 	  ),
 	  Error,
 	  Event1 = error(ID, Error)),
-    pengine_queue_message(Thread, Event1),
-    wait_and_output_result(Parent, Thread, URL, Format).
-
-
-
-url(URL:id(_, _), URL).
-
-parent(id(Parent, _), Parent).
-parent(_:id(Parent, _), Parent).
-
-thread(id(_, Thread), Thread).
-thread(_:id(_, Thread), Thread).
-
+    pengine_queue_message(ID, Event1),
+    wait_and_output_result(ID, Format).
 
 
 fix_bindings(json,
@@ -1529,28 +1617,19 @@ fix_bindings(_, Command, _, _, Command).
 
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
-            [   id(IdAtom, []),
+            [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    atom_to_term(IdAtom, ID, _),
-    parent(ID, Parent),
-    thread(ID, Thread),
-    request_to_url(Request, URL),
-    wait_and_output_result(Parent, Thread, URL, Format).
+    wait_and_output_result(ID, Format).
 
 
 http_pengine_abort(Request) :-
     http_parameters(Request,
-            [   id(IdAtom, []),
+            [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    atom_to_term(IdAtom, ID, _),
-    thread(ID, Thread),
-    parent(ID, Parent),
-    url(ID, URL),
-    catch(thread_signal(Thread, throw(abort)), _, true),
-    output_result(Format, abort(id(Parent, Thread)), URL).
-
+    pengine_abort(ID),
+    wait_and_output_result(ID, Format).
 
 
 % Output
