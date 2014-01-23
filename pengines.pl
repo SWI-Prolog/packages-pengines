@@ -500,19 +500,22 @@ pengine_send(Target0, Event0, Options) :-
     ),
     (   option(delay(Delay), Options)
     ->  alarm(Delay,
-	      send1(Target, Event, Options),
-	      _AlarmID, [remove(true)])
-    ;   send1(Target, Event, Options)
+	      pengine_send_message(Target, Event, Options),
+	      _AlarmID,
+	      [remove(true)])
+    ;   pengine_send_message(Target, Event, Options)
     ).
 
 
-send1(BaseURL:ID, Event, Options) :- !,
+pengine_send_message(BaseURL:ID, Event, Options) :- !,
     remote_pengine_send(BaseURL, BaseURL:ID, Event, Options).
-send1(id(_From, To), Event, _Options) :- !,
-    thread_send_message(To, Event).
-send1(RealID, Event, _Options) :-
-    thread_send_message(RealID, Event).
+pengine_send_message(id(_From, To), Event, _Options) :- !,
+    pengine_queue_message(To, Event).
+pengine_send_message(RealID, Event, _Options) :-
+    pengine_queue_message(RealID, Event).
 
+pengine_queue_message(To, Event) :-
+    thread_send_message(To, Event).
 
 
 /** pengine_ask(+NameOrID, @Query) is det
@@ -785,7 +788,7 @@ create(Self, Child, Options) :-
     ).
 
 probe_failure(Self, Term) :-
-	thread_send_message(Self, error(id(null, null), Term)).
+	pengine_queue_message(Self, error(id(null, null), Term)).
 
 
 pengine_create_option(src_text(_)).
@@ -821,7 +824,7 @@ pengine_main(ID, Options) :-
 	      ( send_error(ID, Error),
 		fail
 	      ))
-    ->  thread_send_message(Parent, create(ID, Template)),
+    ->  pengine_queue_message(Parent, create(ID, Template)),
         pengine_main_loop(ID)
     ;   true
     ).
@@ -839,7 +842,7 @@ process_create_option(_).
 pengine_main_loop(ID) :-
     catch(guarded_main_loop(ID), abort_query,
 	  ( parent(ID, Parent),
-	    thread_send_message(Parent, abort(ID)),
+	    pengine_queue_message(Parent, abort(ID)),
 	    pengine_main_loop(ID)
 	  )).
 
@@ -855,7 +858,7 @@ pengine_main_loop(ID) :-
 %	  Solve Goal.
 
 guarded_main_loop(ID) :-
-    thread_get_message(Event),
+    pengine_event(Event),
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
 	pengine_terminate(ID)
@@ -864,14 +867,14 @@ guarded_main_loop(ID) :-
         ask(ID, Goal, Options)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
-        %thread_send_message(Parent, error(ID, error(protocol_error, _))),
+        %pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
         guarded_main_loop(ID)
     ).
 
 
 pengine_terminate(ID) :-
     parent(ID, Parent),
-    thread_send_message(Parent, destroy(ID)),
+    pengine_queue_message(Parent, destroy(ID)),
     thread_self(Me),		% Make the thread silently disappear
     thread_detach(Me).
 
@@ -890,23 +893,23 @@ solve(Template, Goal, ID) :-
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
-            ->  thread_send_message(Parent, success(ID, Template, true)),
+            ->  pengine_queue_message(Parent, success(ID, Template, true)),
                 debug(pengine(event), 'sending to ~q: ~q',
 		      [Parent, success(Template, true)]),
                 more_solutions(ID, Choice)
             ;   !,			% commit
-		thread_send_message(Parent, success(ID, Template, false)),
+		pengine_queue_message(Parent, success(ID, Template, false)),
                 debug(pengine(event), 'sending to ~q: ~q',
 		      [Parent, success(Template, false)]),
                 guarded_main_loop(ID)
             )
         ;   !,				% commit
-	    thread_send_message(Parent, error(ID, Error)),
+	    pengine_queue_message(Parent, error(ID, Error)),
             debug(pengine(event), 'sending to ~q: ~q', [Parent, error(Error)]),
             guarded_main_loop(ID)
         )
     ;   !,				% commit
-	thread_send_message(Parent, failure(ID)),
+	pengine_queue_message(Parent, failure(ID)),
         debug(pengine(event), 'sending to ~q: failure', [Parent]),
         guarded_main_loop(ID)
     ).
@@ -926,11 +929,11 @@ solve(_, _, _).				% leave a choice point
 %	  of the previous goal asked for.
 
 more_solutions(ID, Choice) :-
-    thread_get_message(Event),
+    pengine_event(Event),
     (   Event = request(stop)
     ->  debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
         parent(ID, Parent),
-        thread_send_message(Parent, stop(ID)),
+        pengine_queue_message(Parent, stop(ID)),
         guarded_main_loop(ID)
     ;   Event = request(next)
     ->  debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
@@ -944,7 +947,7 @@ more_solutions(ID, Choice) :-
         pengine_terminate(ID)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
-        %thread_send_message(Parent, error(ID, error(protocol_error, _))),
+        pengine_queue_message(Parent, error(ID, error(protocol_error, _))),
         more_solutions(ID, Choice)
     ).
 
@@ -964,7 +967,7 @@ ask(ID, Goal, Options) :-
         ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID)
         )
     ;   parent(ID, Parent),
-        thread_send_message(Parent, error(ID, Error))
+        pengine_queue_message(Parent, error(ID, Error))
     ).
 
 
@@ -1003,8 +1006,8 @@ pengine_input(Term) :-
     thread_self(Self),
     nb_getval(parent, Parent),
     pengine_get_prompt(Prompt),
-    thread_send_message(Parent, prompt(id(Parent, Self), Prompt)),
-    thread_get_message(input(Term)).
+    pengine_queue_message(Parent, prompt(id(Parent, Self), Prompt)),
+    pengine_event(input(Term)).
 
 
 
@@ -1043,7 +1046,7 @@ pengine_get_prompt(Prompt) :-
 send_error(Pengine, Error) :-
 	replace_blobs(Error, Error1),
 	parent(Pengine, Parent),
-	thread_send_message(Parent, error(Pengine, Error1)).
+	pengine_queue_message(Parent, error(Pengine, Error1)).
 
 %%	replace_blobs(Term0, Term) is det.
 %
@@ -1079,7 +1082,7 @@ remote_pengine_create(BaseURL, Options) :-
     ;   true
     ),
     thread_self(Self),
-    thread_send_message(Self, Event).
+    pengine_queue_message(Self, Event).
 
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
@@ -1090,7 +1093,7 @@ remote_pengine_send(BaseURL, ID, Event, Options) :-
     atomic_list_concat([BaseURL, '/pengine/send?id=', IdAtomEncoded, '&event=', EventAtomEncoded], URL),
     url_message(URL, Message, Options),
     thread_self(Self),
-    thread_send_message(Self, Message).
+    pengine_queue_message(Self, Message).
 
 
 remote_pengine_pull_response(BaseURL, ID, Options) :-
@@ -1099,7 +1102,7 @@ remote_pengine_pull_response(BaseURL, ID, Options) :-
     atomic_list_concat([BaseURL, '/pengine/pull_response?id=', IdAtomEncoded], URL),
     url_message(URL, Event, Options),
     thread_self(Self),
-    thread_send_message(Self, Event).
+    pengine_queue_message(Self, Event).
 
 
 remote_pengine_abort(BaseURL, ID, Options) :-
@@ -1108,7 +1111,7 @@ remote_pengine_abort(BaseURL, ID, Options) :-
     atomic_list_concat([BaseURL, '/pengine/abort?id=', IdAtomEncoded], URL),
     url_message(URL, Event, Options),
     thread_self(Self),
-    thread_send_message(Self, Event).
+    pengine_queue_message(Self, Event).
 
 
 url_message(URL, Message, Options) :-
@@ -1140,7 +1143,7 @@ queue.
    * timeout(+Time)
      Time is a float or integer and specifies the maximum time to wait
      in seconds. If no event has arrived before the time is up EventTerm
-     is bound to the atom `timeout'.
+     is bound to the atom =timeout=.
 
 */
 
@@ -1462,7 +1465,9 @@ request_to_url(Request, BaseURL) :-
 
 wait_and_output_result(Parent, To, URL, Format) :-
     setting(time_limit, TimeLimit),
-    (   thread_get_message(Parent, Event, [timeout(TimeLimit)])
+    (   thread_get_message(Parent, Event,
+			   [ timeout(TimeLimit)
+			   ])
     ->  (   Event = done(Id)
         ->  thread_join(Id, _Message),
             ReturnEvent = destroy(Id)
