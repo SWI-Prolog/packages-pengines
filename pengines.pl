@@ -864,10 +864,7 @@ guarded_main_loop(ID) :-
     thread_get_message(Event),
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
-        parent(ID, Parent),
-        thread_send_message(Parent, destroy(ID)),
-	thread_self(Me),		% Make the thread silently disappear
-	thread_detach(Me)
+	pengine_terminate(ID)
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
@@ -876,6 +873,13 @@ guarded_main_loop(ID) :-
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
         guarded_main_loop(ID)
     ).
+
+
+pengine_terminate(ID) :-
+    parent(ID, Parent),
+    thread_send_message(Parent, destroy(ID)),
+    thread_self(Me),		% Make the thread silently disappear
+    thread_detach(Me).
 
 
 %%	solve(+Template, :Goal, +ID) is det.
@@ -941,6 +945,9 @@ more_solutions(ID, Choice) :-
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
 	prolog_cut_to(Choice),
         ask(ID, Goal, Options)
+    ;	Event = request(destroy)
+    ->	debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
+        pengine_terminate(ID)
     ;   debug(pengine(event), 'sending to ~q: protocol_error', [Parent]),
         parent(ID, Parent),
         %thread_send_message(Parent, error(ID, error(protocol_error, _))),
@@ -1271,7 +1278,11 @@ pengine_rpc(URL, Query, Options) :-
 		       | Options
 		       ]),
 	wait_event(Query, Options),
-	pengine_destroy(Id)).
+	pengine_destroy_and_wait(Id)).
+
+pengine_destroy_and_wait(Id) :-
+	pengine_destroy(Id),
+	pengine_event(destroy(Id)).
 
 wait_event(Query, Options) :-
     pengine_event(Event),
