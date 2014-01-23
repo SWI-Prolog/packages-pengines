@@ -469,8 +469,6 @@ pengine_send(Target, Event) :-
     pengine_send(Target, Event, []).
 
 
-:- thread_local current_alarm/1.
-
 /**  pengine_send(+NameOrID, +Term, +Options) is det
 
 Succeeds immediately and  places  Term  in   the  queue  of  the pengine
@@ -501,11 +499,9 @@ pengine_send(Target0, Event0, Options) :-
         Event = Event0
     ),
     (   option(delay(Delay), Options)
-    ->  alarm(Delay, (
-                send1(Target, Event, Options),
-                retract(current_alarm(AlarmID))
-            ), AlarmID, [remove(true)]),
-        assert(current_alarm(AlarmID))
+    ->  alarm(Delay,
+	      send1(Target, Event, Options),
+	      _AlarmID, [remove(true)])
     ;   send1(Target, Event, Options)
     ).
 
@@ -808,8 +804,6 @@ pengine_create_option(probe_template(_)).
 	done/2.
 
 done(_Parent, Self) :-
-    forall(retract(current_alarm(AlarmId)),
-	   catch(remove_alarm(AlarmId), _, true)),
     forall(retract(child(Self, Child)),
 	   pengine_destroy(Child)).
 
