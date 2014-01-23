@@ -1486,18 +1486,12 @@ http_pengine_send(Request) :-
     parent(ID, Parent),
     thread(ID, Thread),
     url(ID, URL),
-    catch(
-        (
-            atom_to_term(EventAtom, Event0, Bindings),
-            fix_bindings(Format, Event0, ID, Bindings, Event1)
-        ),
-        Error,
-        true
-    ),
-    (   var(Error)
-    ->  thread_send_message(Thread, Event1)
-    ;   thread_send_message(Parent, error(ID, Error))
-    ),
+    catch(( atom_to_term(EventAtom, Event0, Bindings),
+	    fix_bindings(Format, Event0, ID, Bindings, Event1)
+	  ),
+	  Error,
+	  Event1 = error(ID, Error)),
+    pengine_queue_message(Thread, Event1),
     wait_and_output_result(Parent, Thread, URL, Format).
 
 
