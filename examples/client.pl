@@ -28,7 +28,7 @@
 %	run
 %
 %	  ==
-%	  ?- client(4040, X).
+%	  ?- rpc_demo(4040, X).
 %	  X = aap ;
 %	  X = noot ;
 %	  X = mies ;
