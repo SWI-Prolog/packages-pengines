@@ -354,6 +354,18 @@ Settings currently recognized by the Pengines library:
 	pengine_event_loop(1),
 	pengine_event_loop(1, +).
 
+:- predicate_options(pengine_create/1, 1,
+		     [ id(-atom),
+		       name(atom),
+		       server(atom),
+		       src_list(list),
+		       src_text(any),		% text
+		       src_url(atom),
+		       probe(callable),
+		       probe_template(any),
+		       format(oneof([prolog,json,'json-s']))
+		     ]).
+
 % :- debug(pengine(transition)).
 
 
