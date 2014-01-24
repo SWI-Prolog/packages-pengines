@@ -773,19 +773,17 @@ pengine_self(Id) :-
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
-pengine_parent(Pengine, Parent) :-
-    current_pengine(Pengine, Parent, _Thread, _URL).
+
+http_pengine_parent(Pengine, Parent) :-
+    current_pengine(Pengine, Parent, Thread, _URL),
+    Thread \== 0, !.
 
 pengine_thread(Pengine, Thread) :-
-    current_pengine(Pengine, _Parent, Thread, _URL).
+    current_pengine(Pengine, _Parent, Thread, _URL),
+    Thread \== 0, !.
 
 pengine_remote(Pengine, URL) :-
     current_pengine(Pengine, _Parent, 0, URL).
-
-pengine_url(Pengine, URL) :-
-    current_pengine(Pengine, _Parent, _Thread, URL),
-    URL \== local.
-
 
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
@@ -1534,7 +1532,7 @@ http_pengine_create(Request) :-
     ->  http_session_assert(pengine(Pengine))
     ;   true
     ),
-    pengine_parent(Pengine, Queue),
+    http_pengine_parent(Pengine, Queue),
     wait_and_output_result(Pengine, Queue, Format).
 
 %%	wait_and_output_result(+Pengine, +Format)
@@ -1567,7 +1565,7 @@ http_pengine_send(Request) :-
 	  Error,
 	  Event1 = error(ID, Error)),
     pengine_thread(ID, Thread),
-    pengine_parent(ID, Queue),
+    http_pengine_parent(ID, Queue),
     thread_send_message(Thread, Event1),
     wait_and_output_result(ID, Queue, Format).
 
@@ -1593,7 +1591,7 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    pengine_parent(Queue),
+    http_pengine_parent(Queue),
     wait_and_output_result(ID, Queue, Format).
 
 
@@ -1602,7 +1600,7 @@ http_pengine_abort(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    pengine_parent(Queue),
+    http_pengine_parent(Queue),
     pengine_abort(ID),
     wait_and_output_result(ID, Queue, Format).
 
