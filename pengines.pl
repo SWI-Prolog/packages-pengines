@@ -1608,7 +1608,7 @@ output_result('json-s', Term) :-
 
 to_prolog(Term) :-
     format('Content-type: text/x-prolog~n~n'),
-    format('~q.~n', [Term]).
+    format('~q .~n', [Term]).
 
 
 to_json(create(ID0, Term0)) :-
