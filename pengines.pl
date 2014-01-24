@@ -102,12 +102,8 @@ sandbox:safe_primitive(pengine:pengine_output(_, _)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_event_loop(_)).
 
-sandbox:safe_primitive(_:html(_, _, _)).
-sandbox:safe_primitive(_:with_output_to(_, _)).
-
 sandbox:safe_primitive(system:sleep(_)).
 sandbox:safe_primitive(system:atom_concat(_, _, _)).
-
 
 
 /* Settings */
