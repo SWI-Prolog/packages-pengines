@@ -56,7 +56,7 @@ locally or remotely with respect to its   master.  Subject to a setting,
 slaves are also dependent on their masters in the sense that if a master
 terminates, so do its slaves.
 
-[[architecture.png]]
+[[penarch.png]]
 
 The transport format is different depending on the nature of the master.
 If the master is a JavaScript process,   it  will (by default) formulate
