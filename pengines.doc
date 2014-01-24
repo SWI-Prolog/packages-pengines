@@ -13,15 +13,22 @@
 \begin{document}
 
 \title{Prolog Engines: pengines}
-\author{Torbjörn Lager \\
+\author{Torbj\"orn Lager \\
 	University of Gothenburg \\
 	Sweden \\
-	E-mail: \email{lager@ling.gu.se}}
+	E-mail: \email{lager@ling.gu.se} \\
+	Jan Wielemaker \\
+	VU University Amsterdam \\
+	The Netherlands \\
+	E-mail: \email{J.Wielemaker@vu.nl}}
 
 \maketitle
 
 \begin{abstract}
-Pengines provides ...
+Pengines is short for Prolog Engines.  The pengines package greatly
+simplifies (1) developing JavaScript based web-applications that must
+talk to a Prolog server and (2) realise distributed programming in
+Prolog by providing RPC (\jargon{Remote Procedure Calling}) over HTTP.
 \end{abstract}
 
 \pagebreak
