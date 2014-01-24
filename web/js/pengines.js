@@ -46,7 +46,7 @@ function Pengine(callbacks) {
             if (callbacks.onabort) callbacks.onabort.call(obj);
         } else if (obj.event === 'destroy') {
             if (callbacks.ondestroy) callbacks.ondestroy.call(obj);
-        }  
+        }
     };
     // Public functions
     this.send = function(event) {
@@ -74,11 +74,14 @@ function Pengine(callbacks) {
     this.abort = function() {
         $.get('/pengine/abort?id=' + that.id + '&format=' + format, process_response);
     }
-    var src0 = source();
-    var src1 = src0 + "\n" + src;
-    src1 = src1.replace(/\\/g,'\\\\');
-    src1 = src1.replace(/"/g,'\\"');
-    var options = '[src_text("' + src1 + '")]';
-    options = encodeURIComponent(options);
-    $.post('/pengine/create','options=' + options + '&format=' + format, process_response);      
+
+    $.ajax('/pengine/create',
+	   { "contentType": "application/json; charset=utf-8",
+	     "dataType": "json",
+	     "data": JSON.stringify({ src_text: source(),
+				      format: format
+				    }),
+	     "success": process_response,
+	     "type": "POST"
+	   });
 }
