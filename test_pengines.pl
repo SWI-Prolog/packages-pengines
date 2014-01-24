@@ -1,10 +1,27 @@
 :- module(test_pengines,
 	  [ test_pengines/0
 	  ]).
+
+% setup paths to load relevant packages from development environment
+:- asserta(user:file_search_path(foreign, '../http')).
+:- asserta(user:file_search_path(foreign, '../clib')).
+:- asserta(user:file_search_path(foreign, '../sgml')).
+:- asserta(user:file_search_path(library, '.')).
+:- asserta(user:file_search_path(library, '..')).
+:- asserta(user:file_search_path(library, '../sgml')).
+:- asserta(user:file_search_path(library, '../plunit')).
+:- asserta(user:file_search_path(library, '../clib')).
+
+% Hack: auto-loading this does not work.
+:- [library(charsio)].
+:- [charsio:library(memfile)].
+
+% the regular things we need for testing.
 :- use_module(library(plunit)).
 :- use_module(library(lists)).
 :- use_module(library(debug)).
 :- use_module(library(pengines)).
+:- use_module(library(option)).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_files)).
@@ -17,6 +34,7 @@ test_pengines :-
 		remote_pengines
 	      ]).
 
+% :- debug(pengine(_)).
 
 :- begin_tests(local_pengines).
 
@@ -93,6 +111,21 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
+test(rpc, all(X == [1,2,3])) :-
+    pengine_server(Server),
+    pengine_rpc(Server,
+		member(X, [1,2,3]),
+		[]).
+test(rpc, X == 1) :-
+    pengine_server(Server),
+    pengine_rpc(Server,
+		member(X, [1,2,3]),
+		[]), !.
+test(rpc, fail) :-
+    pengine_server(Server),
+    pengine_rpc(Server,
+		fail,
+		[]), !.
 
 :- end_tests(remote_pengines).
 

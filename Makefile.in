@@ -46,7 +46,7 @@ uninstall:
 
 
 check::
-#		$(PL) -q -f test_pengines.pl -g test,halt -t 'halt(1)'
+		$(PL) -q -f test_pengines.pl -g test_pengines,halt -t 'halt(1)'
 
 
 ################################################################
