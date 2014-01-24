@@ -11,7 +11,8 @@
 :- asserta(user:file_search_path(foreign, .)).
 
 pltotex(File, Options) :-
-	file_name_extension(_, txt, File), !,
+	wiki_extension(Ext),
+	file_name_extension(_, Ext, File), !,
 	tex_file(File, Out, Options),
 	doc_latex(File, Out,
 		  [ stand_alone(false)
@@ -32,6 +33,9 @@ pltotex(Lib, Options) :-
 		  [ stand_alone(false)
 		  | Options
 		  ]).
+
+wiki_extension(txt).
+wiki_extension(md).
 
 tex_file(_, TeXFile, Options) :-
 	option(out(Base), Options), !,

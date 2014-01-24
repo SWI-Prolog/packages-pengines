@@ -53,13 +53,15 @@ check::
 # Documentation
 ################################################################
 
-TEXEXTRA=	penlib.tex termtojson.tex
+TEXEXTRA=	pendoc.tex penlib.tex termtojson.tex
 $(TEX):		$(TEXEXTRA)
 
+pendoc.tex:	pendoc.md
+		$(PLTOTEX) --out=pendoc.tex pendoc.md
 penlib.tex:	pengines.pl
-		$(PLTOTEX) --section --out=penlib.tex 'library(pengines)'
+		$(PLTOTEX) --subsection --out=penlib.tex 'library(pengines)'
 termtojson.tex:	term_to_json.pl
-		$(PLTOTEX) --section 'library(term_to_json)'
+		$(PLTOTEX) --subsection 'library(term_to_json)'
 
 ################################################################
 # Clean

@@ -32,6 +32,7 @@ Pengines provides ...
 
 \newpage
 
+\input{pendoc.tex}
 \input{penlib.tex}
 \input{termtojson.tex}
 

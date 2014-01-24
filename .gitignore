@@ -6,6 +6,7 @@ config.h.in
 config.status
 configure
 penlib.tex
+pendoc.tex
 termtojson.tex
 pengines.tex
 pengines.html
