@@ -333,7 +333,7 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(http/http_session)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
-:- use_module(library(http/http_host)).
+:- use_module(library(http/http_stream)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -914,6 +914,7 @@ pengine_done :-
 %	pengine_main_loop/1.
 
 pengine_main(Parent, Options) :-
+    fix_streams,
     thread_get_message(pengine_registered(Self)),
     nb_setval(parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
@@ -925,6 +926,20 @@ pengine_main(Parent, Options) :-
         pengine_main_loop(Self)
     ;   true
     ).
+
+%%	fix_streams is det.
+%
+%	If we are a pengine that is   created  from a web server thread,
+%	the current output points to a CGI stream.
+
+fix_streams :-
+	fix_stream(current_output).
+
+fix_stream(Name) :-
+	is_cgi_stream(Name), !,
+	debug(pengine(stream), '~w is a CGI stream!', [Name]),
+	set_stream(user_output, alias(Name)).
+fix_stream(_).
 
 
 process_create_option(src_list(ClauseList)) :- !,
