@@ -405,6 +405,8 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 :- setting(pengine_alive_time_limit, number, 60,
 	   'Maximum time to allow a pengine to live').
 
+:- setting(max_pengines, integer, 200,
+	   'Maximum number of pengines that can be alive').
 
 
 /**  pengine_create(+Options) is det.
@@ -871,10 +873,11 @@ create(Queue, Child, Options, URL) :-
     partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
     (   catch(Condition, E, true)
     ->  (   var(E)
-	->  thread_create(pengine_main(Queue, PengineOptions), ChildThread,
-			  [ at_exit(pengine_done)
-			  | RestOptions
-			  ]),
+	->  thread_create(
+		pengine_main(Queue, PengineOptions), ChildThread,
+		[ at_exit(pengine_done)
+		| RestOptions
+		]),
 	    pengine_register_local(Child, ChildThread, Queue, URL),
 	    thread_send_message(ChildThread, pengine_registered(Child)),
 	    (	option(id(Id), Options)
