@@ -365,6 +365,9 @@ Settings currently recognized by the Pengines library:
 		       probe_template(any),
 		       format(oneof([prolog,json,'json-s']))
 		     ]).
+:- predicate_options(pengine_event/2, 2,
+		     [ pass_to(thread_get_message/3, 3)
+		     ]).
 
 % :- debug(pengine(transition)).
 
@@ -1212,24 +1215,13 @@ remote_send_rec(Server, Action, Params, Reply, Options) :-
     uri_data(path, Components0, Path, Components),
     uri_data(search, Components, Query),
     uri_components(URL, Components),
-    setup_call_cleanup(
-	http_open(URL, Stream, Options),
+    http_open(URL, Stream, Options),	% putting this in setup_call_cleanup/3
+    call_cleanup(			% makes it impossible to interrupt.
 	read(Stream, Reply),
 	close(Stream)).
 
-
-
-/** pengine_event(?EventTerm) is det
-
-Same as  pengine_event(EventTerm, []).
-
-*/
-
-pengine_event(Event) :-
-    thread_get_message(Event).
-
-
-/** pengine_event(?EventTerm, +Options) is det
+/** pengine_event(?EventTerm) is det.
+    pengine_event(?EventTerm, +Options) is det.
 
 Examines the pengine's event queue  and   if  necessary blocks execution
 until a term that unifies to Term  arrives   in  the queue. After a term
@@ -1242,28 +1234,27 @@ queue.
      Time is a float or integer and specifies the maximum time to wait
      in seconds. If no event has arrived before the time is up EventTerm
      is bound to the atom =timeout=.
-
 */
+
+pengine_event(Event) :-
+    pengine_event(Event, []).
 
 pengine_event(Event, Options) :-
     thread_self(Self),
     (   thread_get_message(Self, Event, Options)
     ->  true
     ;   Event = timeout
-    ).
+    ),
+    update_remote_destroy(Event).
+
+update_remote_destroy(destroy(Id)) :-
+    pengine_remote(Id, _Server), !,
+    pengine_unregister(Id).
+update_remote_destroy(_).
 
 
-/** pengine_event_loop(+Closure) is det
-
-Same as pengine_event_loop(Closure, []).
-
-*/
-
-pengine_event_loop(Closure) :-
-    pengine_event_loop(Closure, [], []).
-
-
-/** pengine_event_loop(:Closure, +Options) is det
+/** pengine_event_loop(+Closure) is det.
+    pengine_event_loop(:Closure, +Options) is det
 
 Starts an event loop accepting event terms   sent to the current pengine
 or thread. For each such  event   E,  calls  ignore(call(Closure, E)). A
@@ -1288,6 +1279,9 @@ Valid options are:
      implemented]
 
 */
+
+pengine_event_loop(Closure) :-
+    pengine_event_loop(Closure, [], []).
 
 pengine_event_loop(Closure, Options) :-
     pengine_event_loop(Closure, [], Options).
