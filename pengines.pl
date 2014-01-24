@@ -550,7 +550,7 @@ send_message(pengine(Pengine), Event, Options) :-
 %	Queue.
 
 pengine_reply(Event) :-
-    nb_getval(parent, Queue),
+    nb_getval(pengine_parent, Queue),
     pengine_reply(Queue, Event).
 
 pengine_reply(Queue, Event) :-
@@ -921,7 +921,7 @@ pengine_done :-
 pengine_main(Parent, Options) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
-    nb_setval(parent, Parent),
+    nb_setval(pengine_parent, Parent),
     select_option(probe_template(Template), Options, RestOptions, true),
     (   catch(maplist(process_create_option, RestOptions), Error,
 	      ( send_error(Error),
@@ -1110,7 +1110,7 @@ and waits for input.
 
 pengine_input(Term) :-
     pengine_self(Self),
-    nb_getval(parent, Parent),
+    nb_getval(pengine_parent, Parent),
     pengine_get_prompt(Prompt),
     pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_event(input(Term)).
@@ -1655,7 +1655,7 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    pengine_parent(Queue),
+    http_pengine_parent(ID, Queue),
     wait_and_output_result(ID, Queue, Format).
 
 http_pengine_abort(Request) :-
@@ -1663,7 +1663,7 @@ http_pengine_abort(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    pengine_parent(Queue),
+    http_pengine_parent(ID, Queue),
     pengine_abort(ID),
     wait_and_output_result(ID, Queue, Format).
 
