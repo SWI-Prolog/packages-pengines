@@ -1534,24 +1534,20 @@ http_pengine_create(Request) :-
     ->  http_session_assert(pengine(Pengine))
     ;   true
     ),
-    wait_and_output_result(Pengine, Format).
+    pengine_parent(Pengine, Queue),
+    wait_and_output_result(Pengine, Queue, Format).
 
 %%	wait_and_output_result(+Pengine, +Format)
 %
 %
 
-wait_and_output_result(Pengine, Format) :-
+wait_and_output_result(Pengine, Queue, Format) :-
     setting(time_limit, TimeLimit),
-    pengine_parent(Pengine, Parent),
-    (   thread_get_message(Parent, Event,
+    (   thread_get_message(Queue, Event,
 			   [ timeout(TimeLimit)
-			   ])
-    ->  (   Event = done(Id)
-        ->  thread_join(Id, _Message),		% FIXME: Ok?
-            ReturnEvent = destroy(Id)
-        ;   ReturnEvent = Event
-        ),
-        output_result(Format, ReturnEvent)
+			   ]),
+	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue])
+    ->  output_result(Format, Event)
     ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
@@ -1561,18 +1557,19 @@ wait_and_output_result(Pengine, Format) :-
 
 http_pengine_send(Request) :-
     http_parameters(Request,
-            [   id(ID, [ type(atom) ]),
-                event(EventAtom, []),
-                format(Format, [default(prolog)])
-            ]),
+		    [ id(ID, [ type(atom) ]),
+		      event(EventAtom, []),
+		      format(Format, [default(prolog)])
+		    ]),
     catch(( atom_to_term(EventAtom, Event0, Bindings),
 	    fix_bindings(Format, Event0, ID, Bindings, Event1)
 	  ),
 	  Error,
 	  Event1 = error(ID, Error)),
     pengine_thread(ID, Thread),
+    pengine_parent(ID, Queue),
     thread_send_message(Thread, Event1),
-    wait_and_output_result(ID, Format).
+    wait_and_output_result(ID, Queue, Format).
 
 
 fix_bindings(json,
@@ -1596,7 +1593,8 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    wait_and_output_result(ID, Format).
+    pengine_parent(Queue),
+    wait_and_output_result(ID, Queue, Format).
 
 
 http_pengine_abort(Request) :-
@@ -1604,8 +1602,9 @@ http_pengine_abort(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
+    pengine_parent(Queue),
     pengine_abort(ID),
-    wait_and_output_result(ID, Format).
+    wait_and_output_result(ID, Queue, Format).
 
 
 % Output
