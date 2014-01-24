@@ -6,6 +6,7 @@
 
 PACKAGE=pengines
 DOC=pengines
+DOCIMG=architecture.png  lptpsynch.png
 include ../Makefile.defs
 JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
@@ -32,8 +33,10 @@ ln-install::
 rpm-install:	install
 
 pdf-install:	install-examples
+		$(INSTALL_DATA) $(DOC).pdf $(DESTDIR)$(PKGDOCDIR)
 
 html-install:	install-examples
+		$(INSTALL_DATA) $(DOC).html $(DOCIMG) $(DESTDIR)$(PKGDOCDIR)
 
 install-examples::
 		mkdir -p $(EXDIR)/web
