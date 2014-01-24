@@ -1620,71 +1620,53 @@ to_prolog(Term) :-
     format('~q .~n', [Term]).
 
 
-to_json(create(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json(create(ID, Term0)) :-
     term_to_json(Term0, Term),
     reply_json(json([event=create, id=ID, data=Term])).
-to_json(stop(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json(stop(ID)) :-
     reply_json(json([event=stop, id=ID])).
-to_json(success(ID0, Bindings0, More)) :-
-    term_to_atom(ID0, ID),
+to_json(success(ID, Bindings0, More)) :-
     term_to_json(Bindings0, Bindings),
     reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
-to_json(failure(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json(failure(ID)) :-
     reply_json(json([event=failure, id=ID])).
-to_json(error(ID0, Error0)) :-
-    term_to_atom(ID0, ID),
+to_json(error(ID, Error0)) :-
     message_to_string(Error0, Error),
     reply_json(json([event=error, id=ID, data=Error])).
-to_json(output(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json(output(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=output, id=ID, data=Json])).
-to_json(prompt(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json(prompt(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=prompt, id=ID, data=Json])).
-to_json(abort(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
-to_json(destroy(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
 
 
-to_json_s(create(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(create(ID, Term0)) :-
     term_to_json(Term0, Term),
     reply_json(json([event=create, id=ID, data=Term])).
-to_json_s(stop(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(stop(ID)) :-
     reply_json(json([event=stop, id=ID])).
-to_json_s(success(ID0, Bindings0, More)) :-
-    term_to_atom(ID0, ID),
+to_json_s(success(ID, Bindings0, More)) :-
     solution_to_json(Bindings0, Bindings),
     reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
-to_json_s(failure(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(failure(ID)) :-
     reply_json(json([event=failure, id=ID])).
-to_json_s(error(ID0, Error0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(error(ID, Error0)) :-
     message_to_string(Error0, Error),
     reply_json(json([event=error, id=ID, data=Error])).
-to_json_s(output(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(output(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=output, id=ID, data=Json])).
-to_json_s(prompt(ID0, Term0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(prompt(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=prompt, id=ID, data=Json])).
-to_json_s(abort(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
-to_json_s(destroy(ID0)) :-
-    term_to_atom(ID0, ID),
+to_json_s(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
 
 
