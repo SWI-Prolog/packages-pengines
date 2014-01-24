@@ -343,6 +343,7 @@ Settings currently recognized by the Pengines library:
 :- use_module(library(option)).
 :- use_module(library(settings)).
 :- use_module(library(debug)).
+:- use_module(library(error)).
 :- use_module(library(sandbox)).
 :- use_module(library(term_to_json)).
 :- if(exists_source(library(uuid))).
@@ -1176,8 +1177,8 @@ replace_blobs(Term, Term).
 
 remote_pengine_create(BaseURL, Options) :-
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
-    term_to_atom(PengineOptions, OptionsAtom),
-    remote_send_rec(BaseURL, create, [options=OptionsAtom], Reply, RestOptions),
+    options_to_dict(PengineOptions, PostData),
+    remote_post_rec(BaseURL, create, PostData, Reply, RestOptions),
     arg(1, Reply, ID),
     (	option(id(ID2), Options)
     ->	ID = ID2
@@ -1190,6 +1191,32 @@ remote_pengine_create(BaseURL, Options) :-
     pengine_register_remote(ID, BaseURL),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
+
+options_to_dict(Options, Dict) :-
+    select_option(probe_template(Template), Options, Options1),
+    select_option(probe(Probe), Options1, Options2), !,
+    numbervars(Probe+Template, 0, _),
+    format(string(ProbeString), '~k', [Probe]),
+    format(string(TemplateString), '~k', [Template]),
+    maplist(prolog_option, Options2, Options3),
+    dict_create(Dict, _,
+		[ probe(ProbeString),
+		  probe_template(TemplateString)
+		| Options3
+		]).
+options_to_dict(Options, Dict) :-
+    maplist(prolog_option, Options, Options1),
+    dict_create(Dict, _, Options1).
+
+prolog_option(Option0, Option) :-
+    prolog_option(Option0), !,
+    Option0 =.. [Name,Value],
+    format(string(String), '~k', [Value]),
+    Option =.. [Name,String].
+prolog_option(Option, Option).
+
+prolog_option(src_list(_)).
+
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
     term_to_atom(Event, EventAtom),
@@ -1207,7 +1234,29 @@ remote_pengine_abort(BaseURL, ID, Options) :-
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
+%%	remote_send_rec(+Server, +Action, +Params, -Reply, +Options)
+%
+%	Issue a GET request on Server and   unify Reply with the replied
+%	term.
+
 remote_send_rec(Server, Action, Params, Reply, Options) :-
+    server_url(Server, Action, Params, URL),
+    http_open(URL, Stream, Options),	% putting this in setup_call_cleanup/3
+    call_cleanup(			% makes it impossible to interrupt.
+	read(Stream, Reply),
+	close(Stream)).
+
+remote_post_rec(Server, Action, Data, Reply, Options) :-
+    server_url(Server, Action, [], URL),
+    http_open(URL, Stream,
+	      [ post(json(Data))
+	      | Options
+	      ]),
+    call_cleanup(			% makes it impossible to interrupt.
+	read(Stream, Reply),
+	close(Stream)).
+
+server_url(Server, Action, Params, URL) :-
     uri_components(Server, Components0),
     uri_query_components(Query, Params),
     uri_data(path, Components0, Path0),
@@ -1215,11 +1264,8 @@ remote_send_rec(Server, Action, Params, Reply, Options) :-
     directory_file_path(Path0, PAction, Path),
     uri_data(path, Components0, Path, Components),
     uri_data(search, Components, Query),
-    uri_components(URL, Components),
-    http_open(URL, Stream, Options),	% putting this in setup_call_cleanup/3
-    call_cleanup(			% makes it impossible to interrupt.
-	read(Stream, Reply),
-	close(Stream)).
+    uri_components(URL, Components).
+
 
 /** pengine_event(?EventTerm) is det.
     pengine_event(?EventTerm, +Options) is det.
@@ -1510,30 +1556,50 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 
 
 http_pengine_create(Request) :-
-    http_parameters(Request,
-		    [ options(OptionsAtom, [optional(true)]),
-		      format(Format,
-			     [ oneof([prolog, json, 'json-s']),
-			       default(prolog)
-			     ])
-		    ]),
-    (	var(OptionsAtom)
-    ->	Options = []
-    ;	atom_to_term(OptionsAtom, Options, _)
+    http_read_json_dict(Request, Dict),
+    (	get_dict(format, Dict, FormatString)
+    ->	atom_string(Format, FormatString),
+	must_be(oneof([prolog,json,'json-s']), Format)
+    ;	Format = prolog
     ),
+    dict_to_options(Dict, CreateOptions),
     (   setting(allow_multiple_session_pengines, false)
     ->  forall(http_session_retract(pengine(ID)),
 	       pengine_destroy(ID))
     ;   true
     ),
     message_queue_create(From, []),
-    create(From, Pengine, Options, http),
+    create(From, Pengine, CreateOptions, http),
     (   setting(allow_multiple_session_pengines, false)
     ->  http_session_assert(pengine(Pengine))
     ;   true
     ),
     http_pengine_parent(Pengine, Queue),
     wait_and_output_result(Pengine, Queue, Format).
+
+dict_to_options(Dict, CreateOptions) :-
+    dict_pairs(Dict, _, Pairs),
+    (	select(probe_template-TemplateString, Pairs, Pairs1),
+	select(probe-ProbeString, Pairs1, Pairs2)
+    ->	format(string(Combined), '(~s)-(~s)', [TemplateString,ProbeString]),
+	term_string(Combined, Template-Probe),
+	pairs_create_options(Pairs2, MoreOptions),
+	CreateOptions = [probe(Probe), probe_template(Template) | MoreOptions]
+    ;	pairs_create_options(Pairs, CreateOptions)
+    ).
+
+pairs_create_options([], []).
+pairs_create_options([N-V0|T0], [Opt|T]) :-
+    Opt =.. [N,V],
+    pengine_create_option(Opt), !,
+    (   prolog_option(Opt)
+    ->  atom_to_term(V0, V, _)
+    ;   V = V0
+    ),
+    pairs_create_options(T0, T).
+pairs_create_options([_|T0], T) :-
+    pairs_create_options(T0, T).
+
 
 %%	wait_and_output_result(+Pengine, +Format)
 %
@@ -1584,23 +1650,20 @@ fix_bindings('json-s',
     NewOptions = [template(Template), paging(Paging)].
 fix_bindings(_, Command, _, _, Command).
 
-
-
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    http_pengine_parent(Queue),
+    pengine_parent(Queue),
     wait_and_output_result(ID, Queue, Format).
-
 
 http_pengine_abort(Request) :-
     http_parameters(Request,
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    http_pengine_parent(Queue),
+    pengine_parent(Queue),
     pengine_abort(ID),
     wait_and_output_result(ID, Queue, Format).
 
