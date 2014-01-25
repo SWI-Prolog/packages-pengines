@@ -1370,11 +1370,12 @@ http_pengine_send(Request) :-
 	  ),
 	  Error,
 	  Event1 = error(ID, Error)),
-    pengine_thread(ID, Thread),
-    http_pengine_parent(ID, Queue),
-    thread_send_message(Thread, Event1),
-    wait_and_output_result(ID, Queue, Format).
-
+    (	pengine_thread(ID, Thread)
+    ->	http_pengine_parent(ID, Queue),
+	thread_send_message(Thread, Event1),
+	wait_and_output_result(ID, Queue, Format)
+    ;	http_404([], Request)
+    ).
 
 fix_bindings(json,
 	     request(ask(Goal, Options)), _ID, Bindings,
@@ -1395,17 +1396,21 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    http_pengine_parent(ID, Queue),
-    wait_and_output_result(ID, Queue, Format).
+    (	http_pengine_parent(ID, Queue)
+    ->	wait_and_output_result(ID, Queue, Format)
+    ;	http_404([], Request)
+    ).
 
 http_pengine_abort(Request) :-
     http_parameters(Request,
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    http_pengine_parent(ID, Queue),
-    pengine_abort(ID),
-    wait_and_output_result(ID, Queue, Format).
+    (	http_pengine_parent(ID, Queue)
+    ->	pengine_abort(ID),
+	wait_and_output_result(ID, Queue, Format)
+    ;	http_404([], Request)
+    ).
 
 
 % Output
