@@ -808,15 +808,19 @@ more_solutions(Event, ID, Choice) :-
 %	Migrate from state `2' to `3'.  This predicate validates that it
 %	is safe to call Goal using safe_goal/1 and then calls solve/3 to
 %	prove the goal. It takes care of the paging(N) option.
+%
+%	@tbd Assumes goal is called in the module =pengine=; this will
+%	be changed.
 
 ask(ID, Goal, Options) :-
-    catch(safe_goal(Goal), Error, true),
+    expand_goal(pengine:Goal, Goal1),
+    catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(paging(N), Options, 1),
         (   N == 1
-        ->  solve([Template], Goal, ID)
-        ;   solve(Res, pengine_find_n(N, Template, Goal, Res), ID)
+        ->  solve([Template], Goal1, ID)
+        ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID)
         )
     ;   pengine_reply(error(ID, Error))
     ).
