@@ -84,6 +84,7 @@ from Prolog or JavaScript.
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
 :- use_module(library(apply)).
+:- use_module(library(aggregate)).
 :- use_module(library(option)).
 :- use_module(library(settings)).
 :- use_module(library(debug)).
@@ -137,9 +138,8 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 
 /* Settings */
 
-:- setting(allow_multiple_session_pengines, atom, false,
-	   'Allow a HTTP session to run more than one top \c
-	   level pengine at a time').
+:- setting(max_session_pengines, integer, 1,
+	   'Maximum number of pengines a client can create.  -1 is infinite.').
 
 :- setting(time_limit, number, 60, 'Maximum time between output').
 
@@ -1303,19 +1303,39 @@ http_pengine_create(Request) :-
     ;	Format = prolog
     ),
     dict_to_options(Dict, CreateOptions),
-    (   setting(allow_multiple_session_pengines, false)
-    ->  forall(http_session_retract(pengine(ID)),
-	       pengine_destroy(ID))
-    ;   true
-    ),
+    setting(max_session_pengines, MaxEngines),
+    enforce_max_session_pengines(pre, MaxEngines, _),
     message_queue_create(From, []),
     create(From, Pengine, CreateOptions, http),
-    (   setting(allow_multiple_session_pengines, false)
-    ->  http_session_assert(pengine(Pengine))
-    ;   true
-    ),
+    enforce_max_session_pengines(post, MaxEngines, Pengine),
     http_pengine_parent(Pengine, Queue),
     wait_and_output_result(Pengine, Queue, Format).
+
+%%	enforce_max_session_pengines(+When, +Max, ?ID) is det.
+%
+%	Enforce  the  setting  =max_session_pengines=   by  killing  old
+%	pengines.
+%
+%	@tbd	Probably it is cleaner to generate a permission error
+%		for creating new pengines.
+
+enforce_max_session_pengines(_When, Max, _) :-
+    Max < 0, !.
+enforce_max_session_pengines(pre, Max, _) :-
+    (	http_in_session(_)
+    ->  (   aggregate_all(count, http_session_data(pengine(_ID)), Count),
+	    Count >= Max,
+	    http_session_retract(pengine(ID))
+	->  pengine_destroy(ID)
+	;   true
+	)
+    ;	true
+    ).
+enforce_max_session_pengines(post, _, ID) :-
+    (   http_in_session(_)
+    ->	http_session_assert(pengine(ID))
+    ;	true
+    ).
 
 dict_to_options(Dict, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),

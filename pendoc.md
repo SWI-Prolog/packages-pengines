@@ -280,7 +280,7 @@ Settings currently recognized by the Pengines library:
 
 
 | *Name*    | *Type* | *Default* | *Description* |
-| allow_multiple_session_pengines    | atom | false | Allow a HTTP session to run more than one top level pengine at a time |
+| max_session_pengines | integer | 5 | Maximum number of pengines a client can create.  -1 is infinite |
 | time_limit    | number | 60 | Maximum time between output (in seconds) |
 | pengine_alive_time_limit    | number | 360 | Maximum time to allow a pengine to live (in seconds) |
 | report_protocol_breach | atom | false | Throw exception when protocol is breached |
