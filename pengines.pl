@@ -57,9 +57,6 @@
             pengine_ask_around/3,
             pengine_seek_agreement/2,
             pengine_seek_agreement/3,
-            pengine_src_list/1,
-            pengine_src_text/1,
-            pengine_src_url/1,
             pengine_find_n/4
 	  ]).
 
