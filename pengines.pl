@@ -94,6 +94,8 @@ from Prolog or JavaScript.
 
 
 :- meta_predicate
+	pengine_create(:),
+	pengine_rpc(+, +, :),
 	pengine_event_loop(1),
 	pengine_event_loop(1, +),
 	pengine_find_n(+, ?, 0, -).
@@ -105,6 +107,7 @@ from Prolog or JavaScript.
 		       src_list(list),
 		       src_text(any),		% text
 		       src_url(atom),
+		       src_predicates(list),
 		       probe(callable),
 		       probe_template(any),
 		       format(oneof([prolog,json,'json-s']))
@@ -152,7 +155,7 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 :- setting(deny_from, list(atom), [],
 	   'IP addresses from which remotes are NOT allowed to connect').
 
-/**  pengine_create(+Options) is det.
+/**  pengine_create(:Options) is det.
 
     Creates a new pengine. Valid options are:
 
@@ -180,6 +183,10 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
     * src_url(+URL)
       Inject the clauses specified in the file located at URL in the
       pengine.
+
+    * src_predicates(+List)
+      Send the local predicates denoted by List to the remote pengine.
+      List is a list of predicate indicators.
 
     * probe(+Query)
       Run Query before creating the pengine. If the query fails, the
@@ -218,12 +225,14 @@ An error will be returned if the pengine could not be created:
 */
 
 
-pengine_create(Options) :-
+pengine_create(QOptions) :-
+    meta_options(is_meta, QOptions, Options),
     (   select_option(server(BaseURL), Options, RestOptions)
     ->  remote_pengine_create(BaseURL, RestOptions)
     ;   local_pengine_create(Options)
     ).
 
+is_meta(src_predicates).
 
 /**  pengine_send(+NameOrID, +Term) is det
 
@@ -637,6 +646,7 @@ probe_failure(Queue, Term) :-
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
+pengine_create_option(src_predicates(_)).
 pengine_create_option(probe(_)).
 pengine_create_option(probe_template(_)).
 
@@ -922,7 +932,8 @@ replace_blobs(Term, Term).
 
 
 remote_pengine_create(BaseURL, Options) :-
-    partition(pengine_create_option, Options, PengineOptions, RestOptions),
+    partition(pengine_create_option, Options, PengineOptions0, RestOptions),
+    translate_local_source(PengineOptions0, PengineOptions),
     options_to_dict(PengineOptions, PostData),
     remote_post_rec(BaseURL, create, PostData, Reply, RestOptions),
     arg(1, Reply, ID),
@@ -937,6 +948,12 @@ remote_pengine_create(BaseURL, Options) :-
     pengine_register_remote(ID, BaseURL),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
+
+translate_local_source(PengineOptions0, PengineOptions) :-
+    select_option(src_predicates(M:List), PengineOptions0, PengineOptions1), !,
+    with_output_to(string(Text), M:maplist(listing, List)),
+    PengineOptions = [src_text(Text)|PengineOptions1].
+translate_local_source(Options, Options).
 
 options_to_dict(Options, Dict) :-
     select_option(probe_template(Template), Options, Options1),
@@ -1153,7 +1170,8 @@ pengine_create/1.
 pengine_rpc(URL, Query) :-
     pengine_rpc(URL, Query, []).
 
-pengine_rpc(URL, Query, Options) :-
+pengine_rpc(URL, Query, QOptions) :-
+    meta_options(is_meta, QOptions, Options),
     setup_call_cleanup(
 	pengine_create([ server(URL),
 			 id(Id)
