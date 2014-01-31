@@ -112,8 +112,41 @@ from Prolog or JavaScript.
 		       probe_template(any),
 		       format(oneof([prolog,json,'json-s']))
 		     ]).
+:- predicate_options(pengine_ask/3, 3,
+		     [ template(any),
+		       paging(integer)
+		     ]).
+:- predicate_options(pengine_next/2, 2,
+		     [ pass_to(pengine_send/3, 3)
+		     ]).
+:- predicate_options(pengine_stop/2, 2,
+		     [ pass_to(pengine_send/3, 3)
+		     ]).
+:- predicate_options(pengine_output/2, 2,
+		     [ pass_to(pengine_send/3, 3)
+		     ]).
+:- predicate_options(pengine_rpc/3, 3,
+		     [ paging(integer),
+		       pass_to(pengine_create/1, 1)
+		     ]).
+:- predicate_options(pengine_send/3, 3,
+		     [ delay(number)
+		     ]).
 :- predicate_options(pengine_event/2, 2,
 		     [ pass_to(thread_get_message/3, 3)
+		     ]).
+:- predicate_options(pengine_pull_response/2, 2,
+		     [ pass_to(http_open/3, 3)
+		     ]).
+:- predicate_options(pengine_event_loop/2, 2,
+		     []).			% not yet implemented
+:- predicate_options(pengine_ask_around/3, 3,
+		     [ use_local(boolean),
+		       pass_to(pengine_rpc/3, 3)
+		     ]).
+:- predicate_options(pengine_seek_agreement/3, 3,
+		     [ use_local(boolean),
+		       pass_to(pengine_rpc/3, 3)
 		     ]).
 
 % :- debug(pengine(transition)).
@@ -1063,7 +1096,7 @@ update_remote_destroy(destroy(Id)) :-
 update_remote_destroy(_).
 
 
-/** pengine_event_loop(+Closure) is det.
+/** pengine_event_loop(:Closure) is det.
     pengine_event_loop(:Closure, +Options) is det
 
 Starts an event loop accepting event terms   sent to the current pengine
@@ -1300,8 +1333,8 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
         OverrideOptions = []
     ),
     merge_options(OverrideOptions, Options, NewOptions),
-	catch(pengine_rpc(URL, Query, NewOptions), _, fail),
-	pengine_seek_agreement(URLs, Query, Options).
+    catch(pengine_rpc(URL, Query, NewOptions), _, fail),
+    pengine_seek_agreement(URLs, Query, Options).
 
 
 
