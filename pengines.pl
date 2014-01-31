@@ -56,8 +56,7 @@
             pengine_ask_around/2,
             pengine_ask_around/3,
             pengine_seek_agreement/2,
-            pengine_seek_agreement/3,
-            pengine_find_n/4
+            pengine_seek_agreement/3
 	  ]).
 
 /** <module> Pengines: Web Logic Programming Made Easy
@@ -96,7 +95,8 @@ from Prolog or JavaScript.
 
 :- meta_predicate
 	pengine_event_loop(1),
-	pengine_event_loop(1, +).
+	pengine_event_loop(1, +),
+	pengine_find_n(+, ?, 0, -).
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
