@@ -1205,41 +1205,43 @@ pengine_rpc(URL, Query) :-
 
 pengine_rpc(URL, Query, QOptions) :-
     meta_options(is_meta, QOptions, Options),
+    term_variables(Query, Vars),
+    Template =.. [v|Vars],
     setup_call_cleanup(
 	pengine_create([ server(URL),
 			 id(Id)
 		       | Options
 		       ]),
-	wait_event(Query, Options),
+	wait_event(Query, Template, Options),
 	pengine_destroy_and_wait(Id)).
 
 pengine_destroy_and_wait(Id) :-
 	pengine_destroy(Id),
 	pengine_event(destroy(Id)).
 
-wait_event(Query, Options) :-
+wait_event(Query, Template, Options) :-
     pengine_event(Event),
-    process_event(Event, Query, Options).
+    process_event(Event, Query, Template, Options).
 
-process_event(create(ID, _), Query, Options) :-
-    pengine_ask(ID, Query, Options),
-    wait_event(Query, Options).
-process_event(error(_ID, Error), _Query, _Options) :-
+process_event(create(ID, _), Query, Template, Options) :-
+    pengine_ask(ID, Query, [template(Template)|Options]),
+    wait_event(Query, Template, Options).
+process_event(error(_ID, Error), _Query, _Template, _Options) :-
     throw(Error).
-process_event(failure(_ID), _Query, _Options) :-
+process_event(failure(_ID), _Query, _Template, _Options) :-
     fail.
-process_event(prompt(ID, Term), Query, Options) :-
+process_event(prompt(ID, Term), Query, Template, Options) :-
     pengine_output(prompt(ID, Term)),
-    wait_event(Query, Options).
-process_event(output(ID, Term), Query, Options) :-
+    wait_event(Query, Template, Options).
+process_event(output(ID, Term), Query, Template, Options) :-
     pengine_output(output(ID, Term)),
     pengine_pull_response(ID, Options),
-    wait_event(Query, Options).
-process_event(success(_ID, Solutions, _), Query, _Options) :-
-    member(Query, Solutions).
-process_event(success(ID, _Query, true), Query, Options) :-
+    wait_event(Query, Template, Options).
+process_event(success(_ID, Solutions, _), _Query, Template, _Options) :-
+    member(Template, Solutions).
+process_event(success(ID, _Solutions, true), Query, Template, Options) :-
     pengine_next(ID, Options),
-    wait_event(Query, Options).
+    wait_event(Query, Template, Options).
 
 
 
