@@ -78,6 +78,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_stream)).
+:- use_module(library(http/http_wrapper)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -149,6 +150,10 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 :- setting(max_pengines, integer, 200,
 	   'Maximum number of pengines that can be alive').
 
+:- setting(allow_from, list(atom), [*],
+	   'IP addresses from which remotes are allowed to connect').
+:- setting(deny_from, list(atom), [],
+	   'IP addresses from which remotes are NOT allowed to connect').
 
 /**  pengine_create(+Options) is det.
 
@@ -1296,6 +1301,7 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 
 
 http_pengine_create(Request) :-
+    allowed(Request),
     http_read_json_dict(Request, Dict),
     (	get_dict(format, Dict, FormatString)
     ->	atom_string(Format, FormatString),
@@ -1503,7 +1509,45 @@ solution_to_json(BindingsIn, json(BindingsOut)) :-
 
 swap(N=V, N=A) :- term_to_atom(V, A).
 
+%%	allowed(+Request) is det.
+%
+%	Check whether the peer is allowed to connect.  Returns a
+%	=forbidden= header if contact is not allowed.
 
+allowed(Request) :-
+	setting(allow_from, Allow),
+	match_peer(Request, Allow),
+	setting(deny_from, Deny),
+	\+ match_peer(Request, Deny), !.
+allowed(Request) :-
+	memberchk(request_uri(Here), Request),
+	throw(http_reply(forbidden(Here))).
+
+match_peer(_, Allowed) :-
+	memberchk(*, Allowed), !.
+match_peer(_, []) :- !, fail.
+match_peer(Request, Allowed) :-
+	http_peer(Request, Peer),
+	debug(pengine(allow), 'Peer: ~q, Allow: ~q', [Peer, Allowed]),
+	(   memberchk(Peer, Allowed)
+	->  true
+	;   member(Pattern, Allowed),
+	    match_peer_pattern(Pattern, Peer)
+	).
+
+match_peer_pattern(Pattern, Peer) :-
+	ip_term(Pattern, IP),
+	ip_term(Peer, IP), !.
+
+ip_term(Peer, Pattern) :-
+	split_string(Peer, ".", "", PartStrings),
+	ip_pattern(PartStrings, Pattern).
+
+ip_pattern([], []).
+ip_pattern([*], _) :- !.
+ip_pattern([S|T0], [N|T]) :-
+	number_string(N, S),
+	ip_pattern(T0, T).
 
 
 /*================= Built-ins =======================

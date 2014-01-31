@@ -279,10 +279,12 @@ JSON.
 Settings currently recognized by the Pengines library:
 
 
-| *Name*    | *Type* | *Default* | *Description* |
-| max_session_pengines | integer | 5 | Maximum number of pengines a client can create.  -1 is infinite |
-| time_limit    | number | 60 | Maximum time between output (in seconds) |
-| pengine_alive_time_limit    | number | 360 | Maximum time to allow a pengine to live (in seconds) |
-| report_protocol_breach | atom | false | Throw exception when protocol is breached |
+| *Name*		   | *Type*	| *Default* | *Description*						      |
+| max_session_pengines	   | integer	| 5	    | Maximum number of pengines a client can create.  -1 is infinite |
+| time_limit		   | number	| 60	    | Maximum time between output (in seconds)			      |
+| pengine_alive_time_limit | number	| 360	    | Maximum time to allow a pengine to live (in seconds)	      |
+| report_protocol_breach   | atom	| false	    | Throw exception when protocol is breached			      |
+| allow_from		   | list(atom)	| [*]	    | Specify allowed IP addresses				      |
+| deny_from		   | list(atom)	| []	    | Specify denied IP addresses.  Applied after =allow_from=.	      |
 
 # Pengine libraries		{#pengine-libs}
