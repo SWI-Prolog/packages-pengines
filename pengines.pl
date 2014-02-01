@@ -1237,11 +1237,13 @@ process_event(output(ID, Term), Query, Template, Options) :-
     pengine_output(output(ID, Term)),
     pengine_pull_response(ID, Options),
     wait_event(Query, Template, Options).
-process_event(success(_ID, Solutions, _), _Query, Template, _Options) :-
+process_event(success(_ID, Solutions, false), _Query, Template, _Options) :- !,
     member(Template, Solutions).
-process_event(success(ID, _Solutions, true), Query, Template, Options) :-
-    pengine_next(ID, Options),
-    wait_event(Query, Template, Options).
+process_event(success(ID, Solutions, true), Query, Template, Options) :-
+    (	member(Template, Solutions)
+    ;   pengine_next(ID, Options),
+	wait_event(Query, Template, Options)
+    ).
 
 
 
