@@ -1180,21 +1180,21 @@ pengine_event_loop(destroy(ID), Closure, Created, Options) :-
 /** pengine_rpc(+URL, +Query) is nondet.
     pengine_rpc(+URL, +Query, +Options) is nondet.
 
-Semantically equivalent to Query, except that the   query is run in (and
-in the Prolog context of) the pengine  server referred to by URL, rather
-than locally.
+Semantically equivalent to the sequence below,  except that the query is
+executed in (and in the Prolog context   of) the pengine server referred
+to by URL, rather than locally.
+
+  ==
+    copy_term(Query, Copy),
+    call(Copy),			% executed on server at URL
+    Query = Copy.
+  ==
 
 Valid options are:
 
     * paging(+Integer)
       Can be used to reduce the number of network roundtrips being made.
       See pengine_ask/3.
-
-    * guard(+Goal)
-      The guard is run locally after each return of Query, and if it
-      succeeds, the pengine behind the call is first stopped and then
-      destroyed. If it fails, pengine_rpc/3 will backtrack and look for
-      more solutions. [Not yet implemented]
 
 Remaining  options  (except   the   server    option)   are   passed  to
 pengine_create/1.
