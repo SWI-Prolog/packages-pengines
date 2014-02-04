@@ -196,10 +196,15 @@ collect_handler(_, _, _, failure(Id)) :-
 
 %%	no_more_pengines is semidet.
 %
-%	True if there are no more living pengines.
+%	True if there are no more living pengines. Need to wait a little
+%	because they die asynchronously.
 
 no_more_pengines :-
-    \+ pengine:current_pengine(_,_,_,_).
+    (	true
+    ;	between(1, 10, _),
+	sleep(0.01)
+    ),
+    \+ pengine:current_pengine(_,_,_,_), !.
 
 
 		 /*******************************
