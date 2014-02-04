@@ -1453,7 +1453,6 @@ wait_and_output_result(Pengine, Queue, Format) :-
     ).
 
 
-
 http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
