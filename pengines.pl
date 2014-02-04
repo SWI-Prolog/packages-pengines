@@ -75,6 +75,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_stream)).
 :- use_module(library(http/http_wrapper)).
+:- use_module(library(http/http_cors)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -1521,8 +1522,10 @@ http_pengine_abort(Request) :-
 output_result(prolog, Term) :-
     to_prolog(Term).
 output_result(json, Term) :-
+    cors_enable,
     to_json(Term).
 output_result('json-s', Term) :-
+    cors_enable,
     to_json_s(Term).
 
 
