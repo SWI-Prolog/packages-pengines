@@ -22,13 +22,14 @@ A pengine is comprised of:
     * A Prolog thread
 
     * A dynamic clause database, private to the pengine, into which
-      other processes may assert clauses
+      other processes may assert clauses.  These clauses reside in the
+      module =pengine_sandbox=.
 
     * A message queue for incoming requests
 
     * A message queue for outgoing responses
 
-Everything needed to work with  pengines   are  included in the package,
+Everything needed to work with  pengines   is  included  in the package,
 including  a  JavaScript  library  for  creating  and  interacting  with
 pengines from a web  client.  However,  the   web  server  (in  the file
 example_server.pl) should only be regarded as a minimal example.
@@ -40,9 +41,9 @@ communication protocol that we refer to as the Prolog Transport Protocol
 (PLTP).  The  protocol  has  been  modelled    by  means  of  so  called
 _communicating finite-state machines_ [3]. A  slight modification of the
 protocol -- referred to as PLTP(HTTP) --   enables  us to synchronize it
-with HTTP. Figure 1 depicts the  communicating finite-state machines for
-PLTP(HTTP) and HTTP. Labels in bold indicate requests, and labels with a
-slash in front indicate responses.
+with HTTP. The diagram  below   depicts  the  communicating finite-state
+machines for PLTP(HTTP) and HTTP. Labels  in bold indicate requests, and
+labels with a slash in front indicate responses.
 
 [[lptpsynch.png]]
 
@@ -245,6 +246,51 @@ process_event(success(ID, _Query, true), Query, Options) :-
     wait_event(Query, Options).
 
 ==
+
+## Making predicates available to clients {#pengine-server-code}
+
+The code sent to a pengine is  executed   in  the  context of the module
+=pengine_sandbox= and the safety of goals is validated using safe_goal/1
+prior to execution. Any  pengine  has   access  to  the  safe predicates
+defined in library(sandbox). If a server  wishes   to  extend the set of
+predicates, it must:
+
+  1. Define one or more modules that export the desired additional
+     predicates.
+
+  2. Makes this code available to the sandbox using the call below,
+     assuming that the additional predicates are defined in the
+     Prolog module file domain_predicates.pl
+
+     ==
+     :- use_module(pengine_sandbox:domain_predicates).
+     ==
+
+  3. Register *safe* foreign predicates with library(sandbox), i.e.,
+     predicates that do not have side effects such as accessing the
+     file system, load foreign extensions, define other predicates
+     outside the sandbox environment, etc.
+
+     Note that the safety of Prolog predicate can typically be
+     proven by library(sandbox).  This may not be the case if
+     untracktable forms of meta-calling are used.  In this case
+     it is adviced to avoid such code.  If this is not possible,
+     the code must be carefully reviewed by hand and of proven to
+     be safe it may be registered with the sandbox library.
+
+For example, basic RDF access can be  granted to pengines using the code
+below.  Please  *study  the  sandboxing  code  carefully  before  adding
+declarations*.
+
+  ==
+  :- use_module(pengine_sandbox:library(semweb/rdf_db)).
+  :- use_module(library(sandbox)).
+
+  :- multifile sandbox:safe_primitive/1.
+
+  sandbox:safe_primitive(rdf_db:rdf(_,_,_)).
+  ==
+
 
 ## Mapping Prolog terms into JSON	{#prolog-canonical-json}
 

@@ -862,7 +862,7 @@ more_solutions(Event, ID, Choice) :-
 %	be changed.
 
 ask(ID, Goal, Options) :-
-    expand_goal(pengine:Goal, Goal1),
+    expand_goal(pengine_sandbox:Goal, Goal1),
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
@@ -1677,8 +1677,8 @@ expand_and_assert(Term) :-
 
 assert_local(:-(Head, Body)) :- !,
     functor(Head, F, N),
-    thread_local(F/N),
-    assert(:-(Head, Body)).
+    thread_local(pengine_sandbox:(F/N)),
+    assert(pengine_sandbox:(Head :- Body)).
 assert_local(:-Body) :- !,
     (   safe_goal(Body)
     ->  call(Body)
@@ -1686,8 +1686,8 @@ assert_local(:-Body) :- !,
     ).
 assert_local(Fact) :-
     functor(Fact, F, N),
-    thread_local(F/N),
-    assert(Fact).
+    thread_local(pengine_sandbox:(F/N)),
+    assert(pengine_sandbox:Fact).
 
 
 /*================= Utilities =======================
