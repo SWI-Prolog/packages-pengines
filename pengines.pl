@@ -189,15 +189,7 @@ extend_goal(Compound, Extra, Goal) :-
 
 :- setting(max_session_pengines, integer, 1,
 	   'Maximum number of pengines a client can create.  -1 is infinite.').
-
-:- setting(time_limit, number, 60, 'Maximum time between output').
-
-:- setting(pengine_alive_time_limit, number, 60,
-	   'Maximum time to allow a pengine to live').
-
-:- setting(max_pengines, integer, 200,
-	   'Maximum number of pengines that can be alive').
-
+:- setting(time_limit, number, 60, 'Maximum time to wait for output').
 :- setting(allow_from, list(atom), [*],
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
