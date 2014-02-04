@@ -660,7 +660,7 @@ local_pengine_create(Options) :-
 create(Queue, Child, Options, URL) :-
     select_option(probe(Condition), Options, RestOptions0, true),
     partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
-    (   catch(Condition, E, true)
+    (   catch(probe(Condition), E, true)
     ->  (   var(E)
 	->  thread_create(
 		pengine_main(Queue, PengineOptions), ChildThread,
@@ -677,6 +677,11 @@ create(Queue, Child, Options, URL) :-
 	)
     ;   probe_failure(Queue, error(probe_failure(Condition), _))
     ).
+
+probe(Condition) :-
+	expand_goal(pengine_sandbox:Condition, Goal),
+	safe_goal(Goal),
+	call(Goal).
 
 probe_failure(Queue, Term) :-
     pengine_reply(Queue, error(id(null, null), Term)).
