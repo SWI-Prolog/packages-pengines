@@ -23,7 +23,7 @@
             function handleCreate () {
                 pengine.ask('q(X)', {
                     template:'X',
-		    paging: 3		// get results in chunks of 3
+		    chunk: 3		// get results in chunks of 3
                 });
             }
             function handleSuccess() {

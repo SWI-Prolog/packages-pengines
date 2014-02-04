@@ -73,11 +73,11 @@ test(simple, Results = [a,b,c]) :-
 	]),
     collect(X, p(X), Results, []),
     assertion(no_more_pengines).
-test(paging, Results = [a,b,c]) :-
+test(chunk, Results = [a,b,c]) :-
     pengine_create(
 	[ src_text("p(a). p(b). p(c).")
 	]),
-    collect(X, p(X), Results, [paging(2)]),
+    collect(X, p(X), Results, [chunk(2)]),
     assertion(no_more_pengines).
 test(stop, Results = [a,b]) :-
     pengine_create(
@@ -111,13 +111,13 @@ test(simple, Results = [a,b,c]) :-
 	]),
     collect(X, p(X), Results, []),
     assertion(no_more_pengines).
-test(paging, Results = [a,b,c]) :-
+test(chunk, Results = [a,b,c]) :-
     pengine_server(Server),
     pengine_create(
 	[ server(Server),
 	  src_text("p(a). p(b). p(c).")
 	]),
-    collect(X, p(X), Results, [paging(2)]),
+    collect(X, p(X), Results, [chunk(2)]),
     assertion(no_more_pengines).
 test(stop, Results = [a,b]) :-
     pengine_server(Server),

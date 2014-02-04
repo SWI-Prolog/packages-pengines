@@ -117,7 +117,7 @@ from Prolog or JavaScript.
 		     ]).
 :- predicate_options(pengine_ask/3, 3,
 		     [ template(any),
-		       paging(integer)
+		       chunk(integer)
 		     ]).
 :- predicate_options(pengine_next/2, 2,
 		     [ pass_to(pengine_send/3, 3)
@@ -129,7 +129,7 @@ from Prolog or JavaScript.
 		     [ pass_to(pengine_send/3, 3)
 		     ]).
 :- predicate_options(pengine_rpc/3, 3,
-		     [ paging(integer),
+		     [ chunk(integer),
 		       pass_to(pengine_create/1, 1)
 		     ]).
 :- predicate_options(pengine_send/3, 3,
@@ -371,9 +371,9 @@ Options is a list of options:
       with the query. By default, the template is identical to the
       query.
 
-    * paging(+Integer)
+    * chunk(+Integer)
       Retrieve solutions in chunks of Integer rather than one by one. 0
-      means no paging (default). Other integers indicate the maximum
+      means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk.
 
 Any remaining options are passed to pengine_send/3.
@@ -421,7 +421,7 @@ pengine_ask(ID, Query, Options) :-
 
 
 pengine_ask_option(template(_)).
-pengine_ask_option(paging(_)).
+pengine_ask_option(chunk(_)).
 
 
 /** pengine_next(+NameOrID) is det
@@ -856,7 +856,7 @@ more_solutions(Event, ID, Choice) :-
 %
 %	Migrate from state `2' to `3'.  This predicate validates that it
 %	is safe to call Goal using safe_goal/1 and then calls solve/3 to
-%	prove the goal. It takes care of the paging(N) option.
+%	prove the goal. It takes care of the chunk(N) option.
 %
 %	@tbd Assumes goal is called in the module =pengine=; this will
 %	be changed.
@@ -866,7 +866,7 @@ ask(ID, Goal, Options) :-
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
-        option(paging(N), Options, 1),
+        option(chunk(N), Options, 1),
         (   N == 1
         ->  solve([Template], Goal1, ID)
         ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID)
@@ -1201,7 +1201,7 @@ to by URL, rather than locally.
 
 Valid options are:
 
-    * paging(+Integer)
+    * chunk(+Integer)
       Can be used to reduce the number of network roundtrips being made.
       See pengine_ask/3.
 
@@ -1475,14 +1475,14 @@ fix_bindings(json,
 	     request(ask(Goal, Options)), _ID, Bindings,
 	     request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
-    option(paging(Paging), Options, 1),
-    NewOptions = [template(Template), paging(Paging)].
+    option(chunk(Paging), Options, 1),
+    NewOptions = [template(Template), chunk(Paging)].
 fix_bindings('json-s',
 	     request(ask(Goal, Options)), _ID, Bindings,
 	     request(ask(Goal, NewOptions))) :- !,
     option(template(Template), Options, Bindings),
-    option(paging(Paging), Options, 1),
-    NewOptions = [template(Template), paging(Paging)].
+    option(chunk(Paging), Options, 1),
+    NewOptions = [template(Template), chunk(Paging)].
 fix_bindings(_, Command, _, _, Command).
 
 http_pengine_pull_response(Request) :-
