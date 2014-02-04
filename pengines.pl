@@ -98,7 +98,10 @@ from Prolog or JavaScript.
 	pengine_rpc(+, +, :),
 	pengine_event_loop(1),
 	pengine_event_loop(1, +),
-	pengine_find_n(+, ?, 0, -).
+	pengine_ask_around(+, 0),
+	pengine_ask_around(+, 0, +),
+	pengine_seek_agreement(+, 0),
+	pengine_seek_agreement(+, 0, +).
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
@@ -187,6 +190,12 @@ sandbox:safe_primitive(system:atom_concat(_, _, _)).
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
 	   'IP addresses from which remotes are NOT allowed to connect').
+
+:- meta_predicate			% internal meta predicates
+	solve(?, 0, +),
+	pengine_event_loop(1, +, +),
+	pengine_event_loop(+, 1, +, +),
+	pengine_find_n(+, ?, 0, -).
 
 /**  pengine_create(:Options) is det.
 
