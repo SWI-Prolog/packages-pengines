@@ -1432,9 +1432,13 @@ pairs_create_options([_|T0], T) :-
     pairs_create_options(T0, T).
 
 
-%%	wait_and_output_result(+Pengine, +Format)
+%%	wait_and_output_result(+Pengine, +Queue, +Format)
 %
-%
+%	Wait for the Pengine's Queue and if  there is a message, send it
+%	to the requestor using  output_result/1.   If  Pengine  does not
+%	answer within the time specified   by  the setting =time_limit=,
+%	Pengine is aborted and the  result is error(time_limit_exceeded,
+%	_).
 
 wait_and_output_result(Pengine, Queue, Format) :-
     setting(time_limit, TimeLimit),
