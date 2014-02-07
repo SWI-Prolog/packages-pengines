@@ -339,6 +339,7 @@ send_message(pengine(Pengine), Event, Options) :-
     ->	remote_pengine_send(Server, Pengine, Event, Options)
     ;	pengine_thread(Pengine, Thread),
 	thread_send_message(Thread, Event)
+    ;	existence_error(pengine, Pengine)
     ).
 
 %%	pengine_reply(+Event) is det.
@@ -527,7 +528,9 @@ Destroys the pengine NameOrID.
 */
 
 pengine_destroy(ID) :-
-    pengine_send(ID, request(destroy)).
+    catch(pengine_send(ID, request(destroy)),
+	  error(existence_error(pengine, ID), _),
+	  true).
 
 
 /*================= pengines administration =======================
