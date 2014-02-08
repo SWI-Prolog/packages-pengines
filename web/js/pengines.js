@@ -26,11 +26,11 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 function Pengine(callbacks) {
     var goal = callbacks.goal;
     var src = callbacks.src ? callbacks.src : "";
     var format = callbacks.format ? callbacks.format : "json";
+    var server = callbacks.server !== undefined ? callbacks.server : "/";
     this.id = null;
     var that = this;
     // Private functions
@@ -89,7 +89,8 @@ function Pengine(callbacks) {
     // Public functions
     this.send = function(event) {
         var event = encodeURIComponent(event);
-        $.get('/pengine/send?id=' + that.id + '&event=' + event + '&format=' + format, process_response);
+        $.get(server + 'pengine/send?id=' + that.id +
+	      '&event=' + event + '&format=' + format, process_response);
     }
     this.ask = function(query, options) {
         that.send('request(ask(' + query + ', ' + options_to_list(options) + '))');
@@ -107,13 +108,15 @@ function Pengine(callbacks) {
         that.send('request(destroy)');
     }
     this.pull_response = function() {
-        $.get('/pengine/pull_response?id=' + that.id + '&format=' + format, process_response);
+        $.get(server + 'pengine/pull_response?id=' + that.id +
+	      '&format=' + format, process_response);
     }
     this.abort = function() {
-        $.get('/pengine/abort?id=' + that.id + '&format=' + format, process_response);
+        $.get(server + 'pengine/abort?id=' + that.id +
+	      '&format=' + format, process_response);
     }
 
-    $.ajax('/pengine/create',
+    $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
 	     "data": JSON.stringify({ src_text: source(),
