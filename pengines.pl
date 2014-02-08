@@ -881,7 +881,8 @@ ask(ID, Goal, Options) :-
         ->  solve([Template], Goal1, ID)
         ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID)
         )
-    ;   pengine_reply(error(ID, Error))
+    ;   pengine_reply(error(ID, Error)),
+	guarded_main_loop(ID)
     ).
 
 
