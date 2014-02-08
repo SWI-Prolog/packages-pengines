@@ -1525,11 +1525,19 @@ output_result('json-s', Term) :-
     cors_enable,
     to_json_s(Term).
 
+%%	to_prolog(+Term)
+%
+%	Send a term in Prolog  syntax.   Should  we  use cycles(true) as
+%	well? What about attributes? Use copy_term/3?
 
 to_prolog(Term) :-
     format('Content-type: text/x-prolog~n~n'),
-    format('~q .~n', [Term]).
-
+    write_term(Term,
+	       [ quoted(true),
+		 ignore_ops(true),
+		 fullstop(true),
+		 nl(true)
+	       ]).
 
 to_json(create(ID, Term0)) :-
     term_to_json(Term0, Term),
