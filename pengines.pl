@@ -157,39 +157,6 @@ from Prolog or JavaScript.
 
 % :- debug(pengine(transition)).
 
-
-
-:- multifile
-	sandbox:safe_primitive/1,		% Goal
-	sandbox:safe_meta/2.			% Goal, Calls
-
-sandbox:safe_primitive(pengine:pengine_create(_)).
-sandbox:safe_primitive(pengine:pengine_event(_, _)).
-sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_input(_)).
-sandbox:safe_primitive(pengine:pengine_output(_, _)).
-sandbox:safe_primitive(pengine:pengine_debug(_)).
-sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
-
-
-sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
-	callable(Closure),
-	extend_goal(Closure, [_], Closure1).
-
-extend_goal(Var, _, _) :- !,
-	instantiation_error(Var).
-extend_goal(M:Term0, Extra, M:Term) :-
-	extend_goal(Term0, Extra, Term).
-extend_goal(Atom, Extra, Goal) :-
-	atom(Atom), !,
-	Goal =.. [Atom|Extra].
-extend_goal(Compound, Extra, Goal) :-
-	compound(Compound), !,
-	compound_name_arguments(Compound, Name, Args0),
-	append(Args0, Extra, Args),
-	compound_name_arguments(Goal, Name, Args).
-
-
 /* Settings */
 
 :- setting(max_session_pengines, integer, 1,
@@ -1762,3 +1729,47 @@ pengine_find_n(N, Template, Goal, List) :-
     ),
     findall(Row, (recorded(sols, Row, Ref), erase(Ref)), List),
     List \= [].
+
+
+		 /*******************************
+		 *	  SANDBOX SUPPORT	*
+		 *******************************/
+
+:- multifile
+	sandbox:safe_primitive/1,		% Goal
+	sandbox:safe_meta/2.			% Goal, Calls
+
+%%	sandbox:safe_primitive(+Goal) is semidet.
+%
+%	Declare the core pengine operations as   safe. If we are talking
+%	about  local  pengines,  their  safety   is  guaranteed  by  the
+%	sandboxing done for all pengines.
+%
+%	@tbd	If at some point we allow for `unsafe' pengines, we must
+%		reconsider this.
+
+sandbox:safe_primitive(pengine:pengine_create(_)).
+sandbox:safe_primitive(pengine:pengine_event(_, _)).
+sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
+sandbox:safe_primitive(pengine:pengine_input(_)).
+sandbox:safe_primitive(pengine:pengine_output(_, _)).
+sandbox:safe_primitive(pengine:pengine_debug(_)).
+sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
+
+
+sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
+	callable(Closure),
+	extend_goal(Closure, [_], Closure1).
+
+extend_goal(Var, _, _) :- !,
+	instantiation_error(Var).
+extend_goal(M:Term0, Extra, M:Term) :-
+	extend_goal(Term0, Extra, Term).
+extend_goal(Atom, Extra, Goal) :-
+	atom(Atom), !,
+	Goal =.. [Atom|Extra].
+extend_goal(Compound, Extra, Goal) :-
+	compound(Compound), !,
+	compound_name_arguments(Compound, Name, Args0),
+	append(Args0, Extra, Args),
+	compound_name_arguments(Goal, Name, Args).
