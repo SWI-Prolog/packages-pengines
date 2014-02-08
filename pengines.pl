@@ -736,7 +736,7 @@ pengine_main(Parent, Options) :-
 	      ))
     ->  pengine_reply(create(Self, Template)),
         pengine_main_loop(Self)
-    ;   true
+    ;   pengine_terminate(Self)
     ).
 
 %%	fix_streams is det.
