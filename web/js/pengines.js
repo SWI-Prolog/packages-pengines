@@ -65,13 +65,18 @@ function Pengine(callbacks) {
         } else if (obj.event === 'failure') {
             if (callbacks.onfailure) callbacks.onfailure.call(obj);
         } else if (obj.event === 'error') {
-            if (callbacks.onerror) callbacks.onerror.call(obj);
+            if (callbacks.onerror)
+	        callbacks.onerror.call(obj);
+	    else if (typeof(console) !== 'undefined')
+	        console.error(obj.data);
         } else if (obj.event === 'output') {
             if (callbacks.onoutput) callbacks.onoutput.call(obj);
             that.pull_response();
         } else if (obj.event === 'debug') {
-            console.log(obj.data);
-            if (callbacks.ondebug) callbacks.ondebug.call(obj);
+            if (callbacks.ondebug)
+	        callbacks.ondebug.call(obj);
+	    else if (typeof(console) !== 'undefined')
+		console.log(obj.data);
             that.pull_response();
         } else if (obj.event === 'prompt') {
             if (callbacks.onprompt) callbacks.onprompt.call(obj);
