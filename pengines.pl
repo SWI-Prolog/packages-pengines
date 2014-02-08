@@ -44,6 +44,8 @@
             pengine_get_prompt/1,
             pengine_output/1,
             pengine_output/2,
+            pengine_debug/1,
+            pengine_self/1,
             pengine_pull_response/1,
             pengine_pull_response/2,
             pengine_destroy/1,
@@ -166,7 +168,9 @@ sandbox:safe_primitive(pengine:pengine_event(_, _)).
 sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
+sandbox:safe_primitive(pengine:pengine_debug(_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
+
 
 sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
 	callable(Closure),
@@ -638,6 +642,22 @@ pengine_output(Term, Options) :-
 
 pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 
+
+/** pengine_debug(+Terms) is det
+
+Converts list of Terms to an atom and sends it to the parent pengine or
+thread.
+
+@bug	Terms is incompatible to debug/3.  This is likely to change to
+	use format/3.  This requires extensions to library(sandbox).
+*/
+
+pengine_debug(Terms) :-
+    pengine_parent(Queue),
+    pengine_self(Self),
+    maplist(term_to_atom, Terms, Atoms),
+    atomic_list_concat(Atoms, ' ', Atom),
+    thread_send_message(Queue, debug(Self, Atom)).
 
 
 /*================= Local pengine =======================
@@ -1166,6 +1186,11 @@ pengine_event_loop(output(ID, Msg), Closure, Created, Options) :-
     ignore(call(Closure, output(ID, Msg))),
     pengine_pull_response(ID, []),
     pengine_event_loop(Closure, Created, Options).
+pengine_event_loop(debug(ID, Msg), Closure, Created, Options) :-
+    debug(pengine(transition), '~q: 3 = /~q => 4', [ID, debug(Msg)]),
+    ignore(call(Closure, debug(ID, Msg))),
+    pengine_pull_response(ID, []),
+    pengine_event_loop(Closure, Created, Options).
 pengine_event_loop(prompt(ID, Term), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))),
@@ -1255,6 +1280,10 @@ process_event(prompt(ID, Term), Query, Template, Options) :-
     wait_event(Query, Template, Options).
 process_event(output(ID, Term), Query, Template, Options) :-
     pengine_output(output(ID, Term)),
+    pengine_pull_response(ID, Options),
+    wait_event(Query, Template, Options).
+process_event(debug(ID, Term), Query, Template, Options) :-
+    pengine_output(debug(ID, Term)),
     pengine_pull_response(ID, Options),
     wait_event(Query, Template, Options).
 process_event(success(_ID, Solutions, false), _Query, Template, _Options) :- !,
@@ -1554,6 +1583,8 @@ to_json(output(ID, Term0)) :-
 to_json(prompt(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=prompt, id=ID, data=Json])).
+to_json(debug(ID, Term)) :-
+    reply_json(json([event=debug, id=ID, data=Term])).
 to_json(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
 to_json(destroy(ID)) :-
@@ -1579,6 +1610,8 @@ to_json_s(output(ID, Term0)) :-
 to_json_s(prompt(ID, Term0)) :-
     term_to_json(Term0, Json),
     reply_json(json([event=prompt, id=ID, data=Json])).
+to_json_s(debug(ID, Term)) :-
+    reply_json(json([event=debug, id=ID, data=Term])).
 to_json_s(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
 to_json_s(destroy(ID)) :-

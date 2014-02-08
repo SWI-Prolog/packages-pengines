@@ -69,6 +69,10 @@ function Pengine(callbacks) {
         } else if (obj.event === 'output') {
             if (callbacks.onoutput) callbacks.onoutput.call(obj);
             that.pull_response();
+        } else if (obj.event === 'debug') {
+            console.log(obj.data);
+            if (callbacks.ondebug) callbacks.ondebug.call(obj);
+            that.pull_response();
         } else if (obj.event === 'prompt') {
             if (callbacks.onprompt) callbacks.onprompt.call(obj);
         } else if (obj.event === 'abort') {
