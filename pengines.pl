@@ -870,9 +870,6 @@ more_solutions(Event, ID, Choice) :-
 %	Migrate from state `2' to `3'.  This predicate validates that it
 %	is safe to call Goal using safe_goal/1 and then calls solve/3 to
 %	prove the goal. It takes care of the chunk(N) option.
-%
-%	@tbd Assumes goal is called in the module =pengine=; this will
-%	be changed.
 
 ask(ID, Goal, Options) :-
     expand_goal(pengine_sandbox:Goal, Goal1),
