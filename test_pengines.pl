@@ -175,7 +175,7 @@ collect(Template, Goal, Results, Options) :-
     ->	State = _{results:[], stop_after:StopAfter, options:Options1}
     ;	State = _{results:[], options:Options}
     ),
-    pengine_event_loop(collect_handler(Template, Goal, State)),
+    pengine_event_loop(collect_handler(Template, Goal, State), []),
     Results = State.results.
 
 collect_handler(Template, Goal, State, create(Id, _)) :-
@@ -188,7 +188,7 @@ collect_handler(_, _, State, success(Id, Values, More)) :-
 	Collected >= StopAfter
     ->	pengine_destroy(Id)
     ;	More == true
-    ->	pengine_next(Id)
+    ->	pengine_next(Id, [])
     ;	pengine_destroy(Id)
     ).
 collect_handler(_, _, _, failure(Id)) :-

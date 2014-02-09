@@ -29,34 +29,26 @@
 
 :- module(pengine,
 	  [ pengine_create/1,			% +Options
-            pengine_ask/2,
-            pengine_ask/3,
-            pengine_next/1,
-            pengine_next/2,
-            pengine_stop/1,
-            pengine_stop/2,
-            pengine_event/1,
-            pengine_event/2,
-            pengine_input/1,
-            pengine_set_prompt/1,
-            pengine_get_prompt/1,
-            pengine_output/1,
-            pengine_output/2,
-            pengine_debug/1,
-            pengine_self/1,
-            pengine_pull_response/1,
-            pengine_pull_response/2,
-            pengine_destroy/1,
-            pengine_abort/1,
-            pengine_property/2,
-            pengine_event_loop/1,
-            pengine_event_loop/2,
-            pengine_rpc/2,
-            pengine_rpc/3,
-            pengine_ask_around/2,
-            pengine_ask_around/3,
-            pengine_seek_agreement/2,
-            pengine_seek_agreement/3
+            pengine_ask/3,			% +Pengine, :Query, +Options
+            pengine_next/2,			% +Pengine. +Options
+            pengine_stop/2,			% +Pengine. +Options
+            pengine_event/2,			% -Event, +Options
+            pengine_set_prompt/1,		% +Term
+            pengine_get_prompt/1,		% -Term
+            pengine_input/1,			% -Term
+            pengine_output/1,			% +Term
+            pengine_output/2,			% +Term, +Options
+            pengine_debug/1,			% +list(Term)
+            pengine_self/1,			% -Pengine
+            pengine_pull_response/2,		% +Pengine, +Options
+            pengine_destroy/1,			% +Pengine
+            pengine_abort/1,			% +Pengine
+            pengine_property/2,			% ?Pengine, ?Property
+            pengine_event_loop/2,		% :Closure, +Options
+            pengine_rpc/2,			% +Server, :Goal
+            pengine_rpc/3,			% +Server, +Goal, +Options
+            pengine_ask_around/3,		% +list(Server), :Goal, +Options
+            pengine_seek_agreement/3		% +list(Server), :Goal, +Options
 	  ]).
 
 /** <module> Pengines: Web Logic Programming Made Easy
@@ -97,11 +89,8 @@ from Prolog or JavaScript.
 :- meta_predicate
 	pengine_create(:),
 	pengine_rpc(+, +, :),
-	pengine_event_loop(1),
 	pengine_event_loop(1, +),
-	pengine_ask_around(+, 0),
 	pengine_ask_around(+, 0, +),
-	pengine_seek_agreement(+, 0),
 	pengine_seek_agreement(+, 0, +).
 
 :- predicate_options(pengine_create/1, 1,
@@ -326,15 +315,6 @@ pengine_reply(Queue, Event) :-
     thread_send_message(Queue, Event).
 
 
-/** pengine_ask(+NameOrID, @Query) is det
-
-Same as pengine_ask(NameOrID, Query, []).
-
-*/
-
-pengine_ask(ID, Query) :-
-    pengine_ask(ID, Query, []).
-
 /** pengine_ask(+NameOrID, @Query, +Options) is det
 
 Asks pengine NameOrID a query Query.
@@ -399,14 +379,6 @@ pengine_ask_option(template(_)).
 pengine_ask_option(chunk(_)).
 
 
-/** pengine_next(+NameOrID) is det
-
-Same as pengine_next(NameOrID, []).
-*/
-
-pengine_next(ID) :- pengine_send(ID, request(next)).
-
-
 /** pengine_next(+NameOrID, +Options) is det
 
 Asks pengine NameOrID for the next solution to a query started by
@@ -448,14 +420,6 @@ pengine_next(ID, Options) :-
 
 pengine_next(ID, Options) :- pengine_send(ID, request(next), Options).
 
-
-/** pengine_stop(+NameOrID) is det
-
-Same as pengine_stop(NameOrID, []).
-
-*/
-
-pengine_stop(ID) :- pengine_send(ID, request(stop)).
 
 /** pengine_stop(+NameOrID, +Options) is det
 
@@ -871,17 +835,6 @@ ask(ID, Goal, Options) :-
     ).
 
 
-
-/** pengine_pull_response(+NameOrID) is det
-
-Same as pengine_pull_response(ID, []).
-
-*/
-
-pengine_pull_response(ID) :-
-    pengine_pull_response(ID, []).
-
-
 /** pengine_pull_response(+NameOrID, +Options) is det
 
 Pulls a response (an event term)  from   the  slave  process NameOrID if
@@ -1101,8 +1054,7 @@ update_remote_destroy(destroy(Id)) :-
 update_remote_destroy(_).
 
 
-/** pengine_event_loop(:Closure) is det.
-    pengine_event_loop(:Closure, +Options) is det
+/** pengine_event_loop(:Closure, +Options) is det
 
 Starts an event loop accepting event terms   sent to the current pengine
 or thread. For each such  event   E,  calls  ignore(call(Closure, E)). A
@@ -1127,9 +1079,6 @@ Valid options are:
      implemented]
 
 */
-
-pengine_event_loop(Closure) :-
-    pengine_event_loop(Closure, [], []).
 
 pengine_event_loop(Closure, Options) :-
     pengine_event_loop(Closure, [], Options).
@@ -1260,18 +1209,6 @@ process_event(success(ID, Solutions, true), Query, Template, Options) :-
     ).
 
 
-
-
-/** pengine_ask_around(+URLs, +Query) is nondet
-
-Same as pengine_ask_around(URLs, Query, []).
-
-*/
-
-pengine_ask_around(URLs, Goal) :-
-    pengine_ask_around(URLs, Goal, []).
-
-
 /** pengine_ask_around(+URLs, +Query, +Options) is nondet
 
 Semantically equivalent to Query, except that the   query is run in (and
@@ -1307,18 +1244,6 @@ pengine_ask_around(_URLs, Goal, Options) :-
     ->  catch(Goal, _, false)
     ;   fail
     ).
-
-
-
-/** pengine_seek_agreement(+URLs, +Query) is nondet
-
-Same as pengine_seek_agreement(URLs, Query, []).
-
-*/
-
-pengine_seek_agreement(URLs, Goal) :-
-    pengine_seek_agreement(URLs, Goal, []).
-
 
 
 /** pengine_seek_agreement(+URLs, +Query, +Options) is nondet
