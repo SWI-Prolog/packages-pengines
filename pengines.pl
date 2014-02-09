@@ -835,24 +835,22 @@ ask(ID, Goal, Options) :-
     ).
 
 
-/** pengine_pull_response(+NameOrID, +Options) is det
+/** pengine_pull_response(+Pengine, +Options) is det
 
-Pulls a response (an event term)  from   the  slave  process NameOrID if
-NameOrID is a remote process, else does nothing at all.
-
+Pulls a response (an event term) from the  slave Pengine if Pengine is a
+remote process, else does nothing at all.
 */
 
-pengine_pull_response(BaseURL:ID, Options) :- !,
-    remote_pengine_pull_response(BaseURL, BaseURL:ID, Options).
+pengine_pull_response(Pengine, Options) :-
+    pengine_remote(Pengine, Server), !,
+    remote_pengine_pull_response(Server, Pengine, Options).
 pengine_pull_response(_ID, _Options).
-
 
 
 /** pengine_input(-Term) is det
 
 Sends a prompt (as set by   pengine_set_prompt/1)  to the parent pengine
 and waits for input.
-
 */
 
 pengine_input(Term) :-
@@ -861,7 +859,6 @@ pengine_input(Term) :-
     pengine_get_prompt(Prompt),
     pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_event(input(Term)).
-
 
 
 /** pengine_set_prompt(+Term) is det
