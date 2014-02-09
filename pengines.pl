@@ -29,8 +29,6 @@
 
 :- module(pengine,
 	  [ pengine_create/1,			% +Options
-            pengine_send/2,
-            pengine_send/3,
             pengine_ask/2,
             pengine_ask/3,
             pengine_next/1,
