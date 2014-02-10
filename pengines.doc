@@ -29,6 +29,8 @@ Pengines is short for Prolog Engines.  The pengines package greatly
 simplifies (1) developing JavaScript based web-applications that must
 talk to a Prolog server and (2) realise distributed programming in
 Prolog by providing RPC (\jargon{Remote Procedure Calling}) over HTTP.
+
+See also \url{http://www.swi-prolog.org/pengines}.
 \end{abstract}
 
 \pagebreak
