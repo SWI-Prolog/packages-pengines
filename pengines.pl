@@ -1178,11 +1178,12 @@ pengine_rpc(URL, Query, QOptions) :-
 	pengine_destroy_and_wait(Id)).
 
 pengine_destroy_and_wait(Id) :-
-	pengine_destroy(Id),
-	pengine_event(destroy(Id)).
+    pengine_destroy(Id),
+    pengine_event(destroy(Id)).
 
 wait_event(Query, Template, Options) :-
     pengine_event(Event),
+    debug(pengine(event), 'Received ~p', [Event]),
     process_event(Event, Query, Template, Options).
 
 process_event(create(ID, _), Query, Template, Options) :-
