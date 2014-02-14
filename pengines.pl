@@ -143,6 +143,7 @@ from Prolog or JavaScript.
 		     ]).
 
 % :- debug(pengine(transition)).
+:- debug(pengine(debug)).		% handle pengine_debug in pengine_rpc/3.
 
 /* Settings */
 
@@ -1193,15 +1194,16 @@ process_event(error(_ID, Error), _Query, _Template, _Options) :-
     throw(Error).
 process_event(failure(_ID), _Query, _Template, _Options) :-
     fail.
-process_event(prompt(ID, Term), Query, Template, Options) :-
-    pengine_output(prompt(ID, Term)),
+process_event(prompt(ID, Prompt), Query, Template, Options) :-
+    pengine_rpc_prompt(ID, Prompt, Reply),
+    pengine_send(ID, input(Reply)),
     wait_event(Query, Template, Options).
 process_event(output(ID, Term), Query, Template, Options) :-
-    pengine_output(output(ID, Term)),
+    pengine_rpc_output(ID, Term),
     pengine_pull_response(ID, Options),
     wait_event(Query, Template, Options).
-process_event(debug(ID, Term), Query, Template, Options) :-
-    pengine_output(debug(ID, Term)),
+process_event(debug(ID, Message), Query, Template, Options) :-
+    debug(pengine(debug), '~w', [Message]),
     pengine_pull_response(ID, Options),
     wait_event(Query, Template, Options).
 process_event(success(_ID, Solutions, false), _Query, Template, _Options) :- !,
@@ -1211,6 +1213,34 @@ process_event(success(ID, Solutions, true), Query, Template, Options) :-
     ;   pengine_next(ID, Options),
 	wait_event(Query, Template, Options)
     ).
+
+pengine_rpc_prompt(ID, Prompt, Term) :-
+    prompt(ID, Prompt, Term0), !,
+    Term = Term0.
+pengine_rpc_prompt(_ID, Prompt, Term) :-
+    setup_call_cleanup(
+	prompt(Old, Prompt),
+	read(Term),
+	prompt(_, Old)).
+
+pengine_rpc_output(ID, Term) :-
+    output(ID, Term), !.
+pengine_rpc_output(_ID, Term) :-
+    print(Term).
+
+%%  prompt(+ID, +Prompt, -Term) is semidet.
+%
+%   Hook to handle pengine_input/1 from the remote pengine. If the hooks
+%   fails, pengine_rpc/3 calls read/1 using the current prompt.
+
+:- multifile prompt/3.
+
+%%  output(+ID, +Term) is semidet.
+%
+%   Hook to handle pengine_output/1 from the remote pengine. If the hook
+%   fails, it calls print/1 on Term.
+
+:- multifile output/2.
 
 
 /** pengine_ask_around(+URLs, +Query, +Options) is nondet
