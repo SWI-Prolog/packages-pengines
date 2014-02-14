@@ -38,7 +38,7 @@
             pengine_input/1,			% -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
-            pengine_debug/1,			% +list(Term)
+            pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
             pengine_destroy/1,			% +Pengine
@@ -572,21 +572,27 @@ pengine_output(Term, Options) :-
 pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
 
 
-/** pengine_debug(+Terms) is det
+/** pengine_debug(+Format, +Args) is det
 
-Converts list of Terms to an atom and sends it to the parent pengine or
-thread.
+Create a message using format/3 from Format   and  Args and send this to
+the    client.    The    default    JavaScript    client    will    call
+=|console.log(Message)|=  if  there  is   a    console.   The  predicate
+pengine_rpc/3 calls debug(pengine(debug), '~w',   [Message]).  The debug
+topic pengine(debug) is enabled by default.
 
-@bug	Terms is incompatible to debug/3.  This is likely to change to
-	use format/3.  This requires extensions to library(sandbox).
+@see debug/1 and nodebug/1 for controlling the pengine(debug) topic
+@see format/2 for format specifications
 */
 
-pengine_debug(Terms) :-
+pengine_debug(Format, Args) :-
     pengine_parent(Queue),
     pengine_self(Self),
-    maplist(term_to_atom, Terms, Atoms),
-    atomic_list_concat(Atoms, ' ', Atom),
-    thread_send_message(Queue, debug(Self, Atom)).
+    catch(safe_goal(format(atom(_), Format, Args)), E, true),
+    (	var(E)
+    ->	format(atom(Message), Format, Args)
+    ;	message_to_string(E, Message)
+    ),
+    thread_send_message(Queue, debug(Self, Message)).
 
 
 /*================= Local pengine =======================
@@ -1681,7 +1687,7 @@ sandbox:safe_primitive(pengine:pengine_event(_, _)).
 sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
-sandbox:safe_primitive(pengine:pengine_debug(_)).
+sandbox:safe_primitive(pengine:pengine_debug(_,_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
 
 
