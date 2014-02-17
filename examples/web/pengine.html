@@ -1,16 +1,15 @@
-<html lang="en">   
+<html lang="en">
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
         <script src="/jquery-2.0.3.min.js"></script>
         <script src="/js/pengines.js"></script>
         <script type="text/x-prolog">
 
-            solve :- 
+            solve :-
                 pengine_create([
                     src_text('a(1). a(2). a(3).')
                 ]),
                 pengine_event_loop(handle, []).
-
 
             handle(create(ID, _)) :-
                 pengine_ask(ID, a(X), [
@@ -27,7 +26,6 @@
             handle(error(ID, Err)) :-
                 message_to_string(Err, ErrS),
                 pengine_output(ErrS).
-
 
         </script>
         <script type="text/javascript">
