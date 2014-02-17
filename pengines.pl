@@ -1720,13 +1720,14 @@ sandbox:safe_primitive(pengine:pengine_input(_)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
+sandbox:safe_primitive(pengine:pengine_ask(_, _, _)).
 
 
 sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
-	callable(Closure),
 	extend_goal(Closure, [_], Closure1).
 
-extend_goal(Var, _, _) :- !,
+extend_goal(Var, _, _) :-
+	var(Var), !,
 	instantiation_error(Var).
 extend_goal(M:Term0, Extra, M:Term) :-
 	extend_goal(Term0, Extra, Term).
