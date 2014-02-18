@@ -446,7 +446,7 @@ for new queries.
 @see pengine_destroy/1.
 */
 
-pengine_abort(Pengine) :- !,
+pengine_abort(Pengine) :-
     pengine_remote(Pengine, Server), !,
     remote_pengine_abort(Server, Pengine, []).
 pengine_abort(Pengine) :-
