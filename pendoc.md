@@ -32,7 +32,7 @@ A pengine is comprised of:
 Everything needed to work with  pengines   is  included  in the package,
 including  a  JavaScript  library  for  creating  and  interacting  with
 pengines from a web  client.  However,  the   web  server  (in  the file
-example_server.pl) should only be regarded as a minimal example.
+examples/server.pl) should only be regarded as a minimal example.
 
 Underlying the design of the  package  is   a  careful  analysis  of the
 conversations taking place between Prolog and a   user (which could be a
@@ -79,8 +79,8 @@ to A. Thus, in theory, a Prolog program, be it a pure Horn clause theory
 or not, can be as big as the Web.  This is something that should make us
 think about a _Semantic Web_, especially  when we consider the excellent
 fit between the Pengine library and   SWI-Prolog's  Semantic Web Library
-[4]. Adding Pengines functionality to the Cliopatria platform [5] should
-also be straightforward.
+[4]. Adding Pengines functionality to the Cliopatria platform [5] is
+ straightforward.
 
 A note about safety: Because PLTP is  layered   on  top  of HTTP, it may
 utilize any standard HTTP security feature,  such as HTTP authentication
@@ -110,11 +110,11 @@ solve queries asked by a master.
 
 In this example we load the pengines library and use pengine_create/1 to
 create a slave pengine in a remote   pengine server, and inject a number
-of clauses in it. We then  use   pengine_event_loop/1  to start an event
+of clauses in it. We then  use   pengine_event_loop/2  to start an event
 loop that listens for three kinds of  event terms. Running =main/0= will
 write  the  terms  q(a),  q(b)  and   q(c)  to  standard  output.  Using
-pengine_ask/3 with the option template(X) instead of pengine_ask/2 would
-instead produce the output =a=, =b= and =c=.
+pengine_ask/3 with the option template(X) would instead produce the output
+=a=, =b= and =c=.
 
 ==
 :- use_module(pengines).
@@ -127,21 +127,21 @@ main :-
             p(a). p(b). p(c).
         ")
     ]),
-    pengine_event_loop(handle).
+    pengine_event_loop(handle, []).
 
 
 handle(create(ID, _)) :-
-    pengine_ask(ID, q(X)).
+    pengine_ask(ID, q(X), []).
 handle(success(ID, [X], false)) :-
     writeln(X).
 handle(success(ID, [X], true)) :-
     writeln(X),
-    pengine_next(ID).
+    pengine_next(ID, []).
 ==
 
 Here is another example, showing  how  to   create  and  interact with a
 pengine from JavaScript in a way that seems ideal for Prolog programmers
-and JavaScript programmers/frontend developers alike.   Loading the page
+and JavaScript programmers alike.   Loading the page
 brings up the browser's prompt dialog, waits   for the user's input, and
 writes that input in the browser  window.   If  the input was 'stop', it
 stops there, else it repeats. Note that   I/O  works as expected. All we
@@ -200,51 +200,6 @@ locally:
 X = c ;
 X = d.
 ?-
-==
-
-In our fourth and final  (and   admittedly  most complicated) example we
-show how elegantly pengine_rpc/3, used in the previous example, can been
-implemented using the Pengines  core   predicates  --  pengine_create/1,
-pengine_event/2,            pengine_ask/3,             pengine_output/1,
-pengine_pull_response/2 and pengine_next/2.
-
-==
-
-pengine_rpc(URL, Query, Options) :-
-    pengine_create([
-        server(URL)
-        | Options
-    ]),
-    wait_event(Query, Options).
-
-
-wait_event(Query, Options) :-
-    pengine_event(Event),
-    process_event(Event, Query, Options).
-
-
-process_event(create(ID, _), Query, Options) :-
-    pengine_ask(ID, Query, Options),
-    wait_event(Query, Options).
-process_event(error(_ID, Error), _Query, _Options) :-
-    throw(Error).
-process_event(failure(_ID), _Query, _Options) :-
-    fail.
-process_event(prompt(ID, Term), Query, Options) :-
-    pengine_output(prompt(ID, Term)),
-    wait_event(Query, Options).
-process_event(output(ID, Term), Query, Options) :-
-    pengine_output(output(ID, Term)),
-    pengine_pull_response(ID, Options),
-    wait_event(Query, Options).
-process_event(success(_ID, Solutions, false), Query, _Options) :-
-    member(Query, Solutions).
-process_event(success(_ID, Solutions, true), Query, _Options) :-
-    member(Query, Solutions).
-process_event(success(ID, _Query, true), Query, Options) :-
-    pengine_next(ID, Options),
-    wait_event(Query, Options).
-
 ==
 
 ## Making predicates available to clients {#pengine-server-code}
