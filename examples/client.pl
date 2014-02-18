@@ -54,7 +54,7 @@ pengine_demo :-
                 p(a). p(b). p(c).
 	      ")
 	    ]),
-	pengine_event_loop(handle).
+	pengine_event_loop(handle, []).
 
 pengine_demo(Port) :-
 	format(atom(URL), 'http://localhost:~d', [Port]),
@@ -65,14 +65,14 @@ pengine_demo(Port) :-
                 p(a). p(b). p(c).
 	      ")
 	    ]),
-	pengine_event_loop(handle).
+	pengine_event_loop(handle, []).
 
 
 handle(create(ID, _)) :-
-	pengine_ask(ID, q(_X)).
+	pengine_ask(ID, q(_X), []).
 handle(success(ID, X, false)) :- !,
 	writeln(X),
 	pengine_destroy(ID).
 handle(success(ID, X, true)) :-
 	writeln(X),
-	pengine_next(ID).
+	pengine_next(ID, []).
