@@ -344,7 +344,7 @@ terms_.
       Terms is a list holding instantiations of `Template`. More is
       either `true` or `false`, indicating whether we can expect the
       pengine to be able to return more solutions or not, would we call
-      pengine_next/1.
+      pengine_next/2.
 
     * failure(ID)
       ID is the id of the pengine that failed for lack of a solutions.
@@ -392,7 +392,7 @@ Here too, results will be returned in the form of _event terms_.
       solution to the query. Terms is a list holding instantiations of
       `Template`. More is either `true` or `false`, indicating whether
       we can expect the pengine to be able to return more solutions or
-      not, would we call pengine_next/1.
+      not, would we call pengine_next/2.
 
     * failure(ID)
       ID is the id of the pengine that failed for lack of more solutions.
