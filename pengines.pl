@@ -1529,7 +1529,7 @@ to_json_s(create(ID, Term0)) :-
 to_json_s(stop(ID)) :-
     reply_json(json([event=stop, id=ID])).
 to_json_s(success(ID, Bindings0, More)) :-
-    solution_to_json(Bindings0, Bindings),
+    maplist(solution_to_json, Bindings0, Bindings),
     reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
 to_json_s(failure(ID)) :-
     reply_json(json([event=failure, id=ID])).
