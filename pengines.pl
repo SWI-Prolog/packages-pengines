@@ -874,6 +874,14 @@ pengine_input(Prompt, Term) :-
 Sends a response in the form of the term Input to a slave pengine 
 that has prompted its master for input.
 
+Defined in terms of pengine_send/3, as follows:
+
+==
+pengine_respond(Pengine, Input, Options) :-
+    pengine_send(Pengine, input(Input), Options).
+==
+
+*/
 */
 
 pengine_respond(Pengine, Input, Options) :-
