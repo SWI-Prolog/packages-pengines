@@ -4,12 +4,8 @@
         <script src="/js/pengines.js"></script>
         <script type="text/x-prolog">
 
-            main :-
-                pengine_set_prompt('Please enter a name, stop with "stop"'),
-		read_names.
-
 	    read_names :-
-                pengine_input(X),
+                pengine_input('Please enter a name, stop with "stop"', X),
 		(   X == stop
 		->  !
 		;   pengine_output(X),
@@ -24,10 +20,10 @@
                 onoutput: handleOutput
             });
             function handleCreate() {
-                pengine.ask('main');
+                pengine.ask('read_names');
 	    }
             function handlePrompt() {
-                pengine.input(prompt(this.data));
+                pengine.respond(prompt(this.data));
 	    }
             function handleOutput() {
                 $('#out').append("<div>"+this.data+"</div>");
