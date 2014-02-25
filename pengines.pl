@@ -29,7 +29,6 @@
 
 :- module(pengine,
 	  [ pengine_create/1,			% +Options
-            pengine_send/3,			% +Pengine, :Event, +Options
             pengine_ask/3,			% +Pengine, :Query, +Options
             pengine_next/2,			% +Pengine. +Options
             pengine_stop/2,			% +Pengine. +Options
@@ -39,6 +38,7 @@
             pengine_input/1,			% -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
+            pengine_respond/3,	    % +Pengine, :Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
@@ -117,6 +117,9 @@ from Prolog or JavaScript.
 		     [ pass_to(pengine_send/3, 3)
 		     ]).
 :- predicate_options(pengine_output/2, 2,
+		     [ pass_to(pengine_send/3, 3)
+		     ]).
+:- predicate_options(pengine_respond/3, 2,
 		     [ pass_to(pengine_send/3, 3)
 		     ]).
 :- predicate_options(pengine_rpc/3, 3,
@@ -895,6 +898,17 @@ pengine_get_prompt(Prompt) :-
     ;   Prompt = '|:'
     ).
 
+
+/** pengine_respond(+Pengine, +Input, +Options) is det
+
+Sends a response in the form of the term Input to a slave pengine 
+that has prompted its master for input.
+
+*/
+
+pengine_respond(Pengine, Input, Options) :-
+    pengine_send(Pengine, input(Input), Options).
+    
 
 %%	send_error(+Error) is det.
 %
