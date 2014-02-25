@@ -118,8 +118,9 @@ function Pengine(callbacks) {
     $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
-	     "data": JSON.stringify({ src_text: source(),
-				      format: format
+	     "data": JSON.stringify({ 
+                      src_text: source() + "\n" + src,
+                      format: format
 				    }),
 	     "success": process_response,
 	     "type": "POST"
