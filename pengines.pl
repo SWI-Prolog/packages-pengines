@@ -361,7 +361,7 @@ terms_.
       argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
-      ID is the id of the pengine that called pengine_input/2 and Term is 
+      ID is the id of the pengine that called pengine_input/2 and Term is
       the prompt.
 
 Defined in terms of pengine_send/3, like so:
@@ -409,7 +409,7 @@ Here too, results will be returned in the form of _event terms_.
       argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
-      ID is the id of the pengine that called pengine_input/2 and Term 
+      ID is the id of the pengine that called pengine_input/2 and Term
       is the prompt.
 
 Defined in terms of pengine_send/3, as follows:
@@ -871,7 +871,7 @@ pengine_input(Prompt, Term) :-
 
 /** pengine_respond(+Pengine, +Input, +Options) is det
 
-Sends a response in the form of the term Input to a slave pengine 
+Sends a response in the form of the term Input to a slave pengine
 that has prompted its master for input.
 
 Defined in terms of pengine_send/3, as follows:
@@ -882,11 +882,10 @@ pengine_respond(Pengine, Input, Options) :-
 ==
 
 */
-*/
 
 pengine_respond(Pengine, Input, Options) :-
     pengine_send(Pengine, input(Input), Options).
-    
+
 
 %%	send_error(+Error) is det.
 %

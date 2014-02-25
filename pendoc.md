@@ -47,11 +47,11 @@ labels with a slash in front indicate responses.
 
 [[lptpsynch.png]]
 
-The diagram below depicts a PLTP run (on the right) corresponding to a 
-user's interaction with Prolog (on the left). `1234' is the Pengine's 
+The diagram below depicts a PLTP run (on the right) corresponding to a
+user's interaction with Prolog (on the left). `1234' is the Pengine's
 identifier, which is a UUID in the actual implementation.
 
-[[pltp_run_colour.png]]
+[[pltp-run-colour.png]]
 
 As for the relations between pengines, and   for the time being, we have
 opted for a simple _master-slave   architecture_.  Once the master/slave
