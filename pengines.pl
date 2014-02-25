@@ -858,7 +858,8 @@ pengine_pull_response(_ID, _Options).
 
 /** pengine_input(+Prompt, -Term) is det
 
-Sends Prompt to the parent pengine and waits for input.
+Sends Prompt to the parent pengine and waits for input. Note that Prompt may be
+anÿ term, atomic or complex.
 */
 
 pengine_input(Prompt, Term) :-
@@ -866,33 +867,6 @@ pengine_input(Prompt, Term) :-
     nb_getval(pengine_parent, Parent),
     pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_event(input(Term)).
-
-
-/** pengine_set_prompt(+Term) is det
-
-Sets the prompt associated with pengine_input/1.   Note that Term may be
-any complex term.
-
-*/
-
-:- thread_local pengine_current_prompt/1.
-
-pengine_set_prompt(Prompt) :-
-    retractall(pengine_current_prompt(_)),
-    assert(pengine_current_prompt(Prompt)).
-
-
-/** pengine_get_prompt(-Term) is det
-
-Gets the current pengine prompt.
-
-*/
-
-pengine_get_prompt(Prompt) :-
-    (   pengine_current_prompt(Prompt)
-    ->  true
-    ;   Prompt = '|:'
-    ).
 
 
 /** pengine_respond(+Pengine, +Input, +Options) is det
