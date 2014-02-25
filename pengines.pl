@@ -29,6 +29,7 @@
 
 :- module(pengine,
 	  [ pengine_create/1,			% +Options
+            pengine_send/3,			% +Pengine, :Event, +Options
             pengine_ask/3,			% +Pengine, :Query, +Options
             pengine_next/2,			% +Pengine. +Options
             pengine_stop/2,			% +Pengine. +Options
