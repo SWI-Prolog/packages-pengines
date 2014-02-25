@@ -95,8 +95,8 @@ function Pengine(callbacks) {
     this.ask = function(query, options) {
         that.send('request(ask(' + query + ', ' + options_to_list(options) + '))');
     }
-    this.input = function(event) {
-        that.send('input(' + event + ')');
+    this.respond = function(input) {
+        that.send('input(' + input + ')');
     }
     this.next = function() {
         that.send('request(next)');
