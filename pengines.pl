@@ -33,9 +33,7 @@
             pengine_next/2,			% +Pengine. +Options
             pengine_stop/2,			% +Pengine. +Options
             pengine_event/2,			% -Event, +Options
-            pengine_set_prompt/1,		% +Term
-            pengine_get_prompt/1,		% -Term
-            pengine_input/1,			% -Term
+            pengine_input/2,			% +Prompt, -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
             pengine_respond/3,	    % +Pengine, +Input, +Options
@@ -363,8 +361,8 @@ terms_.
       argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
-      ID is the id of the pengine that called pengine_input/1.
-      Term is the current prompt, as set by pengine_set_prompt/1.
+      ID is the id of the pengine that called pengine_input/2 and Term is 
+      the prompt.
 
 Defined in terms of pengine_send/3, like so:
 
@@ -411,8 +409,8 @@ Here too, results will be returned in the form of _event terms_.
       argument of pengine_output/1 when it was called.
 
     * prompt(ID, Term)
-      ID is the id of the pengine that called pengine_input/1.
-      Term is the current prompt, as set by pengine_set_prompt/1.
+      ID is the id of the pengine that called pengine_input/2 and Term 
+      is the prompt.
 
 Defined in terms of pengine_send/3, as follows:
 
@@ -858,16 +856,14 @@ pengine_pull_response(Pengine, Options) :-
 pengine_pull_response(_ID, _Options).
 
 
-/** pengine_input(-Term) is det
+/** pengine_input(+Prompt, -Term) is det
 
-Sends a prompt (as set by   pengine_set_prompt/1)  to the parent pengine
-and waits for input.
+Sends Prompt to the parent pengine and waits for input.
 */
 
-pengine_input(Term) :-
+pengine_input(Prompt, Term) :-
     pengine_self(Self),
     nb_getval(pengine_parent, Parent),
-    pengine_get_prompt(Prompt),
     pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_event(input(Term)).
 
