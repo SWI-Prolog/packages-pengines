@@ -86,26 +86,23 @@ function Pengine(callbacks) {
             if (callbacks.ondestroy) callbacks.ondestroy.call(obj);
         }
     };
-    // Public functions
-    this.send = function(event) {
+    function send(event) {
         var event = encodeURIComponent(event);
         $.get(server + 'pengine/send?id=' + that.id +
 	      '&event=' + event + '&format=' + format, process_response);
     }
+    // Public functions
     this.ask = function(query, options) {
-        that.send('request(ask(' + query + ', ' + options_to_list(options) + '))');
-    }
-    this.respond = function(input) {
-        that.send('input(' + input + ')');
+        send('request(ask(' + query + ', ' + options_to_list(options) + '))');
     }
     this.next = function() {
-        that.send('request(next)');
+        send('request(next)');
     }
     this.stop = function() {
-        that.send('request(stop)');
+        send('request(stop)');
     }
-    this.destroy = function() {
-        that.send('request(destroy)');
+    this.respond = function(input) {
+        send('input(' + input + ')');
     }
     this.pull_response = function() {
         $.get(server + 'pengine/pull_response?id=' + that.id +
@@ -115,7 +112,9 @@ function Pengine(callbacks) {
         $.get(server + 'pengine/abort?id=' + that.id +
 	      '&format=' + format, process_response);
     }
-
+    this.destroy = function() {
+        send('request(destroy)');
+    }
     $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
