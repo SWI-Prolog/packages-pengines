@@ -1215,7 +1215,7 @@ pengine_rpc_output(_ID, Term) :-
 
 %%  prompt(+ID, +Prompt, -Term) is semidet.
 %
-%   Hook to handle pengine_input/1 from the remote pengine. If the hooks
+%   Hook to handle pengine_input/2 from the remote pengine. If the hooks
 %   fails, pengine_rpc/3 calls read/1 using the current prompt.
 
 :- multifile prompt/3.
@@ -1701,7 +1701,7 @@ pengine_find_n(N, Template, Goal, List) :-
 sandbox:safe_primitive(pengine:pengine_create(_)).
 sandbox:safe_primitive(pengine:pengine_event(_, _)).
 sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_input(_)).
+sandbox:safe_primitive(pengine:pengine_input(_, _)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
