@@ -38,7 +38,7 @@
             pengine_input/1,			% -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
-            pengine_respond/3,	    % +Pengine, :Input, +Options
+            pengine_respond/3,	    % +Pengine, +Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
