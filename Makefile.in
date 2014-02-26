@@ -6,7 +6,7 @@
 
 PACKAGE=pengines
 DOC=pengines
-DOCIMG=penarch.png  lptpsynch.png
+DOCIMG=penarch.png pltpruncolour.png lptpsynch.png
 include ../Makefile.defs
 JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
