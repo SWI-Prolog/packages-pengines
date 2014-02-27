@@ -330,7 +330,7 @@ Options is a list of options:
       query.
 
     * chunk(+Integer)
-      Retrieve solutions in chunks of Integer rather than one by one. 0
+      Retrieve solutions in chunks of Integer rather than one by one. 1
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk.
 
