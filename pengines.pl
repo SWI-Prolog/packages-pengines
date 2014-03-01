@@ -210,6 +210,11 @@ following form:
       ID is the id of the pengine that was created.
       Term is not used at the moment.
 
+An error will be returned if the pengine could not be created:
+
+    * error(ID, Term)
+      ID is invalid, since no pengine was created.
+      Term is the exception's error term.
 */
 
 
@@ -607,20 +612,23 @@ local_pengine_create(Options) :-
 %	@arg Child is the identifier of the created pengine.
 
 create(Queue, Child, Options, URL) :-
-    partition(pengine_create_option, Options, PengineOptions, RestOptions),
-	thread_create(
-	    pengine_main(Queue, PengineOptions), ChildThread,
-	    [ at_exit(pengine_done)
-	    | RestOptions
-	]),
-	pengine_register_local(Child, ChildThread, Queue, URL),
-	thread_send_message(ChildThread, pengine_registered(Child)),
-	(	option(id(Id), Options)
-	->	Id = Child
-	;	true
-	).
-	
+    catch(create0(Queue, Child, Options, URL), 
+        Error, 
+        pengine_reply(Queue, error(id(null, null), Error))).
 
+create0(Queue, Child, Options, URL) :-
+    partition(pengine_create_option, Options, PengineOptions, RestOptions),
+    thread_create(
+        pengine_main(Queue, PengineOptions), ChildThread,
+        [ at_exit(pengine_done)
+        | RestOptions
+    ]),
+    pengine_register_local(Child, ChildThread, Queue, URL),
+    thread_send_message(ChildThread, pengine_registered(Child)),
+    (   option(id(Id), Options)
+    ->  Id = Child
+    ;   true
+    ).
 
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
