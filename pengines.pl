@@ -100,8 +100,6 @@ from Prolog or JavaScript.
 		       src_text(any),		% text
 		       src_url(atom),
 		       src_predicates(list),
-		       probe(callable),
-		       probe_template(any),
 		       format(oneof([prolog,json,'json-s']))
 		     ]).
 :- predicate_options(pengine_ask/3, 3,
@@ -196,19 +194,6 @@ from Prolog or JavaScript.
       Send the local predicates denoted by List to the remote pengine.
       List is a list of predicate indicators.
 
-    * probe(+Query)
-      Run Query before creating the pengine. If the query fails, the
-      pengine is not created. Makes sense only if the pengine is to be
-      run remotely. Query is `true' by default.
-
-    * probe_template(+Template)
-      Template is a term possibly containing variables shared with the
-      probe query. By default, the template is identical to the probe
-      query. The second argument of the =create= event will be bound to
-      an instance of this term, which makes it useful for getting
-      information about the environment in which the pengine is to be
-      run.
-
     * format(+Format)
       Determines the format of event responses. Format is an atom,
       either =prolog= (default), =json=, or =json-s=.
@@ -223,13 +208,8 @@ following form:
 
     * create(ID, Term)
       ID is the id of the pengine that was created.
-      Term is an instance of Template.
+      Term is not used at the moment.
 
-An error will be returned if the pengine could not be created:
-
-    * error(ID, Term)
-      ID is invalid, since no pengine was created.
-      Term is the exception's error term.
 */
 
 
@@ -627,41 +607,26 @@ local_pengine_create(Options) :-
 %	@arg Child is the identifier of the created pengine.
 
 create(Queue, Child, Options, URL) :-
-    select_option(probe(Condition), Options, RestOptions0, true),
-    partition(pengine_create_option, RestOptions0, PengineOptions, RestOptions),
-    (   catch(probe(Condition), E, true)
-    ->  (   var(E)
-	->  thread_create(
-		pengine_main(Queue, PengineOptions), ChildThread,
-		[ at_exit(pengine_done)
-		| RestOptions
-		]),
-	    pengine_register_local(Child, ChildThread, Queue, URL),
-	    thread_send_message(ChildThread, pengine_registered(Child)),
-	    (	option(id(Id), Options)
-	    ->	Id = Child
-	    ;	true
-	    )
-	;   probe_failure(Queue, E)
-	)
-    ;   probe_failure(Queue, error(probe_failure(Condition), _))
-    ).
-
-probe(Condition) :-
-	expand_goal(pengine_sandbox:Condition, Goal),
-	safe_goal(Goal),
-	call(Goal).
-
-probe_failure(Queue, Term) :-
-    pengine_reply(Queue, error(id(null, null), Term)).
+    partition(pengine_create_option, Options, PengineOptions, RestOptions),
+	thread_create(
+	    pengine_main(Queue, PengineOptions), ChildThread,
+	    [ at_exit(pengine_done)
+	    | RestOptions
+	]),
+	pengine_register_local(Child, ChildThread, Queue, URL),
+	thread_send_message(ChildThread, pengine_registered(Child)),
+	(	option(id(Id), Options)
+	->	Id = Child
+	;	true
+	).
+	
 
 
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
-pengine_create_option(probe(_)).
-pengine_create_option(probe_template(_)).
+
 
 %%	pengine_done is det.
 %
@@ -687,12 +652,11 @@ pengine_main(Parent, Options) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
-    select_option(probe_template(Template), Options, RestOptions, true),
-    (   catch(maplist(process_create_option, RestOptions), Error,
+    (   catch(maplist(process_create_option, Options), Error,
 	      ( send_error(Error),
 		fail
 	      ))
-    ->  pengine_reply(create(Self, Template)),
+    ->  pengine_reply(create(Self, _Template)),
         pengine_main_loop(Self)
     ;   pengine_terminate(Self)
     ).
@@ -942,18 +906,7 @@ translate_local_source(PengineOptions0, PengineOptions) :-
     PengineOptions = [src_text(Text)|PengineOptions1].
 translate_local_source(Options, Options).
 
-options_to_dict(Options, Dict) :-
-    select_option(probe_template(Template), Options, Options1),
-    select_option(probe(Probe), Options1, Options2), !,
-    numbervars(Probe+Template, 0, _),
-    format(string(ProbeString), '~k', [Probe]),
-    format(string(TemplateString), '~k', [Template]),
-    maplist(prolog_option, Options2, Options3),
-    dict_create(Dict, _,
-		[ probe(ProbeString),
-		  probe_template(TemplateString)
-		| Options3
-		]).
+
 options_to_dict(Options, Dict) :-
     maplist(prolog_option, Options, Options1),
     dict_create(Dict, _, Options1).
@@ -1366,14 +1319,7 @@ enforce_max_session_pengines(post, _, ID) :-
 
 dict_to_options(Dict, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),
-    (	select(probe_template-TemplateString, Pairs, Pairs1),
-	select(probe-ProbeString, Pairs1, Pairs2)
-    ->	format(string(Combined), '(~s)-(~s)', [TemplateString,ProbeString]),
-	term_string(Combined, Template-Probe),
-	pairs_create_options(Pairs2, MoreOptions),
-	CreateOptions = [probe(Probe), probe_template(Template) | MoreOptions]
-    ;	pairs_create_options(Pairs, CreateOptions)
-    ).
+    pairs_create_options(Pairs, CreateOptions).
 
 pairs_create_options([], []).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
