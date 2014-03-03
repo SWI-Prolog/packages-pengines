@@ -299,9 +299,13 @@ pengine_reply(Event) :-
     pengine_reply(Queue, Event).
 
 pengine_reply(Queue, Event) :-
+    retract(using_ask), !,
+    debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
+    pengine_self(Self),
+    thread_send_message(Queue, create(Self, Event)).
+pengine_reply(Queue, Event) :-
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
     thread_send_message(Queue, Event).
-
 
 /** pengine_ask(+NameOrID, @Query, +Options) is det
 
@@ -614,7 +618,7 @@ local_pengine_create(Options) :-
 create(Queue, Child, Options, URL) :-
     catch(create0(Queue, Child, Options, URL), 
         Error, 
-        pengine_reply(Queue, error(id(null, null), Error))).
+        pengine_reply(Queue,error(id(null, null), Error))).
 
 create0(Queue, Child, Options, URL) :-
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
@@ -625,15 +629,18 @@ create0(Queue, Child, Options, URL) :-
     ]),
     pengine_register_local(Child, ChildThread, Queue, URL),
     thread_send_message(ChildThread, pengine_registered(Child)),
-    (   option(id(Id), Options)
-    ->  Id = Child
-    ;   true
+    (    option(id(Id), Options)
+    ->    Id = Child
+    ;    true
     ).
+	
 
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
+pengine_create_option(ask(_)).
+pengine_create_option(ask_options(_)).
 
 
 %%	pengine_done is det.
@@ -656,6 +663,8 @@ pengine_done :-
 %	Run a pengine main loop. First acknowledges its creation and run
 %	pengine_main_loop/1.
 
+:- thread_local using_ask/0.
+
 pengine_main(Parent, Options) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
@@ -664,8 +673,13 @@ pengine_main(Parent, Options) :-
 	      ( send_error(Error),
 		fail
 	      ))
-    ->  pengine_reply(create(Self, _Template)),
-        pengine_main_loop(Self)
+    ->  (       option(ask(Query), Options)
+        ->      option(ask_options(AskOptions), Options, []),
+                assert(using_ask),
+                ask(Self, Query, AskOptions)
+        ;       pengine_reply(create(Self, noevent)),
+                pengine_main_loop(Self)
+        )
     ;   pengine_terminate(Self)
     ).
 
@@ -675,7 +689,7 @@ pengine_main(Parent, Options) :-
 %	the current output points to a CGI stream.
 
 fix_streams :-
-	fix_stream(current_output).
+        fix_stream(current_output).
 
 fix_stream(Name) :-
 	is_cgi_stream(Name), !,
@@ -1048,10 +1062,13 @@ pengine_event_loop(Closure, Created, Options) :-
     ),
     pengine_event_loop(Event, Closure, Created, Options).
 
-pengine_event_loop(create(ID, T), Closure, Created, Options) :-
-    debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(T)]),
-    ignore(call(Closure, create(ID, T))),
-    pengine_event_loop(Closure, [ID|Created], Options).
+pengine_event_loop(create(ID, Answer), Closure, Created, Options) :-
+    debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(Answer)]),
+    ignore(call(Closure, create(ID, Answer))),
+    (   Answer == noevent
+    ->  pengine_event_loop(Closure, [ID|Created], Options)
+    ;   pengine_event_loop(Answer, Closure, [ID|Created], Options)
+    ).
 pengine_event_loop(output(ID, Msg), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, output(Msg)]),
     ignore(call(Closure, output(ID, Msg))),
