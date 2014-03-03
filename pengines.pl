@@ -640,7 +640,8 @@ pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
 pengine_create_option(ask(_)).
-pengine_create_option(ask_options(_)).
+pengine_create_option(template(_)).
+pengine_create_option(chunk(_)).
 
 
 %%	pengine_done is det.
@@ -674,9 +675,10 @@ pengine_main(Parent, Options) :-
 		fail
 	      ))
     ->  (       option(ask(Query), Options)
-        ->      option(ask_options(AskOptions), Options, []),
-                assert(using_ask),
-                ask(Self, Query, AskOptions)
+        ->      assert(using_ask),
+                option(template(Template), Options, Query),
+                option(chunk(Chunk), Options, 1),                
+                ask(Self, Query, [template(Template), chunk(Chunk)])
         ;       pengine_reply(create(Self, noevent)),
                 pengine_main_loop(Self)
         )
@@ -941,6 +943,8 @@ prolog_option(Option0, Option) :-
 prolog_option(Option, Option).
 
 prolog_option(src_list(_)).
+prolog_option(ask(_)).
+prolog_option(template(_)).
 
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
@@ -1347,6 +1351,14 @@ dict_to_options(Dict, CreateOptions) :-
     pairs_create_options(Pairs, CreateOptions).
 
 pairs_create_options([], []).
+pairs_create_options(T0, [AskOpt, TemplateOpt|T]) :-
+    select(ask-Ask, T0, T1),
+    select(template-Template, T1, T2), !,
+    atomic_list_concat([Ask, -, Template], AskTemplate),
+    atom_to_term(AskTemplate, Ask1-Template1, _),
+    AskOpt =.. [ask, Ask1],
+    TemplateOpt =.. [template, Template1],
+    pairs_create_options(T2, T).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), !,
@@ -1459,9 +1471,11 @@ to_prolog(Term) :-
 		 nl(true)
 	       ]).
 
+to_json(create(ID, noevent)) :- !,
+    reply_json(json([event=create, id=ID, data=noevent])).
 to_json(create(ID, Term0)) :-
-    term_to_json(Term0, Term),
-    reply_json(json([event=create, id=ID, data=Term])).
+    event_term_to_json_data(Term0, Data),
+    reply_json(json([event=create, id=ID, data=Data])).
 to_json(stop(ID)) :-
     reply_json(json([event=stop, id=ID])).
 to_json(success(ID, Bindings0, More)) :-
@@ -1486,9 +1500,11 @@ to_json(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
 
 
+to_json_s(create(ID, noevent)) :- !,
+    reply_json(json([event=create, id=ID, data=noevent])).
 to_json_s(create(ID, Term0)) :-
-    term_to_json(Term0, Term),
-    reply_json(json([event=create, id=ID, data=Term])).
+    event_term_to_json_s_data(Term0, Data),
+    reply_json(json([event=create, id=ID, data=Data])).
 to_json_s(stop(ID)) :-
     reply_json(json([event=stop, id=ID])).
 to_json_s(success(ID, Bindings0, More)) :-
@@ -1512,6 +1528,30 @@ to_json_s(abort(ID)) :-
 to_json_s(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
 
+
+event_term_to_json_data(success(ID, Bindings0, More), json([event=success, id=ID, data=Bindings, more= @(More)])) :- !,
+    term_to_json(Bindings0, Bindings).
+event_term_to_json_data(EventTerm, json([event=F, id=ID])) :-
+    functor(EventTerm, F, 1), !,
+    arg(1, EventTerm, ID).
+event_term_to_json_data(EventTerm, json([event=F, id=ID, data=JSON])) :-
+    functor(EventTerm, F, 2),
+    arg(1, EventTerm, ID),
+    arg(2, EventTerm, Data),
+    term_to_json(Data, JSON).
+    
+    
+event_term_to_json_s_data(success(ID, Bindings0, More), json([event=success, id=ID, data=Bindings, more= @(More)])) :- !,
+    maplist(solution_to_json, Bindings0, Bindings).
+event_term_to_json_s_data(EventTerm, json([event=F, id=ID])) :-
+    functor(EventTerm, F, 1), !,
+    arg(1, EventTerm, ID).
+event_term_to_json_s_data(EventTerm, json([event=F, id=ID, data=JSON])) :-
+    functor(EventTerm, F, 2),
+    arg(1, EventTerm, ID),
+    arg(2, EventTerm, Data),
+    term_to_json(Data, JSON).
+    
 
 solution_to_json(BindingsIn, json(BindingsOut)) :-
     maplist(swap, BindingsIn, BindingsOut).

@@ -6,7 +6,8 @@
 run :- 
     pengine_create([
         ask(member(A, [a,b,c,d,e])),
-        ask_options([template(A), chunk(2)])
+        template(A), 
+        chunk(2)
     ]),
     pengine_event_loop(handle, []).
 
