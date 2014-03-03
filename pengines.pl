@@ -1356,8 +1356,8 @@ pairs_create_options(T0, [AskOpt, TemplateOpt|T]) :-
     select(template-Template, T1, T2), !,
     atomic_list_concat([Ask, -, Template], AskTemplate),
     atom_to_term(AskTemplate, Ask1-Template1, _),
-    AskOpt =.. [ask, Ask1],
-    TemplateOpt =.. [template, Template1],
+    AskOpt = ask(Ask1),
+    TemplateOpt = template(Template1),
     pairs_create_options(T2, T).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
     Opt =.. [N,V],
