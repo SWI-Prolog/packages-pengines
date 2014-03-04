@@ -7,7 +7,8 @@ run :-
     pengine_create([
         ask(member(A, [a,b,c,d,e])),
         template(A), 
-        chunk(2)
+        chunk(2),
+        destroy(true)
     ]),
     pengine_event_loop(handle, []).
 
@@ -15,8 +16,7 @@ run :-
 handle(create(ID, ProbeResult)) :-
     writeln(create(ID, ProbeResult)).
 handle(success(ID, A, false)) :-
-    writeln(A),
-    pengine_destroy(ID).
+    writeln(A).
 handle(success(ID, A, true)) :-
     writeln(A),
     pengine_next(ID, []).

@@ -181,18 +181,20 @@ from Prolog or JavaScript.
       server located at URL.
 
     * ask(@Query)
-      Make Query the first query to be solved by this pengine.
+      Make Query the _first_ query to be solved by this pengine (and thus 
+      avoid one network round-trip).
       
     * template(+Template)
       Template is a variable (or a term containing variables) shared
       with the query. By default, the template is identical to the
-      query. Meaningful only if the ask(Query) option is used.
+      query. Meaningful only if the ask(Query) option is used, and
+      valid only for that query. 
 
     * chunk(+Integer)
       Retrieve solutions in chunks of Integer rather than one by one. 1
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk. Meaningful only if
-      the ask(Query) option is used.
+      the ask(Query) option is used, and valid only for that query.
       
     * src_list(+List_of_clauses)
       Inject a list of Prolog clauses in the pengine.
@@ -657,6 +659,7 @@ pengine_create_option(src_predicates(_)).
 pengine_create_option(ask(_)).
 pengine_create_option(template(_)).
 pengine_create_option(chunk(_)).
+pengine_create_option(destroy(_)).
 
 
 %%	pengine_done is det.
@@ -696,7 +699,8 @@ pengine_main(Parent, Options) :-
                 pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
         ;       pengine_reply(create(Self, noevent))
         ),
-        pengine_main_loop(Self)
+        option(destroy(Destroy), Options, false),
+        pengine_main_loop(Self, Destroy)
     ;   pengine_terminate(Self)
     ).
 
@@ -724,10 +728,10 @@ process_create_option(src_url(URL)) :- !,
 process_create_option(_).
 
 
-pengine_main_loop(ID) :-
-    catch(guarded_main_loop(ID), abort_query,
+pengine_main_loop(ID, Destroy) :-
+    catch(guarded_main_loop(ID, Destroy), abort_query,
 	  ( pengine_reply(abort(ID)),
-	    pengine_main_loop(ID)
+	    pengine_main_loop(ID, Destroy)
 	  )).
 
 
@@ -741,17 +745,17 @@ pengine_main_loop(ID) :-
 %	  - ask(:Goal, +Options)
 %	  Solve Goal.
 
-guarded_main_loop(ID) :-
+guarded_main_loop(ID, Destroy) :-
     pengine_event(Event),
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
 	    pengine_terminate(ID)
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
-        ask(ID, Goal, Options)
+        ask(ID, Goal, Options, Destroy)
     ;   debug(pengine(transition), '~q: 2 = ~q => 2', [ID, protocol_error]),
         %pengine_reply(error(ID, error(protocol_error, _))),
-        guarded_main_loop(ID)
+        guarded_main_loop(ID, Destroy)
     ).
 
 
@@ -769,26 +773,35 @@ pengine_terminate(ID) :-
 %	prolog_current_choice/1. This is the reason   why this predicate
 %	has two clauses.
 
-solve(Template, Goal, ID) :-
+solve(Template, Goal, ID, Destroy) :-
     prolog_current_choice(Choice),
     (   call_cleanup(catch(Goal, Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
             ->  pengine_reply(success(ID, Template, true)),
-                more_solutions(ID, Choice)
+                more_solutions(ID, Choice, Destroy)
             ;   !,			% commit
-		pengine_reply(success(ID, Template, false)),
-                guarded_main_loop(ID)
+                destroy_or_continue(Destroy, ID, success(ID, Template, false))
             )
         ;   !,				% commit
-	    pengine_reply(error(ID, Error)),
-            guarded_main_loop(ID)
+            destroy_or_continue(Destroy, ID, error(ID, Error))
         )
     ;   !,				% commit
-	pengine_reply(failure(ID)),
-        guarded_main_loop(ID)
+        destroy_or_continue(Destroy, ID, failure(ID))
     ).
-solve(_, _, _).				% leave a choice point
+solve(_, _, _, _).				% leave a choice point
+
+
+
+destroy_or_continue(true, ID, Event) :-
+    pengine_reply(destroy(ID, Event)),
+    thread_self(Self),
+    thread_detach(Self).
+destroy_or_continue(false, ID, Event) :-
+    pengine_reply(Event),
+    guarded_main_loop(ID, true).
+
+        
 
 %%	more_solutions(+Pengine, +Choice)
 %
@@ -803,28 +816,27 @@ solve(_, _, _).				% leave a choice point
 %	  Ask another goal.  Note that we must commit the choice point
 %	  of the previous goal asked for.
 
-more_solutions(ID, Choice) :-
+more_solutions(ID, Choice, Destroy) :-
     pengine_event(request(Event)),
-    more_solutions(Event, ID, Choice).
+    more_solutions(Event, ID, Choice, Destroy).
 
-more_solutions(stop, ID, _Choice) :- !,
+more_solutions(stop, ID, _Choice, Destroy) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
-    pengine_reply(stop(ID)),
-    guarded_main_loop(ID).
-more_solutions(next, ID, _Choice) :- !,
+    destroy_or_continue(Destroy, ID, stop(ID)).
+more_solutions(next, ID, _Choice, _Destroy) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
     fail.
-more_solutions(ask(Goal, Options), ID, Choice) :- !,
+more_solutions(ask(Goal, Options), ID, Choice, Destroy) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, ask(Goal)]),
     prolog_cut_to(Choice),
-    ask(ID, Goal, Options).
-more_solutions(destroy, ID, _Choice) :- !,
+    ask(ID, Goal, Options, Destroy).
+more_solutions(destroy, ID, _Choice, _Destroy) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
     pengine_terminate(ID).
-more_solutions(Event, ID, Choice) :-
+more_solutions(Event, ID, Choice, Destroy) :-
     debug(pengine(transition), '~q: 6 = ~q => 6', [ID, protocol_error(Event)]),
     pengine_reply(error(ID, error(protocol_error, _))),
-    more_solutions(ID, Choice).
+    more_solutions(ID, Choice, Destroy).
 
 %%	ask(+Pengine, :Goal, +Options)
 %
@@ -832,18 +844,18 @@ more_solutions(Event, ID, Choice) :-
 %	is safe to call Goal using safe_goal/1 and then calls solve/3 to
 %	prove the goal. It takes care of the chunk(N) option.
 
-ask(ID, Goal, Options) :-
+ask(ID, Goal, Options, Destroy) :-
     expand_goal(pengine_sandbox:Goal, Goal1),
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
         (   N == 1
-        ->  solve([Template], Goal1, ID)
-        ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID)
+        ->  solve([Template], Goal1, ID, Destroy)
+        ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID, Destroy)
         )
     ;   pengine_reply(error(ID, Error)),
-	guarded_main_loop(ID)
+	    guarded_main_loop(ID, Destroy)
     ).
 
 
@@ -947,14 +959,17 @@ translate_local_source(Options, Options).
 
 
 options_to_dict(Options, Dict) :-
-    maplist(prolog_option, Options, Options1),
-    dict_create(Dict, _, Options1).
+    copy_term(Options, Options1),
+    numbervars(Options1, 0, _, [singletons(true)]),
+    maplist(prolog_option, Options1, Options2),
+    dict_create(Dict, _, Options2).
 
 prolog_option(Option0, Option) :-
     prolog_option(Option0), !,
-    Option0 =.. [Name,Value],
-    format(string(String), '~k', [Value]),
-    Option =.. [Name,String].
+    Option0 =.. [Name, Value],
+    format(string(String), '~W', [Value, 
+        [ignore_ops(true), quoted(true), numbervars(true)]]),
+    Option =.. [Name, String].
 prolog_option(Option, Option).
 
 prolog_option(src_list(_)).
@@ -1323,7 +1338,7 @@ http_pengine_create(Request) :-
     http_read_json_dict(Request, Dict),
     (	get_dict(format, Dict, FormatString)
     ->	atom_string(Format, FormatString),
-	must_be(oneof([prolog,json,'json-s']), Format)
+	    must_be(oneof([prolog,json,'json-s']), Format)
     ;	Format = prolog
     ),
     dict_to_options(Dict, CreateOptions),
@@ -1513,6 +1528,9 @@ to_json(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
 to_json(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
+to_json(destroy(ID, Data)) :-
+    event_term_to_json_data(Data, JSON),
+    reply_json(json([event=destroy, id=ID, data=JSON])).
 
 
 to_json_s(create(ID, noevent)) :- !,
@@ -1542,6 +1560,9 @@ to_json_s(abort(ID)) :-
     reply_json(json([event=abort, id=ID])).
 to_json_s(destroy(ID)) :-
     reply_json(json([event=destroy, id=ID])).
+to_json_s(destroy(ID, Data)) :-
+    event_term_to_json_s_data(Data, JSON),
+    reply_json(json([event=destroy, id=ID, data=JSON])).
 
 
 event_term_to_json_data(success(ID, Bindings0, More), json([event=success, id=ID, data=Bindings, more= @(More)])) :- !,
