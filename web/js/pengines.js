@@ -27,6 +27,15 @@
 */
 
 function Pengine(options) {
+
+   // Check to see if the counter has been initialized
+    if ( typeof Pengine.counter == 'undefined' ) {
+        // It has not... perform the initialization
+        Pengine.counter = 0;
+    }
+    Pengine.counter += 1;
+    console.log(Pengine.counter);
+    
     var src = options.src ? options.src : "";
     var format = options.format ? options.format : "json";
     var server = options.server !== undefined ? options.server : "/";
@@ -55,8 +64,10 @@ function Pengine(options) {
     }
     function process_response(obj) {
         if (obj.event === 'create') {
+            Pengine.count += 1;
+            console.log(this.count);
             that.id = encodeURIComponent(obj.id);
-            if (options.oncreate) options.oncreate.call(obj);
+            if (options.oncreate && that.id != "null") options.oncreate.call(obj);
             if (obj.data != "noevent") process_response(obj.data)
         } else if (obj.event === 'stop') {
             if (options.onstop) options.onstop.call(obj);
@@ -65,14 +76,17 @@ function Pengine(options) {
         } else if (obj.event === 'failure') {
             if (options.onfailure) options.onfailure.call(obj);
         } else if (obj.event === 'error') {
+            if (obj.data === "too_many_pengines") alert("too many pengines")
             if (options.onerror) options.onerror.call(obj);
-	        else if (typeof(console) !== 'undefined') console.error(obj.data);
+	    else if (typeof(console) !== 'undefined')
+	        console.error(obj.data);
         } else if (obj.event === 'output') {
             if (options.onoutput) options.onoutput.call(obj);
             that.pull_response();
         } else if (obj.event === 'debug') {
             if (options.ondebug) options.ondebug.call(obj);
-	        else if (typeof(console) !== 'undefined') console.log(obj.data);
+	    else if (typeof(console) !== 'undefined')
+		    console.log(obj.data);
             that.pull_response();
         } else if (obj.event === 'prompt') {
             if (options.onprompt) options.onprompt.call(obj);
@@ -127,3 +141,4 @@ function Pengine(options) {
 	     "type": "POST"
 	   });
 }
+

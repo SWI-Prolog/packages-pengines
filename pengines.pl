@@ -62,6 +62,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/http_session)).
+:- use_module(library(http/http_cookie)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_stream)).
@@ -79,10 +80,15 @@ from Prolog or JavaScript.
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(sandbox)).
+:- use_module(library(broadcast)).
 :- use_module(library(term_to_json)).
 :- if(exists_source(library(uuid))).
 :- use_module(library(uuid)).
 :- endif.
+
+
+
+:- use_module(library(thread_pool)).
 
 
 :- meta_predicate
@@ -92,10 +98,16 @@ from Prolog or JavaScript.
 	pengine_ask_around(+, 0, +),
 	pengine_seek_agreement(+, 0, +).
 
+
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
 		       name(atom),
 		       server(atom),
+		       ask(compound),
+		       template(compound),
+		       chunk(integer),
+		       destroy(boolean),
+		       application(atom),
 		       src_list(list),
 		       src_text(any),		% text
 		       src_url(atom),
@@ -145,21 +157,29 @@ from Prolog or JavaScript.
 % :- debug(pengine(transition)).
 :- debug(pengine(debug)).		% handle pengine_debug in pengine_rpc/3.
 
+
 /* Settings */
 
-:- setting(max_session_pengines, integer, 1,
-	   'Maximum number of pengines a client can create.  -1 is infinite.').
+:- http_set_session_options([timeout(300)]).
+
+:- setting(max_session_pengines, integer, 3,
+	   'Maximum number of pengines a client can create.').
+:- setting(pengine_stacks, list(compound), 
+        [global(8000), local(1000), c_stack(1000), trail(1000)], 
+        'Default max stack sizes for one pengine').
 :- setting(time_limit, number, 60, 'Maximum time to wait for output').
 :- setting(allow_from, list(atom), [*],
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
 	   'IP addresses from which remotes are NOT allowed to connect').
 
+
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +),
 	pengine_event_loop(1, +, +),
 	pengine_event_loop(+, 1, +, +),
 	pengine_find_n(+, ?, 0, -).
+
 
 /**  pengine_create(:Options) is det.
 
@@ -195,7 +215,11 @@ from Prolog or JavaScript.
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk. Meaningful only if
       the ask(Query) option is used, and valid only for that query.
-      
+
+    * destroy(+Boolean)
+      Destroy the pengine after the completion (including backtracking)
+      of the processing of the first query. Defaults to =false=.
+            
     * src_list(+List_of_clauses)
       Inject a list of Prolog clauses in the pengine.
 
@@ -217,7 +241,7 @@ from Prolog or JavaScript.
 Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
 non-local pengines) and thread_create/3. Note   that for thread_create/3
 only options changing the stack-sizes can be used. In particular, do not
-pass the detached or alias options..
+pass the detached or alias options.
 
 Successful creation of a pengine will return an _event term_ of the
 following form:
@@ -612,13 +636,18 @@ pengine_debug(Format, Args) :-
 %	Creates  a  local   Pengine,   which    is   a   thread  running
 %	pengine_main/2.  It maintains two predicates:
 %
-%	  - The global dynamic predicate id/2 relates Pengines to their
+%	  - The global dynamic predicate child/1 relates Pengines to their
 %	    childs.
-%	  - The local predicate id/2 maps named childs to their ids.
+%	  - The local predicate named_child/2 maps named childs to their ids.
 
 local_pengine_create(Options) :-
     thread_self(Self),
-    create(Self, Child, Options, local),
+    (   parent_thread_pool(Pool)
+    ->  true
+    ;   option(application(Application), Options, pengine_sandbox),
+        maybe_create_thread_pool(Application, Pool)
+    ),
+    create(Self, Child, Options, local, Pool),
     assert(child(Child)),
     (   option(name(Name), Options)
     ->  assert(named_child(Name, Child))
@@ -632,16 +661,15 @@ local_pengine_create(Options) :-
 %	@arg Queue is the queue (or thread handle) to report to
 %	@arg Child is the identifier of the created pengine.
 
-create(Queue, Child, Options, URL) :-
-    catch(create0(Queue, Child, Options, URL), 
-        Error, 
-        pengine_reply(Queue,error(id(null, null), Error))).
 
-create0(Queue, Child, Options, URL) :-
+
+create(Queue, Child, Options, URL, Pool) :-
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
-    thread_create(
-        pengine_main(Queue, PengineOptions), ChildThread,
-        [ at_exit(pengine_done)
+    thread_create_in_pool(
+        Pool,
+        pengine_main(Queue, PengineOptions, Pool), ChildThread,
+        [ wait(false),
+          at_exit(pengine_done)
         | RestOptions
     ]),
     pengine_register_local(Child, ChildThread, Queue, URL),
@@ -684,8 +712,12 @@ pengine_done :-
 
 :- thread_local wrap_first_answer_in_create_event/0.
 
-pengine_main(Parent, Options) :-
-    fix_streams,
+:- thread_local parent_thread_pool/1.
+
+pengine_main(Parent, Options, Pool) :-
+% TODO: For some reason my approach to resource allocations doesn't work if fix_stream/0 is called here. Check why Jan thought that this was needed. 
+%    fix_streams, 
+    assert(parent_thread_pool(Pool)),
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
     (   catch(maplist(process_create_option, Options), Error,
@@ -793,14 +825,14 @@ solve(_, _, _, _).				% leave a choice point
 
 
 
-destroy_or_continue(true, ID, Event) :-
-    pengine_reply(destroy(ID, Event)),
-    thread_self(Self),
-    thread_detach(Self).
-destroy_or_continue(false, ID, Event) :-
-    pengine_reply(Event),
-    guarded_main_loop(ID, true).
-
+destroy_or_continue(Destroy, ID, Event) :-
+    (   Destroy == true
+    ->  pengine_reply(destroy(ID, Event)),
+        thread_self(Self),
+        thread_detach(Self)
+    ;   pengine_reply(Event),
+        guarded_main_loop(ID, true)
+    ).
         
 
 %%	more_solutions(+Pengine, +Choice)
@@ -1324,11 +1356,10 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 /*================= HTTP handlers =======================
 */
 
-
 %   Declare HTTP locations we serve and how.
 
 :- http_handler(root(pengine/create),	     http_pengine_create,	 []).
-:- http_handler(root(pengine/send),	     http_pengine_send,		 []).
+:- http_handler(root(pengine/send),     http_pengine_send,		 []).
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response, []).
 :- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
 
@@ -1341,40 +1372,52 @@ http_pengine_create(Request) :-
 	    must_be(oneof([prolog,json,'json-s']), Format)
     ;	Format = prolog
     ),
-    dict_to_options(Dict, CreateOptions),
-    setting(max_session_pengines, MaxEngines),
-    enforce_max_session_pengines(pre, MaxEngines, _),
+    dict_to_options(Dict, Options),
     message_queue_create(From, []),
-    create(From, Pengine, CreateOptions, http),
-    enforce_max_session_pengines(post, MaxEngines, Pengine),
-    http_pengine_parent(Pengine, Queue),
-    wait_and_output_result(Pengine, Queue, Format).
+    option(application(Application), Options, pengine_sandbox),
+    maybe_create_thread_pool(Application, Pool),
+    try_pengine_create(From, Options, Format, Pool).
 
-%%	enforce_max_session_pengines(+When, +Max, ?ID) is det.
-%
-%	Enforce  the  setting  =max_session_pengines=   by  killing  old
-%	pengines.
-%
-%	@tbd	Probably it is cleaner to generate a permission error
-%		for creating new pengines.
 
-enforce_max_session_pengines(_When, Max, _) :-
-    Max < 0, !.
-enforce_max_session_pengines(pre, Max, _) :-
-    (	http_in_session(_)
-    ->  (   aggregate_all(count, http_session_data(pengine(_ID)), Count),
-	    Count >= Max,
-	    http_session_retract(pengine(ID))
-	->  pengine_destroy(ID)
-	;   true
-	)
-    ;	true
+maybe_create_thread_pool(Application, Pool) :-
+    get_thread_pool_name(Pool),
+    (   Application == pengine_sandbox
+    ->  setting(max_session_pengines, Max),
+        setting(pengine_stacks, Stacks)
+    ;   setting(Application: max_session_pengines, Max),
+        setting(Application: pengine_stacks, Stacks)
+    ),
+    catch(thread_pool_create(Pool, Max, Stacks), _, true).
+
+
+get_thread_pool_name(Pool) :-
+    catch(http_session_id(Pool), _, uuid(Pool)).
+
+
+try_pengine_create(From, Options, Format, Pool) :-   
+    catch(create(From, Pengine, Options, http, Pool), Error, true),
+    (   var(Error)
+    ->  http_pengine_parent(Pengine, Queue),
+        wait_and_output_result(Pengine, Queue, Format)
+    ;   Error = error(resource_error(threads_in_pool(Pool)), _)
+    ->  destroy_thread_pool(Pool),
+        message_to_string(Error, ErrorString),
+        output_result(Format, create(null, error(null, ErrorString)))
+    ;   message_to_string(Error, ErrorString),
+        output_result(Format, create(null, error(null, ErrorString)))
     ).
-enforce_max_session_pengines(post, _, ID) :-
-    (   http_in_session(_)
-    ->	http_session_assert(pengine(ID))
-    ;	true
-    ).
+    
+
+% This is how we get rid of leftover thread pools.
+:- listen(http_session(end(Pool, _Peer)), destroy_thread_pool(Pool)).
+
+
+destroy_thread_pool(Pool) :-
+    thread_pool_property(Pool, members(IDs)),
+    forall(member(ID, IDs), (thread_signal(ID, abort), thread_join(ID, _))),
+    thread_pool_destroy(Pool),
+    debug(pengine(resources), 'Destroyed thread pool: ~q', [Pool]).
+
 
 dict_to_options(Dict, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),
