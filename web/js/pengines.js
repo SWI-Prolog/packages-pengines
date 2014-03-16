@@ -26,11 +26,13 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
-function Pengine(callbacks) {
-    var goal = callbacks.goal;
-    var src = callbacks.src ? callbacks.src : "";
-    var format = callbacks.format ? callbacks.format : "json";
-    var server = callbacks.server !== undefined ? callbacks.server : "/";
+function Pengine(options) {
+    if ( typeof Pengine.ids == 'undefined' ) {
+        Pengine.ids = [];
+    }
+    var src = options.src ? options.src : "";
+    var format = options.format ? options.format : "json";
+    var server = options.server !== undefined ? options.server : "/";
     this.id = null;
     var that = this;
     // Private functions
@@ -56,34 +58,41 @@ function Pengine(callbacks) {
     }
     function process_response(obj) {
         if (obj.event === 'create') {
-            that.id = encodeURIComponent(obj.id);
-            if (callbacks.oncreate) callbacks.oncreate.call(obj);
+            Pengine.ids.push(obj.id);
+            if (Pengine.ids.length > obj.data.slave_limit) {
+                alert("Attempt to use too many slave pengines. The limit is :" + obj.data.slave_limit);
+                Pengine.destroy_all();
+            } else {
+                that.id = encodeURIComponent(obj.id);
+                if (options.oncreate && that.id != "null") options.oncreate.call(obj.data.answer);
+                if (obj.data.answer) process_response(obj.data.answer);
+            }
         } else if (obj.event === 'stop') {
-            if (callbacks.onstop) callbacks.onstop.call(obj);
+            if (options.onstop) options.onstop.call(obj);
         } else if (obj.event === 'success') {
-            if (callbacks.onsuccess) callbacks.onsuccess.call(obj);
+            if (options.onsuccess) options.onsuccess.call(obj);
         } else if (obj.event === 'failure') {
-            if (callbacks.onfailure) callbacks.onfailure.call(obj);
+            if (options.onfailure) options.onfailure.call(obj);
         } else if (obj.event === 'error') {
-            if (callbacks.onerror)
-	        callbacks.onerror.call(obj);
+            if (obj.data === "too_many_pengines") alert("too many pengines")
+            if (options.onerror) options.onerror.call(obj);
 	    else if (typeof(console) !== 'undefined')
 	        console.error(obj.data);
         } else if (obj.event === 'output') {
-            if (callbacks.onoutput) callbacks.onoutput.call(obj);
+            if (options.onoutput) options.onoutput.call(obj);
             that.pull_response();
         } else if (obj.event === 'debug') {
-            if (callbacks.ondebug)
-	        callbacks.ondebug.call(obj);
+            if (options.ondebug) options.ondebug.call(obj);
 	    else if (typeof(console) !== 'undefined')
-		console.log(obj.data);
+		    console.log(obj.data);
             that.pull_response();
         } else if (obj.event === 'prompt') {
-            if (callbacks.onprompt) callbacks.onprompt.call(obj);
+            if (options.onprompt) options.onprompt.call(obj);
         } else if (obj.event === 'abort') {
-            if (callbacks.onabort) callbacks.onabort.call(obj);
+            if (options.onabort) options.onabort.call(obj);
         } else if (obj.event === 'destroy') {
-            if (callbacks.ondestroy) callbacks.ondestroy.call(obj);
+            if (options.ondestroy) options.ondestroy.call(obj);
+            if (obj.data) process_response(obj.data)
         }
     };
     function send(event) {
@@ -101,6 +110,9 @@ function Pengine(callbacks) {
     this.stop = function() {
         send('request(stop)');
     }
+//    this.destroy = function() {
+//        send('request(destroy)');
+//    }
     this.respond = function(input) {
         send('input(' + input + ')');
     }
@@ -113,16 +125,35 @@ function Pengine(callbacks) {
 	      '&format=' + format, process_response);
     }
     this.destroy = function() {
-        send('request(destroy)');
+        $.get(server + 'pengine/destroy?id=' + that.id +
+	      '&format=' + format, process_response);
     }
+    // Static functions
+    Pengine.destroy_all = function() {
+        $.ajax({url:server + 'pengine/destroy_all?ids=' + Pengine.ids, async:false})
+    }; 
+    // On creation
+    var createOptions = {};
+    createOptions["src_text"] = source() + "\n" + src;
+    createOptions["format"] = format;
+    if (options.application) createOptions["application"] = options.application;
+    if (options.ask) createOptions["ask"] = options.ask;
+    if (options.template) createOptions["template"] = options.template;
+    if (options.chunk) createOptions["chunk"] = options.chunk;
+    if (typeof options.destroy == "boolean" ) createOptions["destroy"] = options.destroy;
     $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
-	     "data": JSON.stringify({ 
-                      src_text: source() + "\n" + src,
-                      format: format
-				    }),
+	     "data": JSON.stringify(createOptions),
 	     "success": process_response,
 	     "type": "POST"
 	   });
 }
+
+window.onunload = function() {
+    try {
+        Pengine.destroy_all();
+    } catch(e) {}
+};
+
+
