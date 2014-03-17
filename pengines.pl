@@ -1,8 +1,8 @@
 /*  Part of SWI-Prolog
 
-    Author:        TorbjÃ¶rn Lager and Jan Wielemaker
+    Author:        Torbjörn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, TorbjÃ¶rn Lager,
+    Copyright (C): 2014, Torbjörn Lager,
 			 VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -36,7 +36,7 @@
             pengine_input/2,			% +Prompt, -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
-            pengine_respond/3,	    % +Pengine, +Input, +Options
+            pengine_respond/3,			% +Pengine, +Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
@@ -56,7 +56,7 @@ The library(pengines) provides an  infrastructure   for  creating Prolog
 engines in a (remote) pengine server  and accessing these engines either
 from Prolog or JavaScript.
 
-@author TorbjÃ¶rn Lager and Jan Wielemaker
+@author Torbjörn Lager and Jan Wielemaker
 */
 
 :- use_module(library(http/http_dispatch)).
@@ -66,6 +66,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_stream)).
 :- use_module(library(http/http_wrapper)).
 :- use_module(library(http/http_cors)).
+:- use_module(library(thread_pool)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -94,11 +95,11 @@ from Prolog or JavaScript.
 		     [ id(-atom),
 		       name(atom),
 		       server(atom),
-               ask(compound),
-               template(compound),
-               chunk(integer),
-               destroy(boolean),
-               application(atom),
+		       ask(compound),
+		       template(compound),
+		       chunk(integer),
+		       destroy(boolean),
+		       application(atom),
 		       src_list(list),
 		       src_text(any),		% text
 		       src_url(atom),
@@ -157,15 +158,15 @@ from Prolog or JavaScript.
 :- setting(slave_limit, integer, 3,
 	   'Maximum number of local slave pengines a master pengine can create.').
 :- setting(time_limit, number, 30,
-       'Maximum time to wait for output').
+	   'Maximum time to wait for output').
 :- setting(allow_from, list(atom), [*],
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
 	   'IP addresses from which remotes are NOT allowed to connect').
-    
+
 
 :- meta_predicate			% internal meta predicates
-	solve(?, 0, +),
+	solve(?, 0, +, +),
 	pengine_event_loop(1, +, +),
 	pengine_event_loop(+, 1, +, +),
 	pengine_find_n(+, ?, 0, -).
@@ -190,25 +191,25 @@ from Prolog or JavaScript.
       server located at URL.
 
     * ask(@Query)
-      Make Query the _first_ query to be solved by this pengine (and thus 
+      Make Query the _first_ query to be solved by this pengine (and thus
       avoid one network round-trip).
-      
+
     * template(+Template)
       Template is a variable (or a term containing variables) shared
       with the query. By default, the template is identical to the
       query. Meaningful only if the ask(Query) option is used, and
-      valid only for that query. 
+      valid only for that query.
 
     * chunk(+Integer)
       Retrieve solutions in chunks of Integer rather than one by one. 1
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk. Meaningful only if
       the ask(Query) option is used, and valid only for that query.
-      
+
     * destroy(+Boolean)
       Destroy the pengine after the completion (including backtracking)
       of the processing of the first query. Defaults to =true=.
-      
+
     * src_list(+List_of_clauses)
       Inject a list of Prolog clauses in the pengine.
 
@@ -517,7 +518,7 @@ pengine_destroy_soft(ID) :-
 :- thread_local
     child/1,                % ?Child
 	named_child/2.			% ?Name, ?Child
-	
+
 
 %%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue) is det.
@@ -638,7 +639,7 @@ pengine_debug(Format, Args) :-
 %%	local_pengine_create(+Options)
 %
 %	Creates  a  local   Pengine,   which    is   a   thread  running
-%	pengine_main/2.  It maintains two predicates:
+%	pengine_main/3.  It maintains two predicates:
 %
 %	  - The global dynamic predicate child/1 relates Pengines to their
 %	    childs.
@@ -656,11 +657,13 @@ local_pengine_create(Options) :-
         )
     ;   message_to_string(Error, ErrorString),
         get_setting(Application, slave_limit, Max),
-        pengine_reply(create(null, [answer=error(null, ErrorString), slave_limit=Max]))
+        pengine_reply(create(null, [ answer=error(null, ErrorString),
+				     slave_limit=Max
+				   ]))
     ).
 
 
-%%	create(+Queue, -Child, +Options, +URL) is det.
+%%	create(+Queue, -Child, +Options, +URL, +Application) is det.
 %
 %	Create a new pengine thread.
 %
@@ -671,8 +674,8 @@ local_pengine_create(Options) :-
 :-  setting(thread_pool_size, Size),
     setting(thread_pool_stacks, Stacks),
     thread_pool_create(pengine_sandbox, Size, Stacks).
-    
-         
+
+
 create(Queue, Child, Options, URL, Application) :-
     aggregate_all(count, child(_), Count),
     get_setting(Application, slave_limit, Max),
@@ -685,9 +688,9 @@ create(Queue, Child, Options, URL, Application) :-
             Application,
             pengine_main(Queue, PengineOptions, Application), ChildThread,
             [ wait(false),
-              at_exit(pengine_done)
-              | RestOptions
-        ]),
+	      at_exit(pengine_done)
+	    | RestOptions
+	    ]),
         pengine_register_local(Child, ChildThread, Queue, URL, Application),
         thread_send_message(ChildThread, pengine_registered(Child)),
         (    option(id(Id), Options)
@@ -696,22 +699,22 @@ create(Queue, Child, Options, URL, Application) :-
         )
     ).
 
-        
+
 
 maybe_create_application_thread_pool(pengine_sandbox) :- !.
 maybe_create_application_thread_pool(Application) :-
     get_setting(Application, thread_pool_size, Size),
     get_setting(Application, thread_pool_stacks, Stacks),
     catch(thread_pool_create(Application, Size, Stacks), _, true).
-    
+
 
 % Missing settings for an application is inherited from the settings
-% for pengine_sandbox. 
+% for pengine_sandbox.
 
 get_setting(Application, Setting, Value) :-
-    catch(setting(Application:Setting, Value), _, 
-        setting(Setting, Value)).
-        
+    catch(setting(Application:Setting, Value), _,
+	  setting(Setting, Value)).
+
 
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
@@ -738,7 +741,7 @@ pengine_done :-
     pengine_unregister(Id).
 
 
-%%	pengine_main(+Parent, +Options)
+%%	pengine_main(+Parent, +Options, +Application)
 %
 %	Run a pengine main loop. First acknowledges its creation and run
 %	pengine_main_loop/1.
@@ -753,13 +756,13 @@ pengine_main(Parent, Options, Application) :-
 	      ( send_error(Error),
 		fail
 	      ))
-    ->  (       option(ask(Query), Options)
-        ->      assert(wrap_first_answer_in_create_event),
-                option(template(Template), Options, Query),
-                option(chunk(Chunk), Options, 1),                
-                pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
-        ;       get_setting(Application, slave_limit, Max),
-                pengine_reply(create(Self, [slave_limit=Max]))
+    ->  (   option(ask(Query), Options)
+        ->  asserta(wrap_first_answer_in_create_event),
+	    option(template(Template), Options, Query),
+	    option(chunk(Chunk), Options, 1),
+	    pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
+	;   get_setting(Application, slave_limit, Max),
+	    pengine_reply(create(Self, [slave_limit=Max]))
         ),
         option(destroy(Destroy), Options, false),
         pengine_main_loop(Self, Destroy)
@@ -775,18 +778,18 @@ fix_streams :-
     fix_stream(current_output).
 
 fix_stream(Name) :-
-	is_cgi_stream(Name), !,
-	debug(pengine(stream), '~w is a CGI stream!', [Name]),
-	set_stream(user_output, alias(Name)).
+    is_cgi_stream(Name), !,
+    debug(pengine(stream), '~w is a CGI stream!', [Name]),
+    set_stream(user_output, alias(Name)).
 fix_stream(_).
 
 
 process_create_option(Application, src_list(ClauseList)) :- !,
-	pengine_src_list(Application, ClauseList).
+    pengine_src_list(Application, ClauseList).
 process_create_option(Application, src_text(Text)) :- !,
-	pengine_src_text(Application, Text).
+    pengine_src_text(Application, Text).
 process_create_option(Application, src_url(URL)) :- !,
-	pengine_src_url(Application, URL).
+    pengine_src_url(Application, URL).
 process_create_option(_Application, _).
 
 
@@ -797,7 +800,7 @@ pengine_main_loop(ID, Destroy) :-
 	  )).
 
 
-%%	guarded_main_loop(+Pengine) is det.
+%%	guarded_main_loop(+Pengine, +Destroy) is det.
 %
 %	Executes state `2' of  the  pengine,   where  it  waits  for two
 %	events:
@@ -811,7 +814,7 @@ guarded_main_loop(ID, Destroy) :-
     pengine_event(Event),
     (   Event = request(destroy)
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
-	    pengine_terminate(ID)
+	pengine_terminate(ID)
     ;   Event = request(ask(Goal, Options))
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options, Destroy)
@@ -827,7 +830,7 @@ pengine_terminate(ID) :-
     thread_detach(Me).
 
 
-%%	solve(+Template, :Goal, +ID) is det.
+%%	solve(+Template, :Goal, +ID, +Destroy) is det.
 %
 %	Solve Goal. Note that because we can ask for a new goal in state
 %	`6', we must provide for an ancesteral cut (prolog_cut_to/1). We
@@ -851,7 +854,7 @@ solve(Template, Goal, ID, Destroy) :-
     ;   !,				% commit
         destroy_or_continue(Destroy, ID, failure(ID))
     ).
-solve(_, _, _, _).				% leave a choice point
+solve(_, _, _, _).			% leave a choice point
 
 
 
@@ -873,7 +876,7 @@ destroy_or_continue(Destroy, ID, Event) :-
 %	  * stop
 %	  Go back via state `7' to state `2' (guarded_main_loop/1)
 %	  * next
-%	  Fail.  This causes solve/3 to backtrack on the goal asked.
+%	  Fail.  This causes solve/4 to backtrack on the goal asked.
 %	  * ask(Goal, Options)
 %	  Ask another goal.  Note that we must commit the choice point
 %	  of the previous goal asked for.
@@ -901,10 +904,10 @@ more_solutions(Event, ID, Choice, Destroy) :-
     more_solutions(ID, Choice, Destroy).
 
 
-%%	ask(+Pengine, :Goal, +Options)
+%%	ask(+Pengine, :Goal, +Options, +Destroy)
 %
 %	Migrate from state `2' to `3'.  This predicate validates that it
-%	is safe to call Goal using safe_goal/1 and then calls solve/3 to
+%	is safe to call Goal using safe_goal/1 and then calls solve/4 to
 %	prove the goal. It also takes care of the chunk(N) option.
 
 ask(ID, Goal, Options, Destroy) :-
@@ -919,7 +922,7 @@ ask(ID, Goal, Options, Destroy) :-
         ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID, Destroy)
         )
     ;   pengine_reply(error(ID, Error)),
-	    guarded_main_loop(ID, Destroy)
+	guarded_main_loop(ID, Destroy)
     ).
 
 
@@ -1031,8 +1034,8 @@ options_to_dict(Options, Dict) :-
 prolog_option(Option0, Option) :-
     prolog_option(Option0), !,
     Option0 =.. [Name, Value],
-    format(string(String), '~W', [Value, 
-        [ignore_ops(true), quoted(true), numbervars(true)]]),
+    format(string(String), '~W',
+	   [Value, [ignore_ops(true), quoted(true), numbervars(true)]]),
     Option =.. [Name, String].
 prolog_option(Option, Option).
 
@@ -1058,13 +1061,6 @@ remote_pengine_abort(BaseURL, ID, Options) :-
     remote_send_rec(BaseURL, abort, [id=ID], Reply, Options),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
-
-remote_pengine_destroy(BaseURL, ID, Options) :-
-    remote_send_rec(BaseURL, destroy, [id=ID], Reply, Options),
-    thread_self(Queue),
-    pengine_reply(Queue, Reply). 
-    
-    
 
 %%	remote_send_rec(+Server, +Action, +Params, -Reply, +Options)
 %
@@ -1424,7 +1420,10 @@ http_pengine_create(Request) :-
         wait_and_output_result(Pengine, Queue, Format)
     ;   message_to_string(Error, ErrorString),
         get_setting(Application, slave_limit, Max),
-        output_result(Format, create(null, [answer=error(null, ErrorString), slave_limit=Max]))
+        output_result(Format, create(null,
+				     [ answer=error(null, ErrorString),
+				       slave_limit=Max
+				     ]))
     ).
 
 
@@ -1646,7 +1645,7 @@ to_json_s(destroy(ID, Data)) :-
     reply_json(json([event=destroy, id=ID, data=JSON])).
 
 
-event_term_to_json_data(success(ID, Bindings0, More), 
+event_term_to_json_data(success(ID, Bindings0, More),
         json([event=success, id=ID, data=Bindings, more= @(More)])) :- !,
     term_to_json(Bindings0, Bindings).
 event_term_to_json_data(EventTerm, json([event=F, id=ID])) :-
@@ -1657,8 +1656,8 @@ event_term_to_json_data(EventTerm, json([event=F, id=ID, data=JSON])) :-
     arg(1, EventTerm, ID),
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
-    
-    
+
+
 event_term_to_json_s_data(success(ID, Bindings0, More),
         json([event=success, id=ID, data=Bindings, more= @(More)])) :- !,
     maplist(solution_to_json, Bindings0, Bindings).
@@ -1670,7 +1669,7 @@ event_term_to_json_s_data(EventTerm, json([event=F, id=ID, data=JSON])) :-
     arg(1, EventTerm, ID),
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
-    
+
 
 solution_to_json(BindingsIn, json(BindingsOut)) :-
     maplist(swap, BindingsIn, BindingsOut).
