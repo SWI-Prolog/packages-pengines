@@ -1,0 +1,27 @@
+Plans
+=====
+
+Short term
+----------
+
+- we may need another time_limit, destroying a pengine that hasn't been used at all for a certain period of time.
+
+- split up into different files, making it easier to add stuff such as a state machine interpreter.
+One suggestion would be:
++ pengine_core.pl
++ pengine_event_loop.pl
++ pengine_rpc.pl
+
+- evolve test_pengines.pl
+
+- finalize Scratchpad
+
+
+Long term
+----------
+
+- REST-based predicate pengine_rest(+URL, +Query, +Options) where options can be cursor(_) and limit(_).  Can probably be built on top of the core.
+
+- look at ways to make siblings communicate
+
+- experiment with non-prolog pengines, i.e. pengines that accept Prolog queries, and respond with Prolog terms, but are NOT implemented in Prolog.
