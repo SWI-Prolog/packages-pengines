@@ -41,3 +41,7 @@ test :-
 
 - There are still problems with the cleaning up of pengines that are no longer connected to a master.
 
+
+- JW: Now, pengines can communicate using the dynamic database. That seems a
+bad idea.  Not really sure how to deal with that. In the general sandbox scheme 
+there is not necessarily something wrong with plain dynamic.

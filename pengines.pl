@@ -1,6 +1,6 @@
 /*  Part of SWI-Prolog
 
-    Author:        Torbjorn Lager and Jan Wielemaker
+    Author:        TorbjÃ¶rn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
     Copyright (C): 2014, TorbjÃ¶rn Lager,
 			 VU University Amsterdam
@@ -44,10 +44,6 @@
             pengine_destroy/1,			% +Pengine
             pengine_abort/1,			% +Pengine
             pengine_property/2,			% ?Pengine, ?Property
-            pengine_assert/1,			% +Term
-            pengine_asserta/1,			% +Term
-            pengine_retract/1,			% +Term
-            pengine_retractall/1,		% +Term
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
             pengine_rpc/3,			% +Server, +Goal, +Options
@@ -61,7 +57,7 @@ The library(pengines) provides an  infrastructure   for  creating Prolog
 engines in a (remote) pengine server  and accessing these engines either
 from Prolog or JavaScript.
 
-@author Torbjorn Lager and Jan Wielemaker
+@author TorbjÃ¶rn Lager and Jan Wielemaker
 */
 
 :- use_module(library(http/http_dispatch)).
@@ -450,7 +446,7 @@ pengine_next(ID, Options) :-
 
 */
 
-pengine_next(Pengine, Options) :-
+pengine_next(Pengine, Options) :- 
 	pengine_send(Pengine, request(next), Options).
 
 
@@ -467,7 +463,7 @@ pengine_stop(ID, Options) :-
 ==
 */
 
-pengine_stop(Pengine, Options) :-
+pengine_stop(Pengine, Options) :- 
 	pengine_send(Pengine, request(stop), Options).
 
 
@@ -509,7 +505,7 @@ pengine_destroy(Pengine) :-
 
 :- thread_local
 	pengine_name/2.			% ?Pengine, ?Name
-
+	
 
 
 /*================= pengines administration =======================
@@ -533,7 +529,7 @@ pengine_destroy(Pengine) :-
 	child/1.                % ?Child
 
 
-
+	
 %%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue) is det.
 %%	pengine_unregister(+Id) is det.
@@ -696,7 +692,7 @@ create(Queue, Child, Options, URL, Application) :-
     get_setting(Application, slave_limit, Max),
     (   Count >= Max
     ->  pengine_done,
-        throw(attempt_to_create_too_many_local_slaves(Max))
+        throw(attempt_to_create_too_many_local_slaves(Max))   
     ;   maybe_create_application_thread_pool(Application),
         partition(pengine_create_option, Options, PengineOptions, RestOptions),
         thread_create_in_pool(
@@ -1539,7 +1535,7 @@ http_pengine_abort(Request) :-
             ]),
     (	http_pengine_parent(ID, Queue)
     ->	pengine_abort(ID),
-	wait_and_output_result(ID, Queue, Format)
+	    wait_and_output_result(ID, Queue, Format)
     ;	http_404([], Request)
     ).
 
@@ -1550,7 +1546,7 @@ http_pengine_destroy(Request) :-
             ]),
     (	http_pengine_parent(ID, Queue)
     ->	pengine_destroy(ID),
-	wait_and_output_result(ID, Queue, Format)
+	    wait_and_output_result(ID, Queue, Format)
     ;	http_404([], Request)
     ).
 
@@ -1568,7 +1564,7 @@ pengine_destroy_hard(Pengine) :-
     catch(thread_signal(Thread, abort), _, true),
     catch(thread_join(Thread, _), _, true).
 
-
+    
 
 % Output
 
@@ -1744,32 +1740,7 @@ ip_pattern([S|T0], [N|T]) :-
 */
 
 
-%%	pengine_assert(+Term) is det
-%%	pengine_asserta(+Term) is det
-%%	pengine_retract(+Term) is nondet
-%%	pengine_retractall(+Term) is det
-
-pengine_assert(Term) :-
-	pengine_self(Pengine),
-	pengine_application(Pengine, Application),
-	assert(Application: Term).
-
-pengine_asserta(Term) :-
-	pengine_self(Pengine),
-	pengine_application(Pengine, Application),
-	asserta(Application: Term).
-
-pengine_retract(Term) :-
-	pengine_self(Pengine),
-	pengine_application(Pengine, Application),
-	retract(Application: Term).
-
-pengine_retractall(Term) :-
-	pengine_self(Pengine),
-	pengine_application(Pengine, Application),
-	retractall(Application: Term).
-
-
+	
 /** pengine_src_list(+ClauseList) is det
 
 Asserts the list of clauses ClauseList   in the private dynamic database
@@ -1889,11 +1860,6 @@ sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_, _)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
-
-sandbox:safe_primitive(pengine:pengine_assert(_)).
-sandbox:safe_primitive(pengine:pengine_asserta(_)).
-sandbox:safe_primitive(pengine:pengine_retract(_)).
-sandbox:safe_primitive(pengine:pengine_retractall(_)).
 
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
 
