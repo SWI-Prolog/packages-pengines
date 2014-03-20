@@ -1,8 +1,8 @@
 /*  Part of SWI-Prolog
 
-    Author:        Torbjörn Lager and Jan Wielemaker
+    Author:        TorbjÃ¶rn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, Torbjörn Lager,
+    Copyright (C): 2014, TorbjÃ¶rn Lager,
 			 VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -39,6 +39,7 @@
             pengine_respond/3,			% +Pengine, +Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
+	    pengine_name/2,                     % ?Pengine, ?Name
             pengine_pull_response/2,		% +Pengine, +Options
             pengine_destroy/1,			% +Pengine
             pengine_abort/1,			% +Pengine
@@ -56,7 +57,7 @@ The library(pengines) provides an  infrastructure   for  creating Prolog
 engines in a (remote) pengine server  and accessing these engines either
 from Prolog or JavaScript.
 
-@author Torbjörn Lager and Jan Wielemaker
+@author TorbjÃ¶rn Lager and Jan Wielemaker
 */
 
 :- use_module(library(http/http_dispatch)).
@@ -231,7 +232,7 @@ from Prolog or JavaScript.
 Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
 non-local pengines) and thread_create/3. Note   that for thread_create/3
 only options changing the stack-sizes can be used. In particular, do not
-pass the detached or alias options..
+pass the detached or alias options.
 
 Successful creation of a pengine will return an _event term_ of the
 following form:
@@ -298,7 +299,7 @@ pengine_send2(self, Event, Options) :- !,
     thread_self(Queue),
     delay_message(queue(Queue), Event, Options).
 pengine_send2(Name, Event, Options) :-
-    named_child(Name, Target), !,
+    pengine_name(Target, Name), !,
     delay_message(pengine(Target), Event, Options).
 pengine_send2(Target, Event, Options) :-
     delay_message(pengine(Target), Event, Options).
@@ -445,7 +446,8 @@ pengine_next(ID, Options) :-
 
 */
 
-pengine_next(ID, Options) :- pengine_send(ID, request(next), Options).
+pengine_next(Pengine, Options) :- 
+	pengine_send(Pengine, request(next), Options).
 
 
 /** pengine_stop(+NameOrID, +Options) is det
@@ -461,7 +463,8 @@ pengine_stop(ID, Options) :-
 ==
 */
 
-pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
+pengine_stop(Pengine, Options) :- 
+	pengine_send(Pengine, request(stop), Options).
 
 
 /** pengine_abort(+NameOrID) is det
@@ -487,15 +490,22 @@ Destroys the pengine NameOrID.
 */
 
 pengine_destroy(Pengine) :-
-    pengine_thread(Pengine, Thread),
-    catch(thread_signal(Thread, abort), _, true),
-    catch(thread_join(Thread, _), _, true).
+    catch(pengine_send(Pengine, request(destroy)),
+	  error(existence_error(pengine, Pengine), _),
+	  true),
+    retractall(pengine_name(Pengine, _)).
 
 
-pengine_destroy_soft(ID) :-
-    catch(pengine_send(ID, request(destroy)),
-	  error(existence_error(pengine, ID), _),
-	  true).
+
+%%	pengine_name(?Pengine, ?Name)
+%
+%	Local predicate that relates Pengine to a Name.
+%	Accessible only from the master of Pengine.
+%	Fails if Pengine has not been named.
+
+:- thread_local
+	pengine_name/2.			% ?Pengine, ?Name
+	
 
 
 /*================= pengines administration =======================
@@ -516,10 +526,10 @@ pengine_destroy_soft(ID) :-
 	current_pengine/5.
 
 :- thread_local
-    child/1,                % ?Child
-	named_child/2.			% ?Name, ?Child
+	child/1.                % ?Child
 
 
+	
 %%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue) is det.
 %%	pengine_unregister(+Id) is det.
@@ -533,7 +543,8 @@ pengine_register_remote(Id, URL) :-
     asserta(current_pengine(Id, Queue, 0, URL, 0)).
 
 pengine_unregister(Id) :-
-    retractall(current_pengine(Id, _, _, _, _)).
+    retractall(current_pengine(Id, _, _, _, _)),
+    retractall(pengine_name(Id, _)).
 
 pengine_self(Id) :-
     thread_self(Thread),
@@ -643,7 +654,7 @@ pengine_debug(Format, Args) :-
 %
 %	  - The global dynamic predicate child/1 relates Pengines to their
 %	    childs.
-%	  - The local predicate named_child/2 maps named childs to their ids.
+%	  - The local predicate pengine_name/2 maps childs to their names.
 
 local_pengine_create(Options) :-
     thread_self(Self),
@@ -652,7 +663,7 @@ local_pengine_create(Options) :-
     (   var(Error)
     ->  assert(child(Child)),
         (   option(name(Name), Options)
-        ->  assert(named_child(Name, Child))
+        ->  assert(pengine_name(Child, Name))
         ;   true
         )
     ;   message_to_string(Error, ErrorString),
@@ -680,8 +691,8 @@ create(Queue, Child, Options, URL, Application) :-
     aggregate_all(count, child(_), Count),
     get_setting(Application, slave_limit, Max),
     (   Count >= Max
-    ->  throw(attempt_to_create_too_many_local_slaves(Max)),
-        pengine_done
+    ->  pengine_done,
+        throw(attempt_to_create_too_many_local_slaves(Max))   
     ;   maybe_create_application_thread_pool(Application),
         partition(pengine_create_option, Options, PengineOptions, RestOptions),
         thread_create_in_pool(
@@ -941,7 +952,7 @@ pengine_pull_response(_ID, _Options).
 /** pengine_input(+Prompt, -Term) is det
 
 Sends Prompt to the parent pengine and waits for input. Note that Prompt may be
-anÃ¿ term, atomic or complex.
+anÃÂ¿ term, atomic or complex.
 */
 
 pengine_input(Prompt, Term) :-
@@ -1011,7 +1022,7 @@ remote_pengine_create(BaseURL, Options) :-
     ;	true
     ),
     (   option(name(Name), Options)
-    ->  assert(named_child(Name, ID))
+    ->  assert(pengine_name(ID, Name))
     ;   true
     ),
     pengine_register_remote(ID, BaseURL),
@@ -1205,6 +1216,7 @@ pengine_event_loop(stop(ID), Closure, Created, Options) :-
 pengine_event_loop(destroy(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 1 = /~q => 0', [ID, destroy]),
     ignore(call(Closure, destroy(ID))),
+    retractall(child(ID)),
     delete(Created, ID, RestCreated),
     (   RestCreated == []
     ->  debug(pengine(event), '*** Event loop terminated', []),
@@ -1252,7 +1264,7 @@ pengine_rpc(URL, Query, QOptions) :-
 	pengine_destroy_and_wait(Id)).
 
 pengine_destroy_and_wait(Id) :-
-    pengine_destroy_soft(Id),
+    pengine_destroy(Id),
     pengine_event(destroy(Id)).
 
 wait_event(Query, Template, Options) :-
@@ -1543,10 +1555,16 @@ http_pengine_destroy_all(Request) :-
             [   ids(IDsAtom, [])
             ]),
     atomic_list_concat(IDs, ',', IDsAtom),
-    forall(member(ID, IDs), pengine_destroy(ID)),
+    maplist(pengine_destroy_hard, IDs),
     reply_json("ok").
 
+pengine_destroy_hard(Pengine) :-
+    pengine_thread(Pengine, Thread),
+    retractall(pengine_name(Pengine, _)),
+    catch(thread_signal(Thread, abort), _, true),
+    catch(thread_join(Thread, _), _, true).
 
+    
 
 % Output
 
