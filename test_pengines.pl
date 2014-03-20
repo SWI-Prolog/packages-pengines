@@ -204,7 +204,7 @@ no_more_pengines :-
     ;	between(1, 10, _),
 	sleep(0.01)
     ),
-    \+ pengine:current_pengine(_,_,_,_), !.
+    \+ pengine:current_pengine(_,_,_,_,_), !.
 
 
 		 /*******************************
