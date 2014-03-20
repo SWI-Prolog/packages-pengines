@@ -44,6 +44,10 @@
             pengine_destroy/1,			% +Pengine
             pengine_abort/1,			% +Pengine
             pengine_property/2,			% ?Pengine, ?Property
+            pengine_assert/1,			% +Term
+            pengine_asserta/1,			% +Term
+            pengine_retract/1,			% +Term
+            pengine_retractall/1,		% +Term
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
             pengine_rpc/3,			% +Server, +Goal, +Options
@@ -1740,6 +1744,32 @@ ip_pattern([S|T0], [N|T]) :-
 */
 
 
+%%	pengine_assert(+Term) is det
+%%	pengine_asserta(+Term) is det
+%%	pengine_retract(+Term) is nondet
+%%	pengine_retractall(+Term) is det
+
+pengine_assert(Term) :-	
+	pengine_self(Pengine),
+	pengine_application(Pengine, Application),
+	assert(Application: Term).
+
+pengine_asserta(Term) :-	
+	pengine_self(Pengine),
+	pengine_application(Pengine, Application),
+	asserta(Application: Term).
+	
+pengine_retract(Term) :-	
+	pengine_self(Pengine),
+	pengine_application(Pengine, Application),
+	retract(Application: Term).	
+
+pengine_retractall(Term) :-	
+	pengine_self(Pengine),
+	pengine_application(Pengine, Application),
+	retractall(Application: Term).
+	
+	
 /** pengine_src_list(+ClauseList) is det
 
 Asserts the list of clauses ClauseList   in the private dynamic database
@@ -1859,8 +1889,13 @@ sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_, _)).
 sandbox:safe_primitive(pengine:pengine_output(_, _)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
+
+sandbox:safe_primitive(pengine:pengine_assert(_)).
+sandbox:safe_primitive(pengine:pengine_asserta(_)).
+sandbox:safe_primitive(pengine:pengine_retract(_)).
+sandbox:safe_primitive(pengine:pengine_retractall(_)).
+
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_ask(_, _, _)).
 
 
 sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
