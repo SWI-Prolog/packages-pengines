@@ -681,11 +681,19 @@ local_pengine_create(Options) :-
 %	@arg Queue is the queue (or thread handle) to report to
 %	@arg Child is the identifier of the created pengine.
 
-
-:-  setting(thread_pool_size, Size),
+:- if(current_predicate(thread_pool:create_pool/1)).
+:- multifile thread_pool:create_pool/1.
+thread_pool:create_pool(pengine_sandbox) :-
+    setting(thread_pool_size, Size),
     setting(thread_pool_stacks, Stacks),
     thread_pool_create(pengine_sandbox, Size, Stacks).
-
+:- else.
+:- initialization
+	( setting(thread_pool_size, Size),
+	  setting(thread_pool_stacks, Stacks),
+	  thread_pool_create(pengine_sandbox, Size, Stacks)
+	).
+:- endif.
 
 create(Queue, Child, Options, URL, Application) :-
     aggregate_all(count, child(_), Count),
