@@ -1,8 +1,8 @@
 /*  Part of SWI-Prolog
 
-    Author:        TorbjÃ¶rn Lager and Jan Wielemaker
+    Author:        Torbjörn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, TorbjÃ¶rn Lager,
+    Copyright (C): 2014, Torbjörn Lager,
 			 VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
@@ -57,7 +57,7 @@ The library(pengines) provides an  infrastructure   for  creating Prolog
 engines in a (remote) pengine server  and accessing these engines either
 from Prolog or JavaScript.
 
-@author TorbjÃ¶rn Lager and Jan Wielemaker
+@author Torbjörn Lager and Jan Wielemaker
 */
 
 :- use_module(library(http/http_dispatch)).
@@ -446,7 +446,7 @@ pengine_next(ID, Options) :-
 
 */
 
-pengine_next(Pengine, Options) :- 
+pengine_next(Pengine, Options) :-
 	pengine_send(Pengine, request(next), Options).
 
 
@@ -463,7 +463,7 @@ pengine_stop(ID, Options) :-
 ==
 */
 
-pengine_stop(Pengine, Options) :- 
+pengine_stop(Pengine, Options) :-
 	pengine_send(Pengine, request(stop), Options).
 
 
@@ -505,7 +505,7 @@ pengine_destroy(Pengine) :-
 
 :- thread_local
 	pengine_name/2.			% ?Pengine, ?Name
-	
+
 
 
 /*================= pengines administration =======================
@@ -529,7 +529,7 @@ pengine_destroy(Pengine) :-
 	child/1.                % ?Child
 
 
-	
+
 %%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue) is det.
 %%	pengine_unregister(+Id) is det.
@@ -692,7 +692,7 @@ create(Queue, Child, Options, URL, Application) :-
     get_setting(Application, slave_limit, Max),
     (   Count >= Max
     ->  pengine_done,
-        throw(attempt_to_create_too_many_local_slaves(Max))   
+        throw(attempt_to_create_too_many_local_slaves(Max))
     ;   maybe_create_application_thread_pool(Application),
         partition(pengine_create_option, Options, PengineOptions, RestOptions),
         thread_create_in_pool(
@@ -1564,7 +1564,7 @@ pengine_destroy_hard(Pengine) :-
     catch(thread_signal(Thread, abort), _, true),
     catch(thread_join(Thread, _), _, true).
 
-    
+
 
 % Output
 
@@ -1740,7 +1740,7 @@ ip_pattern([S|T0], [N|T]) :-
 */
 
 
-	
+
 /** pengine_src_list(+ClauseList) is det
 
 Asserts the list of clauses ClauseList   in the private dynamic database
