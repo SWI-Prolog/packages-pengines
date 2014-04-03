@@ -179,9 +179,8 @@ from Prolog or JavaScript.
     Creates a new pengine. Valid options are:
 
     * id(-ID)
-      ID gets instantiated to the id of the pengine. The id is a complex
-      term, its structure will remain undocumented and should not be
-      relied on.
+      ID gets instantiated to the id of the pengine.  ID is an atom
+      (a UUID).
 
     * name(+Name)
       The pengine is named Name (an atom). A slave pengine (child) can
