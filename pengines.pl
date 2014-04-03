@@ -290,7 +290,7 @@ pengine_send2(parent, Event0, Options) :- !,
     pengine_self(Self),
     pengine_parent(Queue),
     (   retract(wrap_first_answer_in_create_event)
-    ->  pengine_application(Self, Application),
+    ->  get_pengine_application(Self, Application),
         get_setting(Application, slave_limit, Max),
         Event = create(Self, [answer=output(Self, Event0), slave_limit=Max])
     ;   Event = output(Self, Event0)
@@ -338,7 +338,7 @@ pengine_reply(Event) :-
 pengine_reply(Queue, Event) :-
     retract(wrap_first_answer_in_create_event), !,
     pengine_self(Self),
-    pengine_application(Self, Application),
+    get_pengine_application(Self, Application),
     get_setting(Application, slave_limit, Max),
     thread_send_message(Queue, create(Self, [answer=Event, slave_limit=Max])).
 pengine_reply(Queue, Event) :-
@@ -565,7 +565,7 @@ pengine_thread(Pengine, Thread) :-
 pengine_remote(Pengine, URL) :-
     current_pengine(Pengine, _Parent, 0, URL, _Application).
 
-pengine_application(Pengine, Application) :-
+get_pengine_application(Pengine, Application) :-
     current_pengine(Pengine, _Parent, Thread, _URL, Application),
     Thread \== 0, !.
 
@@ -931,7 +931,7 @@ more_solutions(Event, ID, Choice, Destroy) :-
 %	prove the goal. It also takes care of the chunk(N) option.
 
 ask(ID, Goal, Options, Destroy) :-
-    pengine_application(ID, Application),
+    get_pengine_application(ID, Application),
     expand_goal(Application:Goal, Goal1),
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
@@ -1482,7 +1482,7 @@ pairs_create_options([_|T0], T) :-
 %	_).
 
 wait_and_output_result(Pengine, Queue, Format) :-
-    pengine_application(Pengine, Application),
+    get_pengine_application(Pengine, Application),
     get_setting(Application, time_limit, TimeLimit),
     (   thread_get_message(Queue, Event,
 			   [ timeout(TimeLimit)
