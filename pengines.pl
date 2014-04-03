@@ -701,7 +701,7 @@ create(Queue, Child, Options, URL, Application) :-
     get_setting(Application, slave_limit, Max),
     (   Count >= Max
     ->  pengine_done,
-        throw(attempt_to_create_too_many_local_slaves(Max))
+        throw(error(resourc_error(max_pengines, _)))
     ;   maybe_create_application_thread_pool(Application),
         partition(pengine_create_option, Options, PengineOptions, RestOptions),
         thread_create_in_pool(
