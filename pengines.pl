@@ -68,6 +68,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_wrapper)).
 :- use_module(library(http/http_cors)).
 :- use_module(library(thread_pool)).
+:- use_module(library(aggregate)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
