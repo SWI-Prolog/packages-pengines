@@ -588,6 +588,10 @@ properties are:
     Thread id for the parent (local) pengine.
   * self(Thread)
     Thread id of the running pengine.
+  * remote(Server)
+    Pengine runs on the remote Server.
+  * application(Application)
+    Pengine runs the given application
 */
 
 
@@ -597,6 +601,8 @@ pengine_property(Id, self(Id)) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application).
 pengine_property(Id, remote(Server)) :-
     current_pengine(Id, _Parent, 0, Server, _Application).
+pengine_property(Id, application(Application)) :-
+    current_pengine(Id, _Parent, _Thread, _Server, Application).
 
 
 /** pengine_output(+Term) is det
