@@ -771,7 +771,8 @@ pengine_create_option(application(_)).
 %    use pengine:Setting as fallback.
 
 application_setting(Application, Setting, Value) :-
-    catch(setting(Application:Setting, Value), _,
+    catch(setting(Application:Setting, Value),
+	  error(existence_error(setting, _), _),
 	  setting(Setting, Value)).
 
 %%	pengine_done is det.
