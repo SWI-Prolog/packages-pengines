@@ -43,6 +43,7 @@
             pengine_pull_response/2,		% +Pengine, +Options
             pengine_destroy/1,			% +Pengine
             pengine_abort/1,			% +Pengine
+	    pengine_application/1,		% +Application
             pengine_property/2,			% ?Pengine, ?Property
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
@@ -291,7 +292,7 @@ pengine_send2(parent, Event0, Options) :- !,
     pengine_parent(Queue),
     (   retract(wrap_first_answer_in_create_event)
     ->  get_pengine_application(Self, Application),
-        get_setting(Application, slave_limit, Max),
+        application_setting(Application, slave_limit, Max),
         Event = create(Self, [answer=output(Self, Event0), slave_limit=Max])
     ;   Event = output(Self, Event0)
     ),
@@ -339,7 +340,7 @@ pengine_reply(Queue, Event) :-
     retract(wrap_first_answer_in_create_event), !,
     pengine_self(Self),
     get_pengine_application(Self, Application),
-    get_setting(Application, slave_limit, Max),
+    application_setting(Application, slave_limit, Max),
     thread_send_message(Queue, create(Self, [answer=Event, slave_limit=Max])).
 pengine_reply(Queue, Event) :-
     thread_send_message(Queue, Event).
@@ -579,6 +580,39 @@ uuid(Id) :-
 :- endif.
 
 
+/** pengine_application(+Application) is det.
+
+Directive that must be used to declarate  a module a pengine application
+module. The module may not  be  associated   to  any  file.  The default
+application is =pengine_sandbox=.  The  example   below  creates  a  new
+application =address_book= and imports the  API   defined  in the module
+file =adress_book_api.pl= into the application.
+
+  ==
+  :- pengine_application(address_book).
+  :- use_module(address_book:adress_book_api).
+  ==
+*/
+
+pengine_application(Application) :-
+    throw(error(context_error(nodirective,
+				  pengine_application(Application)), _)).
+
+:- multifile
+    system:term_expansion/2,
+    current_application/1.
+
+current_application(pengine_sandbox).
+
+system:term_expansion((:- pengine_application(Application)),
+		      pengine:current_application(Application)) :-
+    must_be(atom, Application),
+    (   module_property(Application, file(_))
+    ->  permission_error(create, pengine_application, Application)
+    ;   true
+    ).
+
+
 /** pengine_property(+NameOrID, ?Property) is nondet.
 
 True  when  Property  is  a  property  of  the  given  Pengine.  Defined
@@ -674,7 +708,7 @@ local_pengine_create(Options) :-
         ;   true
         )
     ;   message_to_string(Error, ErrorString),
-        get_setting(Application, slave_limit, Max),
+        application_setting(Application, slave_limit, Max),
         pengine_reply(create(null, [ answer=error(null, ErrorString),
 				     slave_limit=Max
 				   ]))
@@ -688,28 +722,23 @@ local_pengine_create(Options) :-
 %	@arg Queue is the queue (or thread handle) to report to
 %	@arg Child is the identifier of the created pengine.
 
-:- if(current_predicate(thread_pool:create_pool/1)).
-:- multifile thread_pool:create_pool/1.
-thread_pool:create_pool(pengine_sandbox) :-
-    setting(thread_pool_size, Size),
-    setting(thread_pool_stacks, Stacks),
-    thread_pool_create(pengine_sandbox, Size, Stacks).
-:- else.
-:- initialization
-	( setting(thread_pool_size, Size),
-	  setting(thread_pool_stacks, Stacks),
-	  thread_pool_create(pengine_sandbox, Size, Stacks)
-	).
-:- endif.
+thread_pool:create_pool(Application) :-
+    application_setting(Application, thread_pool_size, Size),
+    application_setting(Application, thread_pool_stacks, Stacks),
+    thread_pool_create(Application, Size, Stacks).
+
 
 create(Queue, Child, Options, URL, Application) :-
+    (	current_application(Application)
+    ->	true
+    ;	existence_error(pengine_application, Application)
+    ),
     aggregate_all(count, child(_), Count),
-    get_setting(Application, slave_limit, Max),
+    application_setting(Application, slave_limit, Max),
     (   Count >= Max
     ->  pengine_done,
         throw(error(resourc_error(max_pengines, _)))
-    ;   maybe_create_application_thread_pool(Application),
-        partition(pengine_create_option, Options, PengineOptions, RestOptions),
+    ;   partition(pengine_create_option, Options, PengineOptions, RestOptions),
         thread_create_in_pool(
             Application,
             pengine_main(Queue, PengineOptions, Application), ChildThread,
@@ -726,22 +755,6 @@ create(Queue, Child, Options, URL, Application) :-
     ).
 
 
-
-maybe_create_application_thread_pool(pengine_sandbox) :- !.
-maybe_create_application_thread_pool(Application) :-
-    get_setting(Application, thread_pool_size, Size),
-    get_setting(Application, thread_pool_stacks, Stacks),
-    catch(thread_pool_create(Application, Size, Stacks), _, true).
-
-
-% Missing settings for an application is inherited from the settings
-% for pengine_sandbox.
-
-get_setting(Application, Setting, Value) :-
-    catch(setting(Application:Setting, Value), _,
-	  setting(Setting, Value)).
-
-
 pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
@@ -752,6 +765,15 @@ pengine_create_option(chunk(_)).
 pengine_create_option(destroy(_)).
 pengine_create_option(application(_)).
 
+
+%%   application_setting(+Application, +Setting, -Value)
+%
+%    First query the setting as Application:Setting and on failure,
+%    use pengine:Setting as fallback.
+
+application_setting(Application, Setting, Value) :-
+    catch(setting(Application:Setting, Value), _,
+	  setting(Setting, Value)).
 
 %%	pengine_done is det.
 %
@@ -787,7 +809,7 @@ pengine_main(Parent, Options, Application) :-
 	    option(template(Template), Options, Query),
 	    option(chunk(Chunk), Options, 1),
 	    pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
-	;   get_setting(Application, slave_limit, Max),
+	;   application_setting(Application, slave_limit, Max),
 	    pengine_reply(create(Self, [slave_limit=Max]))
         ),
         option(destroy(Destroy), Options, false),
@@ -1446,7 +1468,7 @@ http_pengine_create(Request) :-
     ->  http_pengine_parent(Pengine, Queue),
         wait_and_output_result(Pengine, Queue, Format)
     ;   message_to_string(Error, ErrorString),
-        get_setting(Application, slave_limit, Max),
+        application_setting(Application, slave_limit, Max),
         output_result(Format, create(null,
 				     [ answer=error(null, ErrorString),
 				       slave_limit=Max
@@ -1489,7 +1511,7 @@ pairs_create_options([_|T0], T) :-
 
 wait_and_output_result(Pengine, Queue, Format) :-
     get_pengine_application(Pengine, Application),
-    get_setting(Application, time_limit, TimeLimit),
+    application_setting(Application, time_limit, TimeLimit),
     (   thread_get_message(Queue, Event,
 			   [ timeout(TimeLimit)
 			   ]),
@@ -1716,9 +1738,9 @@ swap(N=V, N=A) :- term_to_atom(V, A).
 %	=forbidden= header if contact is not allowed.
 
 allowed(Request, Application) :-
-	get_setting(Application, allow_from, Allow),
+	application_setting(Application, allow_from, Allow),
 	match_peer(Request, Allow),
-	get_setting(Application, deny_from, Deny),
+	application_setting(Application, deny_from, Deny),
 	\+ match_peer(Request, Deny), !.
 allowed(Request, _Application) :-
 	memberchk(request_uri(Here), Request),
