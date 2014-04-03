@@ -87,12 +87,14 @@ test(stop, Results = [a,b]) :-
     assertion(no_more_pengines).
 test(two, Sorted = [a,b,c,d,e,f]) :-
     pengine_create(
-	[ src_text("p(a). p(b). p(c).")
+	[ src_text("p(a). p(b). p(c)."),
+	  id(P1)
 	]),
     pengine_create(
-	[ src_text("p(d). p(e). p(f).")
+	[ src_text("p(d). p(e). p(f)."),
+	  id(P2)
 	]),
-    collect(X, p(X), Results, []),
+    collect(X, p(X), Results, [created([P1,P2])]),
     msort(Results, Sorted),
     assertion(no_more_pengines).
 
@@ -131,13 +133,15 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     pengine_server(Server),
     pengine_create(
 	[ server(Server),
-	  src_text("p(a). p(b). p(c).")
+	  src_text("p(a). p(b). p(c)."),
+	  id(P1)
 	]),
     pengine_create(
 	[ server(Server),
-	  src_text("p(d). p(e). p(f).")
+	  src_text("p(d). p(e). p(f)."),
+	  id(P2)
 	]),
-    collect(X, p(X), Results, []),
+    collect(X, p(X), Results, [created([P1,P2])]),
     msort(Results, Sorted),
     assertion(no_more_pengines).
 test(rpc, all(X == [1,2,3])) :-
@@ -169,13 +173,23 @@ test(rpc, fail) :-
 %
 %	  * stop_after(N)
 %	  Stop collecting results after N answers
+%	  * created(Pengines)
+%	  Passed to pengine_event_loop/2.
+%
+%	Remaining options are passed to pengine_ask/3.
 
 collect(Template, Goal, Results, Options) :-
     (	select_option(stop_after(StopAfter), Options, Options1)
-    ->	State = _{results:[], stop_after:StopAfter, options:Options1}
-    ;	State = _{results:[], options:Options}
+    ->	State = _{results:[], stop_after:StopAfter, options:AskOptions}
+    ;	State = _{results:[], options:AskOptions},
+	Options1 = Options
     ),
-    pengine_event_loop(collect_handler(Template, Goal, State), []),
+    (	select_option(created(Created), Options1, AskOptions)
+    ->	EvOptions = [created(Created)]
+    ;	EvOptions = [],
+	AskOptions = Options1
+    ),
+    pengine_event_loop(collect_handler(Template, Goal, State), EvOptions),
     Results = State.results.
 
 collect_handler(Template, Goal, State, create(Id, _)) :-

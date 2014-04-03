@@ -1196,18 +1196,25 @@ treated specially:
 Valid options are:
 
    * autoforward(+To)
-     Forwards received event terms to slaves. To is either =all=,
-     =all_but_sender= or a Prolog list of NameOrIDs. [not yet
-     implemented]
+     Forwards received event terms to slaves.  The To argument
+     is reserved for future extensions and must be instantiated to
+     =all=.
 
+   * created(+List)
+     Initial list of pengine IDs to process.  This may be needed if
+     events from more than one pengines must be processed because the
+     event loop may otherwise terminate after processing all events of
+     the first pengine because subsequent pengines have not yet become
+     visible.
 */
 
 pengine_event_loop(Closure, Options) :-
-    pengine_event_loop(Closure, [], Options).
+    option(created(Created), Options, []),
+    pengine_event_loop(Closure, Created, Options).
 
 pengine_event_loop(Closure, Created, Options) :-
     pengine_event(Event),
-    (   option(autoforward(all), Options) % TODO: Implement all_but_sender and list of IDs
+    (   option(autoforward(all), Options)
     ->  forall(member(ID, Created), pengine_send(ID, Event))
     ;   true
     ),
@@ -1216,9 +1223,13 @@ pengine_event_loop(Closure, Created, Options) :-
 pengine_event_loop(create(ID, Features), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(Features)]),
     ignore(call(Closure, create(ID, Features))),
-    (   memberchk(answer=Answer, Features)
-    ->  pengine_event_loop(Answer, Closure, [ID|Created], Options)
-    ;   pengine_event_loop(Closure, [ID|Created], Options)
+    (	memberchk(ID, Created)
+    ->	Created2 = Created
+    ;	Created2 = [ID|Created]
+    ),
+    (   option(answer(Answer), Features)
+    ->  pengine_event_loop(Answer, Closure, Created2, Options)
+    ;   pengine_event_loop(Closure, Created2, Options)
     ).
 pengine_event_loop(output(ID, Msg), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, output(Msg)]),
