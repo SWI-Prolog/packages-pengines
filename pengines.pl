@@ -823,7 +823,7 @@ pengine_main(Parent, Options, Application) :-
 %	the current output points to a CGI stream.
 
 fix_streams :-
-    fix_stream(current_output).
+    catch(fix_stream(current_output), _, true).
 
 fix_stream(Name) :-
     is_cgi_stream(Name), !,
