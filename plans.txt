@@ -4,7 +4,7 @@ Plans
 Short term
 ----------
 
-- we may need another time_limit, destroying a pengine that hasn't been used at all for a certain period of time.
+- we may need another time_limit, destroying a pengine that hasn't been used at all for a certain period of time. As things now work, there is no limit for how long a pengine (in state 2) can stay alive and thereby use up memory. Destroying a pengine after a set time limit might make sense. However, a better idea might be to (after a set time) first save the pengine to the server's disk (or only some of its options and the thread_local clauses that it may have in its private database) and then destroy its in-memory version. A pengine_ask/3 request will consult and create it again and start solving the new goal. Thus, it may be possible for a _user_ to "own" a pengine that will stay ready on a server forever. I guess such a mechanism could be built on top of pengines.pl?
 
 - split up into different files, making it easier to add stuff such as a state machine interpreter.
 One suggestion would be:
