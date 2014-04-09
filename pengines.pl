@@ -603,13 +603,18 @@ pengine_application(Application) :-
 
 current_application(pengine_sandbox).
 
-system:term_expansion((:- pengine_application(Application)),
-		      pengine:current_application(Application)) :-
+system:term_expansion((:- pengine_application(Application)), Expanded) :-
     must_be(atom, Application),
     (   module_property(Application, file(_))
     ->  permission_error(create, pengine_application, Application)
     ;   true
-    ).
+    ),
+    expand_term((:- setting(Application:slave_limit, integer, 1,
+			    'Maximum number of slave pengines')),
+		SlaveSetting),
+    flatten([ pengine:current_application(Application),
+	      SlaveSetting
+	    ], Expanded).
 
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
