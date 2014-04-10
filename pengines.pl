@@ -173,6 +173,10 @@ from Prolog or JavaScript.
       (parent). The atoms =parent= and =self= are reserved names and
       must not be used here.
 
+    * application(+Name)
+      The pengine will run in (and in the Prolog context of) the pengine
+      application Name.
+
     * server(+URL)
       The pengine will run in (and in the Prolog context of) the pengine
       server located at URL.
