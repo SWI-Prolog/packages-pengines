@@ -601,7 +601,7 @@ pengine_application(Application) :-
     system:term_expansion/2,
     current_application/1.
 
-current_application(pengine_sandbox).
+%current_application(pengine_sandbox).
 
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
     must_be(atom, Application),
@@ -635,6 +635,11 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 	      AllowFromSetting,
 	      DenyFromSetting
 	    ], Expanded).
+
+
+% Register default application
+
+:- pengine_application(pengine_sandbox).
 
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
