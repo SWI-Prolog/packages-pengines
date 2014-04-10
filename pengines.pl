@@ -291,7 +291,7 @@ pengine_send2(parent, Event0, Options) :- !,
     pengine_parent(Queue),
     (   retract(wrap_first_answer_in_create_event)
     ->  get_pengine_application(Self, Application),
-        application_setting(Application, slave_limit, Max),
+        setting(Application:slave_limit, Max),
         Event = create(Self, [answer=output(Self, Event0), slave_limit=Max])
     ;   Event = output(Self, Event0)
     ),
@@ -339,7 +339,7 @@ pengine_reply(Queue, Event) :-
     retract(wrap_first_answer_in_create_event), !,
     pengine_self(Self),
     get_pengine_application(Self, Application),
-    application_setting(Application, slave_limit, Max),
+    setting(Application:slave_limit, Max),
     thread_send_message(Queue, create(Self, [answer=Event, slave_limit=Max])).
 pengine_reply(Queue, Event) :-
     thread_send_message(Queue, Event).
@@ -595,7 +595,7 @@ file =adress_book_api.pl= into the application.
 
 pengine_application(Application) :-
     throw(error(context_error(nodirective,
-				  pengine_application(Application)), _)).
+			      pengine_application(Application)), _)).
 
 :- multifile
     system:term_expansion/2,
@@ -732,7 +732,7 @@ local_pengine_create(Options) :-
         ;   true
         )
     ;   message_to_string(Error, ErrorString),
-        application_setting(Application, slave_limit, Max),
+        setting(Application:slave_limit, Max),
         pengine_reply(create(null, [ answer=error(null, ErrorString),
 				     slave_limit=Max
 				   ]))
@@ -747,8 +747,8 @@ local_pengine_create(Options) :-
 %	@arg Child is the identifier of the created pengine.
 
 thread_pool:create_pool(Application) :-
-    application_setting(Application, thread_pool_size, Size),
-    application_setting(Application, thread_pool_stacks, Stacks),
+    setting(Application:thread_pool_size, Size),
+    setting(Application:thread_pool_stacks, Stacks),
     thread_pool_create(Application, Size, Stacks).
 
 
@@ -758,7 +758,7 @@ create(Queue, Child, Options, URL, Application) :-
     ;	existence_error(pengine_application, Application)
     ),
     aggregate_all(count, child(_), Count),
-    application_setting(Application, slave_limit, Max),
+    setting(Application:slave_limit, Max),
     (   Count >= Max
     ->  pengine_done,
         throw(error(resourc_error(max_pengines, _)))
@@ -790,15 +790,6 @@ pengine_create_option(destroy(_)).
 pengine_create_option(application(_)).
 
 
-%%   application_setting(+Application, +Setting, -Value)
-%
-%    First query the setting as Application:Setting and on failure,
-%    use pengine:Setting as fallback.
-
-application_setting(Application, Setting, Value) :-
-    catch(setting(Application:Setting, Value),
-	  error(existence_error(setting, _), _),
-	  setting(Setting, Value)).
 
 %%	pengine_done is det.
 %
@@ -834,7 +825,7 @@ pengine_main(Parent, Options, Application) :-
 	    option(template(Template), Options, Query),
 	    option(chunk(Chunk), Options, 1),
 	    pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
-	;   application_setting(Application, slave_limit, Max),
+	;   setting(Application:slave_limit, Max),
 	    pengine_reply(create(Self, [slave_limit=Max]))
         ),
         option(destroy(Destroy), Options, false),
@@ -1504,7 +1495,7 @@ http_pengine_create(Request) :-
     ->  http_pengine_parent(Pengine, Queue),
         wait_and_output_result(Pengine, Queue, Format)
     ;   message_to_string(Error, ErrorString),
-        application_setting(Application, slave_limit, Max),
+        setting(Application:slave_limit, Max),
         output_result(Format, create(null,
 				     [ answer=error(null, ErrorString),
 				       slave_limit=Max
@@ -1547,7 +1538,7 @@ pairs_create_options([_|T0], T) :-
 
 wait_and_output_result(Pengine, Queue, Format) :-
     get_pengine_application(Pengine, Application),
-    application_setting(Application, time_limit, TimeLimit),
+    setting(Application:time_limit, TimeLimit),
     (   thread_get_message(Queue, Event,
 			   [ timeout(TimeLimit)
 			   ]),
@@ -1774,9 +1765,9 @@ swap(N=V, N=A) :- term_to_atom(V, A).
 %	=forbidden= header if contact is not allowed.
 
 allowed(Request, Application) :-
-	application_setting(Application, allow_from, Allow),
+	setting(Application:allow_from, Allow),
 	match_peer(Request, Allow),
-	application_setting(Application, deny_from, Deny),
+	setting(Application:deny_from, Deny),
 	\+ match_peer(Request, Deny), !.
 allowed(Request, _Application) :-
 	memberchk(request_uri(Here), Request),
