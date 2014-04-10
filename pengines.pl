@@ -152,21 +152,6 @@ from Prolog or JavaScript.
 % :- debug(pengine(transition)).
 :- debug(pengine(debug)).		% handle pengine_debug in pengine_rpc/3.
 
-/* Settings */
-
-:- setting(thread_pool_size, integer, 100,
-	   'Maximum number of pengines this application can run.').
-:- setting(thread_pool_stacks, list(compound), [],
-	   'Maximum stack sizes for pengines this application can run.').
-:- setting(slave_limit, integer, 3,
-	   'Maximum number of local slave pengines a master pengine can create.').
-:- setting(time_limit, number, 30,
-	   'Maximum time to wait for output').
-:- setting(allow_from, list(atom), [*],
-	   'IP addresses from which remotes are allowed to connect').
-:- setting(deny_from, list(atom), [],
-	   'IP addresses from which remotes are NOT allowed to connect').
-
 
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +, +),
@@ -601,7 +586,6 @@ pengine_application(Application) :-
     system:term_expansion/2,
     current_application/1.
 
-%current_application(pengine_sandbox).
 
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
     must_be(atom, Application),
