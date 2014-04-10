@@ -609,11 +609,31 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
     ->  permission_error(create, pengine_application, Application)
     ;   true
     ),
-    expand_term((:- setting(Application:slave_limit, integer, 1,
-			    'Maximum number of slave pengines')),
-		SlaveSetting),
+    expand_term((:- setting(Application:thread_pool_size, integer, 100,
+			    'Maximum number of pengines this application can run.')),
+		ThreadPoolSizeSetting),	
+    expand_term((:- setting(Application:thread_pool_stacks, list(compound), [],
+			    'Maximum stack sizes for pengines this application can run.')),
+		ThreadPoolStacksSetting),	
+    expand_term((:- setting(Application:slave_limit, integer, 3,
+			    'Maximum number of local slave pengines a master pengine can create.')),
+		SlaveLimitSetting),	
+    expand_term((:- setting(Application:time_limit, number, 30,
+			    'Maximum time to wait for output')),
+		TimeLimitSetting),	
+    expand_term((:- setting(Application:allow_from, list(atom), [*],
+			    'IP addresses from which remotes are allowed to connect')),
+		AllowFromSetting),	
+    expand_term((:- setting(Application:deny_from, list(atom), [],
+			    'IP addresses from which remotes are NOT allowed to connect')),
+		DenyFromSetting),
     flatten([ pengine:current_application(Application),
-	      SlaveSetting
+	      ThreadPoolSizeSetting,
+	      ThreadPoolStacksSetting,
+	      SlaveLimitSetting,
+	      TimeLimitSetting,
+	      AllowFromSetting,
+	      DenyFromSetting
 	    ], Expanded).
 
 
