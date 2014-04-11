@@ -21,6 +21,9 @@ pengine_event_loop.pl + pengine_rpc.pl
 
 - finalize Scratchpad
 
+- remove dependency on jQuery
+
+
 Long term ----------
 
 - REST-based predicate pengine_rest(+URL, +Query, +Options) where options can
