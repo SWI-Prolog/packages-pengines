@@ -480,9 +480,6 @@ Destroys the pengine NameOrID.
 */
 
 pengine_destroy(Pengine) :-
-    pengine_remote(Pengine, Server), !,
-    remote_pengine_send(Server, Pengine, request(destroy), []).
-pengine_destroy(Pengine) :-
     catch(pengine_send(Pengine, request(destroy)),
 	  error(existence_error(pengine, Pengine), _),
 	  true),
