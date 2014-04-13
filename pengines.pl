@@ -1224,6 +1224,7 @@ pengine_event_loop(Closure, Options) :-
 
 pengine_event_loop(Closure, Created, Options) :-
     pengine_event(Event),
+    debug(pengine(event), 'EVENT: ~q', [Event]),
     (   option(autoforward(all), Options)
     ->  forall(member(ID, Created), pengine_send(ID, Event))
     ;   true
@@ -1271,8 +1272,10 @@ pengine_event_loop(stop(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 7 = /~q => 2', [ID, stop]),
     ignore(call(Closure, stop(ID))),
     pengine_event_loop(Closure, Created, Options).
+pengine_event_loop(destroy(ID, Event), Closure, Created, Options) :-
+    ignore(call(Closure, Event)),
+    pengine_event_loop(destroy(ID), Closure, Created, Options).
 pengine_event_loop(destroy(ID), Closure, Created, Options) :-
-    debug(pengine(transition), '~q: 1 = /~q => 0', [ID, destroy]),
     ignore(call(Closure, destroy(ID))),
     retractall(child(ID)),
     delete(Created, ID, RestCreated),
