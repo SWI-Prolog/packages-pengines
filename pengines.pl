@@ -1319,7 +1319,8 @@ pengine_rpc(URL, Query, QOptions) :-
     Template =.. [v|Vars],
     setup_call_cleanup(
 	pengine_create([ server(URL),
-			 id(Id)
+			 id(Id),,
+			 destroy(false)
 		       | Options
 		       ]),
 	wait_event(Query, Template, Options),
