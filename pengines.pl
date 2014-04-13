@@ -918,6 +918,7 @@ solve(_, _, _, _).			% leave a choice point
 destroy_or_continue(Destroy, ID, Event) :-
     (   Destroy == true
     ->  pengine_reply(destroy(ID, Event)),
+	sleep(0.5), % Seems necessary
         thread_self(Self),
         thread_detach(Self)
     ;   pengine_reply(Event),
