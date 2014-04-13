@@ -821,7 +821,7 @@ pengine_main(Parent, Options, Application) :-
 	;   setting(Application:slave_limit, Max),
 	    pengine_reply(create(Self, [slave_limit=Max]))
         ),
-        option(destroy(Destroy), Options, false),
+        option(destroy(Destroy), Options, true),
         pengine_main_loop(Self, Destroy)
     ;   pengine_terminate(Self)
     ).
