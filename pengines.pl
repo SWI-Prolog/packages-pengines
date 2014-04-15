@@ -511,9 +511,9 @@ pengine_destroy(Pengine) :-
 %	  - remote(URL)
 
 :- dynamic
-	current_pengine/5.		% Id, ParentId, Thread, URL
+	current_pengine/6.		% Id, ParentId, Thread, URL
 :- volatile
-	current_pengine/5.
+	current_pengine/6.
 
 :- thread_local
 	child/1.                % ?Child
@@ -524,39 +524,42 @@ pengine_destroy(Pengine) :-
 %%	pengine_register_remote(+Id, +URL, +Queue) is det.
 %%	pengine_unregister(+Id) is det.
 
-pengine_register_local(Id, Thread, Queue, URL, Application) :-
+pengine_register_local(Id, Thread, Queue, URL, Application, Destroy) :-
     uuid(Id),
-    asserta(current_pengine(Id, Queue, Thread, URL, Application)).
+    asserta(current_pengine(Id, Queue, Thread, URL, Application, Destroy)).
 
 pengine_register_remote(Id, URL) :-
     thread_self(Queue),
-    asserta(current_pengine(Id, Queue, 0, URL, 0)).
+    asserta(current_pengine(Id, Queue, 0, URL, 0, 0)).
 
 pengine_unregister(Id) :-
-    retractall(current_pengine(Id, _, _, _, _)),
+    retractall(current_pengine(Id, _, _, _, _, _)),
     retractall(pengine_name(Id, _)).
 
 pengine_self(Id) :-
     thread_self(Thread),
-    current_pengine(Id, _Parent, Thread, _URL, _Application).
+    current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy).
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
 
 http_pengine_parent(Pengine, Parent) :-
-    current_pengine(Pengine, Parent, Thread, _URL, _Application),
+    current_pengine(Pengine, Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0, !.
 
 pengine_thread(Pengine, Thread) :-
-    current_pengine(Pengine, _Parent, Thread, _URL, _Application),
+    current_pengine(Pengine, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0, !.
 
 pengine_remote(Pengine, URL) :-
-    current_pengine(Pengine, _Parent, 0, URL, _Application).
+    current_pengine(Pengine, _Parent, 0, URL, _Application, _Destroy).
 
 get_pengine_application(Pengine, Application) :-
-    current_pengine(Pengine, _Parent, Thread, _URL, Application),
+    current_pengine(Pengine, _Parent, Thread, _URL, Application, _Destroy),
     Thread \== 0, !.
+
+get_pengine_destroy(Pengine, Destroy) :-
+    current_pengine(Pengine, _Parent, _Thread, _URL, _Application, Destroy).	
 
 
 :- if(\+current_predicate(uuid/1)).
@@ -647,13 +650,13 @@ properties are:
 
 
 pengine_property(Id, parent(Parent)) :-
-    current_pengine(Id, Parent, _Thread, _URL, _Application).
+    current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property(Id, self(Id)) :-
-    current_pengine(Id, _Parent, _Thread, _URL, _Application).
+    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property(Id, remote(Server)) :-
-    current_pengine(Id, _Parent, 0, Server, _Application).
+    current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
 pengine_property(Id, application(Application)) :-
-    current_pengine(Id, _Parent, _Thread, _Server, Application).
+    current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
 
 
 /** pengine_output(+Term) is det
@@ -763,7 +766,8 @@ create(Queue, Child, Options, URL, Application) :-
 	      at_exit(pengine_done)
 	    | RestOptions
 	    ]),
-        pengine_register_local(Child, ChildThread, Queue, URL, Application),
+	option(destroy(Destroy), PengineOptions, true),
+        pengine_register_local(Child, ChildThread, Queue, URL, Application, Destroy),
         thread_send_message(ChildThread, pengine_registered(Child)),
         (    option(id(Id), Options)
         ->   Id = Child
@@ -795,7 +799,10 @@ pengine_create_option(application(_)).
 pengine_done :-
     forall(retract(child(Child)), pengine_destroy(Child)),
     pengine_self(Id),
-    pengine_unregister(Id).
+    (	\+ current_pengine(Id, _, _, http, _, _)
+    ->	pengine_unregister(Id)
+    ;	true
+    ).
 
 
 %%	pengine_main(+Parent, +Options, +Application)
@@ -821,7 +828,7 @@ pengine_main(Parent, Options, Application) :-
 	;   setting(Application:slave_limit, Max),
 	    pengine_reply(create(Self, [slave_limit=Max]))
         ),
-        option(destroy(Destroy), Options, true),
+        get_pengine_destroy(Self, Destroy),
         pengine_main_loop(Self, Destroy)
     ;   pengine_terminate(Self)
     ).
@@ -883,8 +890,8 @@ guarded_main_loop(ID, Destroy) :-
 
 pengine_terminate(ID) :-
     pengine_reply(destroy(ID)),
-    thread_self(Me),		% Make the thread silently disappear
-    thread_detach(Me).
+    thread_self(Self),		% Make the thread silently disappear
+    thread_detach(Self).
 
 
 %%	solve(+Template, :Goal, +ID, +Destroy) is det.
@@ -918,12 +925,12 @@ solve(_, _, _, _).			% leave a choice point
 destroy_or_continue(Destroy, ID, Event) :-
     (   Destroy == true
     ->  pengine_reply(destroy(ID, Event)),
-	sleep(0.5), % Seems necessary
         thread_self(Self),
         thread_detach(Self)
     ;   pengine_reply(Event),
         guarded_main_loop(ID, true)
     ).
+
 
 
 %%	more_solutions(+Pengine, +Choice)
@@ -1375,6 +1382,7 @@ pengine_rpc_output(ID, Term) :-
 pengine_rpc_output(_ID, Term) :-
     print(Term).
 
+
 %%  prompt(+ID, +Prompt, -Term) is semidet.
 %
 %   Hook to handle pengine_input/2 from the remote pengine. If the hooks
@@ -1542,13 +1550,29 @@ wait_and_output_result(Pengine, Queue, Format) :-
 			   [ timeout(TimeLimit)
 			   ]),
 	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue])
-    ->  output_result(Format, Event)
+    ->  output_result(Format, Event),
+	(	get_pengine_destroy(Pengine, true)
+	->	maybe_unregister_pengine(Event)
+	;	true
+	)
     ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
     ).
 
+maybe_unregister_pengine(success(Pengine, _, false)) :- !,
+	pengine_unregister(Pengine).
+maybe_unregister_pengine(failure(Pengine)) :- !,
+	pengine_unregister(Pengine).
+maybe_unregister_pengine(destroy(Pengine)) :- !,
+	pengine_unregister(Pengine).
+maybe_unregister_pengine(destroy(Pengine, _)) :- !,
+	pengine_unregister(Pengine).
+maybe_unregister_pengine(error(Pengine, _)) :- !,
+	pengine_unregister(Pengine).
+maybe_unregister_pengine(_).
 
+	
 http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
@@ -1581,6 +1605,7 @@ fix_bindings('json-s',
     NewOptions = [template(Template), chunk(Paging)].
 fix_bindings(_, Command, _, _, Command).
 
+
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
             [   id(ID, []),
@@ -1591,6 +1616,7 @@ http_pengine_pull_response(Request) :-
     ;	http_404([], Request)
     ).
 
+
 http_pengine_abort(Request) :-
     http_parameters(Request,
             [   id(ID, []),
@@ -1598,9 +1624,10 @@ http_pengine_abort(Request) :-
             ]),
     (	http_pengine_parent(ID, Queue)
     ->	pengine_abort(ID),
-	    wait_and_output_result(ID, Queue, Format)
+	wait_and_output_result(ID, Queue, Format)
     ;	http_404([], Request)
     ).
+
 
 http_pengine_destroy(Request) :-
     http_parameters(Request,
@@ -1609,7 +1636,7 @@ http_pengine_destroy(Request) :-
             ]),
     (	http_pengine_parent(ID, Queue)
     ->	pengine_destroy(ID),
-	    wait_and_output_result(ID, Queue, Format)
+	wait_and_output_result(ID, Queue, Format)
     ;	http_404([], Request)
     ).
 
@@ -1623,9 +1650,9 @@ http_pengine_destroy_all(Request) :-
 
 pengine_destroy_hard(Pengine) :-
     pengine_thread(Pengine, Thread),
-    retractall(pengine_name(Pengine, _)),
     catch(thread_signal(Thread, abort), _, true),
-    catch(thread_join(Thread, _), _, true).
+    catch(thread_join(Thread, _), _, true),
+    pengine_unregister(Pengine).
 
 
 

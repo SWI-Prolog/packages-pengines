@@ -62,6 +62,7 @@ function Pengine(options) {
             if (Pengine.ids.length > obj.data.slave_limit) {
                 alert("Attempt to use too many slave pengines. The limit is :" + obj.data.slave_limit);
                 Pengine.destroy_all();
+                Pengine.ids = [];
             } else {
                 that.id = encodeURIComponent(obj.id);
                 if (options.oncreate && that.id != "null") options.oncreate.call(obj.data.answer);
