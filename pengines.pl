@@ -575,7 +575,7 @@ uuid(Id) :-
 
 Directive that must be used to declarate  a module a pengine application
 module. The module may not  be  associated   to  any  file.  The default
-application is =default=.  The  example   below  creates  a  new
+application is =pengine_sandbox=.  The  example   below  creates  a  new
 application =address_book= and imports the  API   defined  in the module
 file =adress_book_api.pl= into the application.
 
@@ -645,7 +645,7 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 
 % Register default application
 
-:- pengine_application(default).
+:- pengine_application(pengine_sandbox).
 
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
@@ -734,7 +734,7 @@ pengine_debug(Format, Args) :-
 
 local_pengine_create(Options) :-
     thread_self(Self),
-    option(application(Application), Options, default),
+    option(application(Application), Options, pengine_sandbox),
     catch(create(Self, Child, Options, local, Application), Error, true),
     (   var(Error)
     ->  assert(child(Child)),
@@ -1509,7 +1509,7 @@ http_pengine_create(Request) :-
     ;	Format = prolog
     ),
     dict_to_options(Dict, CreateOptions),
-    option(application(Application), CreateOptions, default),
+    option(application(Application), CreateOptions, pengine_sandbox),
     allowed(Request, Application),
     message_queue_create(From, []),
     catch(create(From, Pengine, CreateOptions, http, Application), Error, true),
