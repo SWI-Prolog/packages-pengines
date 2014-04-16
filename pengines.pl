@@ -559,7 +559,7 @@ get_pengine_application(Pengine, Application) :-
     Thread \== 0, !.
 
 get_pengine_destroy(Pengine, Destroy) :-
-    current_pengine(Pengine, _Parent, _Thread, _URL, _Application, Destroy).	
+    current_pengine(Pengine, _Parent, _Thread, _URL, _Application, Destroy).
 
 
 :- if(\+current_predicate(uuid/1)).
@@ -593,6 +593,21 @@ pengine_application(Application) :-
     system:term_expansion/2,
     current_application/1.
 
+% Default settings for all applications
+
+:- setting(thread_pool_size, integer, 100,
+	   'Maximum number of pengines this application can run.').
+:- setting(thread_pool_stacks, list(compound), [],
+	   'Maximum stack sizes for pengines this application can run.').
+:- setting(slave_limit, integer, 3,
+	   'Maximum number of local slave pengines a master pengine can create.').
+:- setting(time_limit, number, 30,
+	   'Maximum time to wait for output').
+:- setting(allow_from, list(atom), [*],
+	   'IP addresses from which remotes are allowed to connect').
+:- setting(deny_from, list(atom), [],
+	   'IP addresses from which remotes are NOT allowed to connect').
+
 
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
     must_be(atom, Application),
@@ -600,22 +615,22 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
     ->  permission_error(create, pengine_application, Application)
     ;   true
     ),
-    expand_term((:- setting(Application:thread_pool_size, integer, 100,
+    expand_term((:- setting(Application:thread_pool_size, integer, setting(pengine:thread_pool_size),
 			    'Maximum number of pengines this application can run.')),
-		ThreadPoolSizeSetting),	
-    expand_term((:- setting(Application:thread_pool_stacks, list(compound), [],
+		ThreadPoolSizeSetting),
+    expand_term((:- setting(Application:thread_pool_stacks, list(compound), setting(pengine:thread_pool_stacks),
 			    'Maximum stack sizes for pengines this application can run.')),
-		ThreadPoolStacksSetting),	
-    expand_term((:- setting(Application:slave_limit, integer, 3,
+		ThreadPoolStacksSetting),
+    expand_term((:- setting(Application:slave_limit, integer, setting(pengine:slave_limit),
 			    'Maximum number of local slave pengines a master pengine can create.')),
-		SlaveLimitSetting),	
-    expand_term((:- setting(Application:time_limit, number, 30,
+		SlaveLimitSetting),
+    expand_term((:- setting(Application:time_limit, number, setting(pengine:time_limit),
 			    'Maximum time to wait for output')),
-		TimeLimitSetting),	
-    expand_term((:- setting(Application:allow_from, list(atom), [*],
+		TimeLimitSetting),
+    expand_term((:- setting(Application:allow_from, list(atom), setting(pengine:allow_from),
 			    'IP addresses from which remotes are allowed to connect')),
-		AllowFromSetting),	
-    expand_term((:- setting(Application:deny_from, list(atom), [],
+		AllowFromSetting),
+    expand_term((:- setting(Application:deny_from, list(atom), setting(pengine:deny_from),
 			    'IP addresses from which remotes are NOT allowed to connect')),
 		DenyFromSetting),
     flatten([ pengine:current_application(Application),
@@ -1572,7 +1587,7 @@ maybe_unregister_pengine(error(Pengine, _)) :- !,
 	pengine_unregister(Pengine).
 maybe_unregister_pengine(_).
 
-	
+
 http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
