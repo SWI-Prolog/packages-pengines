@@ -758,6 +758,7 @@ local_pengine_create(Options) :-
 %	@arg Child is the identifier of the created pengine.
 
 thread_pool:create_pool(Application) :-
+    current_application(Application),
     setting(Application:thread_pool_size, Size),
     setting(Application:thread_pool_stacks, Stacks),
     thread_pool_create(Application, Size, Stacks).
