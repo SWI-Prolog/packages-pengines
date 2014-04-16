@@ -29,17 +29,7 @@ handler(error(ID, Err)) :-
     writeln(Err).
 
 
-
-- This doesn't work:
-
-test :- 
-    pengine_output('<hr>Test 6<hr>'),
-    pengine_rpc('http://localhost:3020', (between(1, 3, X), pengine_output(X))),
-    fail.
-
-
-
-- There are still problems with the cleaning up of pengines that are no longer connected to a master.
+- The message "Oops, current stream closed?" appears frequently.
 
 
 - JW: Now, pengines can communicate using the dynamic database. That seems a
