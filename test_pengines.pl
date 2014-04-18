@@ -87,14 +87,12 @@ test(stop, Results = [a,b]) :-
     assertion(no_more_pengines).
 test(two, Sorted = [a,b,c,d,e,f]) :-
     pengine_create(
-	[ src_text("p(a). p(b). p(c)."),
-	  id(P1)
+	[ src_text("p(a). p(b). p(c).")
 	]),
     pengine_create(
-	[ src_text("p(d). p(e). p(f)."),
-	  id(P2)
+	[ src_text("p(d). p(e). p(f).")
 	]),
-    collect(X, p(X), Results, [created([P1,P2])]),
+    collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
 
@@ -133,15 +131,13 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     pengine_server(Server),
     pengine_create(
 	[ server(Server),
-	  src_text("p(a). p(b). p(c)."),
-	  id(P1)
+	  src_text("p(a). p(b). p(c).")
 	]),
     pengine_create(
 	[ server(Server),
-	  src_text("p(d). p(e). p(f)."),
-	  id(P2)
+	  src_text("p(d). p(e). p(f).")
 	]),
-    collect(X, p(X), Results, [created([P1,P2])]),
+    collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
 test(rpc, all(X == [1,2,3])) :-
@@ -173,23 +169,13 @@ test(rpc, fail) :-
 %
 %	  * stop_after(N)
 %	  Stop collecting results after N answers
-%	  * created(Pengines)
-%	  Passed to pengine_event_loop/2.
-%
-%	Remaining options are passed to pengine_ask/3.
 
 collect(Template, Goal, Results, Options) :-
     (	select_option(stop_after(StopAfter), Options, Options1)
-    ->	State = _{results:[], stop_after:StopAfter, options:AskOptions}
-    ;	State = _{results:[], options:AskOptions},
-	Options1 = Options
+    ->	State = _{results:[], stop_after:StopAfter, options:Options1}
+    ;	State = _{results:[], options:Options}
     ),
-    (	select_option(created(Created), Options1, AskOptions)
-    ->	EvOptions = [created(Created)]
-    ;	EvOptions = [],
-	AskOptions = Options1
-    ),
-    pengine_event_loop(collect_handler(Template, Goal, State), EvOptions),
+    pengine_event_loop(collect_handler(Template, Goal, State), []),
     Results = State.results.
 
 collect_handler(Template, Goal, State, create(Id, _)) :-
@@ -218,7 +204,7 @@ no_more_pengines :-
     ;	between(1, 10, _),
 	sleep(0.01)
     ),
-    \+ pengine:current_pengine(_,_,_,_,_,_), !.
+    \+ pengine:current_pengine(_,_,_,_), !.
 
 
 		 /*******************************
