@@ -905,9 +905,9 @@ guarded_main_loop(ID, Destroy) :-
 
 
 pengine_terminate(ID) :-
-    pengine_reply(destroy(ID)),
     thread_self(Self),		% Make the thread silently disappear
-    thread_detach(Self).
+    thread_detach(Self),
+    pengine_reply(destroy(ID)).
 
 
 %%	solve(+Template, :Goal, +ID, +Destroy) is det.
@@ -940,9 +940,9 @@ solve(_, _, _, _).			% leave a choice point
 
 destroy_or_continue(Destroy, ID, Event) :-
     (   Destroy == true
-    ->  pengine_reply(destroy(ID, Event)),
-        thread_self(Self),
-        thread_detach(Self)
+    ->  thread_self(Self),
+        thread_detach(Self),
+	pengine_reply(destroy(ID, Event))
     ;   pengine_reply(Event),
         guarded_main_loop(ID, true)
     ).
