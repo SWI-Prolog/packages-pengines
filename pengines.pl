@@ -160,8 +160,7 @@ from Prolog or JavaScript.
 
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +),
-	pengine_event_loop(1, +, +),
-	pengine_event_loop(+, 1, +, +),
+	pengine_event_loop(+, 1, +),
 	pengine_find_n(+, ?, 0, -).
 
 /**  pengine_create(:Options) is det.
@@ -1100,62 +1099,57 @@ Valid options are:
 */
 
 pengine_event_loop(Closure, Options) :-
-    pengine_event_loop(Closure, [], Options).
-
-pengine_event_loop(Closure, Created, Options) :-
+    child(_,_), !,
     pengine_event(Event),
     (   option(autoforward(all), Options) % TODO: Implement all_but_sender and list of IDs
-    ->  forall(member(ID, Created), pengine_send(ID, Event))
+    ->  forall(child(_,ID), pengine_send(ID, Event))
     ;   true
     ),
-    pengine_event_loop(Event, Closure, Created, Options).
+    pengine_event_loop(Event, Closure, Options).
+pengine_event_loop(_, _).
 
-pengine_event_loop(create(ID, T), Closure, Created, Options) :-
+pengine_event_loop(create(ID, T), Closure, Options) :-
     debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(T)]),
     ignore(call(Closure, create(ID, T))),
-    pengine_event_loop(Closure, [ID|Created], Options).
-pengine_event_loop(output(ID, Msg), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(output(ID, Msg), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, output(Msg)]),
     ignore(call(Closure, output(ID, Msg))),
     pengine_pull_response(ID, []),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(debug(ID, Msg), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(debug(ID, Msg), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, debug(Msg)]),
     ignore(call(Closure, debug(ID, Msg))),
     pengine_pull_response(ID, []),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(prompt(ID, Term), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(prompt(ID, Term), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(success(ID, Sol, More), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(success(ID, Sol, More), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
     ignore(call(Closure, success(ID, Sol, More))),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(failure(ID), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(failure(ID), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
     ignore(call(Closure, failure(ID))),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(error(ID, Error), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(error(ID, Error), Closure, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Error)]),
     (	call(Closure, error(ID, Error))
-    ->	pengine_event_loop(Closure, Created, Options)
-    ;	maplist(pengine_destroy, Created),
+    ->	pengine_event_loop(Closure, Options)
+    ;	forall(child(_,Child), pengine_destroy(Child)),
 	throw(Error)
     ).
-pengine_event_loop(stop(ID), Closure, Created, Options) :-
+pengine_event_loop(stop(ID), Closure, Options) :-
     debug(pengine(transition), '~q: 7 = /~q => 2', [ID, stop]),
     ignore(call(Closure, stop(ID))),
-    pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(destroy(ID), Closure, Created, Options) :-
+    pengine_event_loop(Closure, Options).
+pengine_event_loop(destroy(ID), Closure, Options) :-
+    retractall(child(_,ID)),
     debug(pengine(transition), '~q: 1 = /~q => 0', [ID, destroy]),
     ignore(call(Closure, destroy(ID))),
-    delete(Created, ID, RestCreated),
-    (   RestCreated == []
-    ->  debug(pengine(event), '*** Event loop terminated', []),
-        true
-    ;   pengine_event_loop(Closure, RestCreated, Options)
-    ).
+    pengine_event_loop(Closure, Options).
 
 
 /** pengine_rpc(+URL, +Query) is nondet.
