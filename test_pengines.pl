@@ -96,6 +96,15 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
+test(name, Name == pippi) :-
+    pengine_create(
+	[ name(pippi),
+	  id(Id)
+	]),
+    pengine_name(Id, Name),
+    collect(_, fail, Results, []),
+    assertion(Results == []),
+    assertion(no_more_pengines).
 
 :- end_tests(local_pengines).
 
@@ -176,7 +185,8 @@ test(simple, Results = [a,b,c]) :-
     collect(X, p1(X), Results, []),
     assertion(no_more_pengines).
 test(self, true) :-
-    pengine_create([]),
+    pengine_create([ application(papp)
+		   ]),
     collect(X, pengine_self(X), Results, []),
     Results = [Self],
     assertion(atom(Self)),
@@ -196,10 +206,12 @@ test(noapp, [Results = [a,b,c],blocked('Create error loops')]) :-
 		 *******************************/
 
 :- pengine_application(papp).
+:- use_module(papp:library(pengines)).
 
 papp:p1(a).
 papp:p1(b).
 papp:p1(c).
+
 
 		 /*******************************
 		 *	     UTILITIES		*

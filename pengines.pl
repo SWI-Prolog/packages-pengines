@@ -44,6 +44,7 @@
             pengine_abort/1,			% +Pengine
 	    pengine_application/1,              % +Application
             pengine_property/2,			% ?Pengine, ?Property
+            pengine_name/2,			% ?Pengine, ?Name
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
             pengine_rpc/3,			% +Server, +Goal, +Options
@@ -560,8 +561,8 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
 
-True  when  Property  is  a  property  of  the  given  Pengine.  Defined
-properties are:
+True when Property is a property of   the  given Pengine. Enumerates all
+pengines the live in the calling Prolog process. Defined properties are:
 
   * parent(Thread)
     Thread id for the parent (local) pengine.
@@ -581,6 +582,15 @@ pengine_property(Id, remote(Server)) :-
 pengine_property(Id, application(Application)) :-
     current_pengine(Id, _Parent, _Thread, _Server, Application).
 
+/** pengine_name(?Id, ?Name) is nondet.
+
+True when pengine Id is a child pengine with the given Name.  The Name
+of a pengine may be specified as an option to pengine_create/1.
+*/
+
+pengine_name(Id, Name) :-
+   child(Name, Id),
+   Name \== Id.
 
 /** pengine_output(+Term) is det
 
