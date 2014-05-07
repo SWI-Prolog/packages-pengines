@@ -269,7 +269,7 @@ pengine_send2(self, Event, Options) :- !,
     thread_self(Queue),
     delay_message(queue(Queue), Event, Options).
 pengine_send2(Name, Event, Options) :-
-    named_child(Name, Target), !,
+    child(Name, Target), !,
     delay_message(pengine(Target), Event, Options).
 pengine_send2(Target, Event, Options) :-
     delay_message(pengine(Target), Event, Options).
@@ -477,8 +477,7 @@ pengine_destroy(ID) :-
 	current_pengine/5.
 
 :- thread_local
-	child/1,			% ?Child
-	named_child/2.			% ?Name, ?Child
+	child/2.			% ?Name, ?Child
 
 %%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue, +Application) is det.
@@ -645,11 +644,9 @@ local_pengine_create(Options) :-
     thread_self(Self),
     option(application(Application), Options, pengine_sandbox),
     create(Self, Child, Options, local, Application),
-    assert(child(Child)),
-    (   option(name(Name), Options)
-    ->  assert(named_child(Name, Child))
-    ;   true
-    ).
+    option(name(Name), Options, Child),
+    assert(child(Name, Child)).
+
 
 %%	create(+Queue, -Child, +Options, +URL, +Application) is det.
 %
@@ -661,7 +658,11 @@ local_pengine_create(Options) :-
 create(Queue, Child, Options, URL, Application) :-
     catch(create0(Queue, Child, Options, URL, Application),
 	  Error,
-	  pengine_reply(Queue, error(id(null, null), Error))).
+	  create_error(Queue, Child, Error)).
+
+create_error(Queue, Child, Error) :-
+    uuid(Child),
+    pengine_reply(Queue, error(Child, Error)).
 
 create0(Queue, Child, Options, URL, Application) :-
     (  current_application(Application)
@@ -696,7 +697,7 @@ pengine_create_option(src_predicates(_)).
 	pengine_done/0.
 
 pengine_done :-
-    forall(retract(child(Child)),
+    forall(child(_Name, Child),
 	   pengine_destroy(Child)),
     pengine_self(Id),
     pengine_unregister(Id).
@@ -952,10 +953,8 @@ remote_pengine_create(BaseURL, Options) :-
     ->	ID = ID2
     ;	true
     ),
-    (   option(name(Name), Options)
-    ->  assert(named_child(Name, ID))
-    ;   true
-    ),
+    option(name(Name), Options, ID),
+    assert(child(Name, ID)),
     option(application(Application), Options, pengine_sandbox),
     pengine_register_remote(ID, BaseURL, Application),
     thread_self(Queue),
@@ -1186,7 +1185,8 @@ pengine_rpc(URL, Query, QOptions) :-
 
 pengine_destroy_and_wait(Id) :-
     pengine_destroy(Id),
-    pengine_event(destroy(Id)).
+    pengine_event(destroy(Id)),
+    retractall(child(_,Id)).
 
 wait_event(Query, Template, Options) :-
     pengine_event(Event),
