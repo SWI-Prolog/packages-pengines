@@ -255,7 +255,8 @@ Any remaining options are passed to http_open/3.
 
 pengine_send(Target, Event, Options) :-
     must_be(atom, Target),
-    pengine_send2(Target, Event, Options).
+    arg(1, Event, ID),
+    pengine_send2(Target, pengine_event(ID, Event), Options).
 
 pengine_send2(parent, Event0, Options) :- !,
     pengine_parent(Queue),
@@ -305,7 +306,8 @@ pengine_reply(Event) :-
 
 pengine_reply(Queue, Event) :-
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
-    thread_send_message(Queue, Event).
+    arg(1, Event, ID),
+    thread_send_message(Queue, pengine_event(ID, Event)).
 
 
 /** pengine_ask(+NameOrID, @Query, +Options) is det
@@ -1053,6 +1055,8 @@ queue.
      Time is a float or integer and specifies the maximum time to wait
      in seconds. If no event has arrived before the time is up EventTerm
      is bound to the atom =timeout=.
+   * listen(+Id)
+     Only listen to events from the pengine identified by Id.
 */
 
 pengine_event(Event) :-
@@ -1060,7 +1064,8 @@ pengine_event(Event) :-
 
 pengine_event(Event, Options) :-
     thread_self(Self),
-    (   thread_get_message(Self, Event, Options)
+    option(listen(Id), Options, _),
+    (   thread_get_message(Self, pengine_event(Id, Event), Options)
     ->  true
     ;   Event = timeout
     ),
@@ -1187,7 +1192,7 @@ pengine_rpc(URL, Query, QOptions) :-
 			 id(Id)
 		       | Options
 		       ]),
-	wait_event(Query, Template, Options),
+	wait_event(Query, Template, [listen(Id)|Options]),
 	pengine_destroy_and_wait(Id)).
 
 pengine_destroy_and_wait(Id) :-
@@ -1196,7 +1201,7 @@ pengine_destroy_and_wait(Id) :-
     retractall(child(_,Id)).
 
 wait_event(Query, Template, Options) :-
-    pengine_event(Event),
+    pengine_event(Event, Options),
     debug(pengine(event), 'Received ~p', [Event]),
     process_event(Event, Query, Template, Options).
 
@@ -1413,7 +1418,7 @@ pairs_create_options([_|T0], T) :-
 
 wait_and_output_result(Pengine, Queue, Format) :-
     setting(time_limit, TimeLimit),
-    (   thread_get_message(Queue, Event,
+    (   thread_get_message(Queue, pengine_event(_, Event),
 			   [ timeout(TimeLimit)
 			   ]),
 	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue])

@@ -165,6 +165,16 @@ test(rpc, fail) :-
     pengine_rpc(Server,
 		fail,
 		[]), !.
+test(pengine_and_rpc, Results = [a,b,c]) :-
+    pengine_server(Server),
+    pengine_create(
+	[ server(Server),
+	  src_text("p(a). p(b). p(c).")
+	]),
+    findall(R, pengine_rpc(Server, member(R, [1,2,3]), []), Rs),
+    assertion(Rs == [1,2,3]),
+    collect(X, p(X), Results, []),
+    assertion(no_more_pengines).
 test(simple_app, Results = [a,b,c]) :-
     pengine_server(Server),
     pengine_create(
