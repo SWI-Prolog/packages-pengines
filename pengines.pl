@@ -152,11 +152,6 @@ from Prolog or JavaScript.
 
 :- setting(max_session_pengines, integer, 1,
 	   'Maximum number of pengines a client can create.  -1 is infinite.').
-:- setting(time_limit, number, 60, 'Maximum time to wait for output').
-:- setting(allow_from, list(atom), [*],
-	   'IP addresses from which remotes are allowed to connect').
-:- setting(deny_from, list(atom), [],
-	   'IP addresses from which remotes are NOT allowed to connect').
 
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +),
@@ -547,13 +542,65 @@ pengine_application(Application) :-
     system:term_expansion/2,
     current_application/1.
 
+% Default settings for all applications
+
+:- setting(thread_pool_size, integer, 100,
+	   'Maximum number of pengines this application can run.').
+:- setting(thread_pool_stacks, list(compound), [],
+	   'Maximum stack sizes for pengines this application can run.').
+:- setting(slave_limit, integer, 3,
+	   'Maximum number of local slave pengines a master pengine can create.').
+:- setting(time_limit, number, 30,
+	   'Maximum time to wait for output').
+:- setting(allow_from, list(atom), [*],
+	   'IP addresses from which remotes are allowed to connect').
+:- setting(deny_from, list(atom), [],
+	   'IP addresses from which remotes are NOT allowed to connect').
+
+
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
     must_be(atom, Application),
     (   module_property(Application, file(_))
     ->  permission_error(create, pengine_application, Application)
     ;   true
     ),
-    Expanded = pengine:current_application(Application).
+    expand_term((:- setting(Application:thread_pool_size, integer,
+			    setting(pengine:thread_pool_size),
+			    'Maximum number of pengines this \c
+			    application can run.')),
+		ThreadPoolSizeSetting),
+    expand_term((:- setting(Application:thread_pool_stacks, list(compound),
+			    setting(pengine:thread_pool_stacks),
+			    'Maximum stack sizes for pengines \c
+			    this application can run.')),
+		ThreadPoolStacksSetting),
+    expand_term((:- setting(Application:slave_limit, integer,
+			    setting(pengine:slave_limit),
+			    'Maximum number of local slave pengines \c
+			    a master pengine can create.')),
+		SlaveLimitSetting),
+    expand_term((:- setting(Application:time_limit, number,
+			    setting(pengine:time_limit),
+			    'Maximum time to wait for output')),
+		TimeLimitSetting),
+    expand_term((:- setting(Application:allow_from, list(atom),
+			    setting(pengine:allow_from),
+			    'IP addresses from which remotes are allowed \c
+			    to connect')),
+		AllowFromSetting),
+    expand_term((:- setting(Application:deny_from, list(atom),
+			    setting(pengine:deny_from),
+			    'IP addresses from which remotes are NOT \c
+			    allowed to connect')),
+		DenyFromSetting),
+    flatten([ pengine:current_application(Application),
+	      ThreadPoolSizeSetting,
+	      ThreadPoolStacksSetting,
+	      SlaveLimitSetting,
+	      TimeLimitSetting,
+	      AllowFromSetting,
+	      DenyFromSetting
+	    ], Expanded).
 
 % Register default application
 
@@ -1348,7 +1395,6 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 
 
 http_pengine_create(Request) :-
-    allowed(Request),
     http_read_json_dict(Request, Dict),
     (	get_dict(format, Dict, FormatString)
     ->	atom_string(Format, FormatString),
@@ -1356,10 +1402,11 @@ http_pengine_create(Request) :-
     ;	Format = prolog
     ),
     dict_to_options(Dict, CreateOptions),
+    option(application(Application), CreateOptions, pengine_sandbox),
+    allowed(Request, Application),
     setting(max_session_pengines, MaxEngines),
     enforce_max_session_pengines(pre, MaxEngines, _),
     message_queue_create(From, []),
-    option(application(Application), CreateOptions, pengine_sandbox),
     create(From, Pengine, CreateOptions, http, Application),
     enforce_max_session_pengines(post, MaxEngines, Pengine),
     http_pengine_parent(Pengine, Queue),
@@ -1417,7 +1464,8 @@ pairs_create_options([_|T0], T) :-
 %	_).
 
 wait_and_output_result(Pengine, Queue, Format) :-
-    setting(time_limit, TimeLimit),
+    get_pengine_application(Pengine, Application),
+    setting(Application:time_limit, TimeLimit),
     (   thread_get_message(Queue, pengine_event(_, Event),
 			   [ timeout(TimeLimit)
 			   ]),
@@ -1567,17 +1615,17 @@ solution_to_json(BindingsIn, json(BindingsOut)) :-
 
 swap(N=V, N=A) :- term_to_atom(V, A).
 
-%%	allowed(+Request) is det.
+%%	allowed(+Request, +Application) is det.
 %
 %	Check whether the peer is allowed to connect.  Returns a
 %	=forbidden= header if contact is not allowed.
 
-allowed(Request) :-
-	setting(allow_from, Allow),
+allowed(Request, Application) :-
+	setting(Application:allow_from, Allow),
 	match_peer(Request, Allow),
 	setting(deny_from, Deny),
 	\+ match_peer(Request, Deny), !.
-allowed(Request) :-
+allowed(Request, _Application) :-
 	memberchk(request_uri(Here), Request),
 	throw(http_reply(forbidden(Here))).
 
