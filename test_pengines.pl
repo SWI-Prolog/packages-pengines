@@ -60,7 +60,8 @@
 
 test_pengines :-
     run_tests([ local_pengines,
-		remote_pengines
+		remote_pengines,
+		application
 	      ]).
 
 % :- debug(pengine(_)).
@@ -155,9 +156,44 @@ test(rpc, fail) :-
     pengine_rpc(Server,
 		fail,
 		[]), !.
+test(simple_app, Results = [a,b,c]) :-
+    pengine_server(Server),
+    pengine_create(
+	[ server(Server),
+	  application(papp)
+	]),
+    collect(X, p1(X), Results, []),
+    assertion(no_more_pengines).
 
 :- end_tests(remote_pengines).
 
+:- begin_tests(application).
+
+test(simple, Results = [a,b,c]) :-
+    pengine_create(
+	[ application(papp)
+	]),
+    collect(X, p1(X), Results, []),
+    assertion(no_more_pengines).
+test(noapp, [Results = [a,b,c],blocked('Create error loops')]) :-
+    pengine_create(
+	[ application(nopapp)
+	]),
+    collect(X, p1(X), Results, []),
+    assertion(no_more_pengines).
+
+:- end_tests(application).
+
+
+		 /*******************************
+		 *	    APPLICATION		*
+		 *******************************/
+
+:- pengine_application(papp).
+
+papp:p1(a).
+papp:p1(b).
+papp:p1(c).
 
 		 /*******************************
 		 *	     UTILITIES		*
@@ -204,7 +240,7 @@ no_more_pengines :-
     ;	between(1, 10, _),
 	sleep(0.01)
     ),
-    \+ pengine:current_pengine(_,_,_,_), !.
+    \+ pengine:current_pengine(_,_,_,_,_), !.
 
 
 		 /*******************************

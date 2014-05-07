@@ -42,6 +42,7 @@
             pengine_pull_response/2,		% +Pengine, +Options
             pengine_destroy/1,			% +Pengine
             pengine_abort/1,			% +Pengine
+	    pengine_application/1,              % +Application
             pengine_property/2,			% ?Pengine, ?Property
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
@@ -95,6 +96,7 @@ from Prolog or JavaScript.
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
 		       name(atom),
+		       application(atom),
 		       server(atom),
 		       src_list(list),
 		       src_text(any),		% text
@@ -175,6 +177,9 @@ from Prolog or JavaScript.
       subsequently be referred to by this name, but only by its master
       (parent). The atoms =parent= and =self= are reserved names and
       must not be used here.
+
+    * application(+Application)
+      Application in which the pengine runs.  See pengine_application/1.
 
     * server(+URL)
       The pengine will run in (and in the Prolog context of) the pengine
@@ -467,46 +472,49 @@ pengine_destroy(ID) :-
 %	  - remote(URL)
 
 :- dynamic
-	current_pengine/4.		% Id, ParentId, Thread, URL
+	current_pengine/5.		% Id, ParentId, Thread, URL, Application
 :- volatile
-	current_pengine/4.
+	current_pengine/5.
 
 :- thread_local
 	child/1,			% ?Child
 	named_child/2.			% ?Name, ?Child
 
-%%	pengine_register_local(-Id, +Thread, +Queue, +URL) is det.
-%%	pengine_register_remote(+Id, +URL, +Queue) is det.
+%%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
+%%	pengine_register_remote(+Id, +URL, +Queue, +Application) is det.
 %%	pengine_unregister(+Id) is det.
 
-pengine_register_local(Id, Thread, Queue, URL) :-
+pengine_register_local(Id, Thread, Queue, URL, Application) :-
     uuid(Id),
-    asserta(current_pengine(Id, Queue, Thread, URL)).
+    asserta(current_pengine(Id, Queue, Thread, URL, Application)).
 
-pengine_register_remote(Id, URL) :-
+pengine_register_remote(Id, URL, Application) :-
     thread_self(Queue),
-    asserta(current_pengine(Id, Queue, 0, URL)).
+    asserta(current_pengine(Id, Queue, 0, URL, Application)).
 
 pengine_unregister(Id) :-
-    retractall(current_pengine(Id, _, _, _)).
+    retractall(current_pengine(Id, _, _, _, _)).
 
 pengine_self(Id) :-
     thread_self(Thread),
-    current_pengine(Id, _Parent, Thread, _URL).
+    current_pengine(Id, _Parent, Thread, _URL, _Application).
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
 
 http_pengine_parent(Pengine, Parent) :-
-    current_pengine(Pengine, Parent, Thread, _URL),
+    current_pengine(Pengine, Parent, Thread, _URL, _Application),
     Thread \== 0, !.
 
 pengine_thread(Pengine, Thread) :-
-    current_pengine(Pengine, _Parent, Thread, _URL),
+    current_pengine(Pengine, _Parent, Thread, _URL, _Application),
     Thread \== 0, !.
 
 pengine_remote(Pengine, URL) :-
-    current_pengine(Pengine, _Parent, 0, URL).
+    current_pengine(Pengine, _Parent, 0, URL, _Application).
+
+get_pengine_application(Pengine, Application) :-
+    current_pengine(Pengine, _Parent, _, _URL, Application).
 
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
@@ -515,6 +523,40 @@ uuid(Id) :-
     random_between(0, Max, Num),
     atom_number(Id, Num).
 :- endif.
+
+/** pengine_application(+Application) is det.
+
+Directive that must be used to declarate  a module a pengine application
+module. The module may not  be  associated   to  any  file.  The default
+application is =pengine_sandbox=.  The  example   below  creates  a  new
+application =address_book= and imports the  API   defined  in the module
+file =adress_book_api.pl= into the application.
+
+  ==
+  :- pengine_application(address_book).
+  :- use_module(address_book:adress_book_api).
+ ==
+*/
+
+pengine_application(Application) :-
+    throw(error(context_error(nodirective,
+                             pengine_application(Application)), _)).
+
+:- multifile
+    system:term_expansion/2,
+    current_application/1.
+
+system:term_expansion((:- pengine_application(Application)), Expanded) :-
+    must_be(atom, Application),
+    (   module_property(Application, file(_))
+    ->  permission_error(create, pengine_application, Application)
+    ;   true
+    ),
+    Expanded = pengine:current_application(Application).
+
+% Register default application
+
+:- pengine_application(pengine_sandbox).
 
 
 /** pengine_property(+NameOrID, ?Property) is nondet.
@@ -526,15 +568,19 @@ properties are:
     Thread id for the parent (local) pengine.
   * self(Thread)
     Thread id of the running pengine.
+  * application(Application)
+    Pengine runs the given application
 */
 
 
 pengine_property(Id, parent(Parent)) :-
-    current_pengine(Id, Parent, _Thread, _URL).
+    current_pengine(Id, Parent, _Thread, _URL, _Application).
 pengine_property(Id, self(Id)) :-
-    current_pengine(Id, _Parent, _Thread, _URL).
+    current_pengine(Id, _Parent, _Thread, _URL, _Application).
 pengine_property(Id, remote(Server)) :-
-    current_pengine(Id, _Parent, 0, Server).
+    current_pengine(Id, _Parent, 0, Server, _Application).
+pengine_property(Id, application(Application)) :-
+    current_pengine(Id, _Parent, _Thread, _Server, Application).
 
 
 /** pengine_output(+Term) is det
@@ -597,33 +643,38 @@ pengine_debug(Format, Args) :-
 
 local_pengine_create(Options) :-
     thread_self(Self),
-    create(Self, Child, Options, local),
+    option(application(Application), Options, pengine_sandbox),
+    create(Self, Child, Options, local, Application),
     assert(child(Child)),
     (   option(name(Name), Options)
     ->  assert(named_child(Name, Child))
     ;   true
     ).
 
-%%	create(+Queue, -Child, +Options, +URL) is det.
+%%	create(+Queue, -Child, +Options, +URL, +Application) is det.
 %
 %	Create a new pengine thread.
 %
 %	@arg Queue is the queue (or thread handle) to report to
 %	@arg Child is the identifier of the created pengine.
 
-create(Queue, Child, Options, URL) :-
-    catch(create0(Queue, Child, Options, URL), 
-        Error, 
-        pengine_reply(Queue, error(id(null, null), Error))).
+create(Queue, Child, Options, URL, Application) :-
+    catch(create0(Queue, Child, Options, URL, Application),
+	  Error,
+	  pengine_reply(Queue, error(id(null, null), Error))).
 
-create0(Queue, Child, Options, URL) :-
+create0(Queue, Child, Options, URL, Application) :-
+    (  current_application(Application)
+    -> true
+    ;  existence_error(pengine_application, Application)
+    ),
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
     thread_create(
-        pengine_main(Queue, PengineOptions), ChildThread,
+        pengine_main(Queue, PengineOptions, Application), ChildThread,
         [ at_exit(pengine_done)
         | RestOptions
     ]),
-    pengine_register_local(Child, ChildThread, Queue, URL),
+    pengine_register_local(Child, ChildThread, Queue, URL, Application),
     thread_send_message(ChildThread, pengine_registered(Child)),
     (   option(id(Id), Options)
     ->  Id = Child
@@ -651,16 +702,16 @@ pengine_done :-
     pengine_unregister(Id).
 
 
-%%	pengine_main(+Parent, +Options)
+%%	pengine_main(+Parent, +Options, +Application)
 %
 %	Run a pengine main loop. First acknowledges its creation and run
 %	pengine_main_loop/1.
 
-pengine_main(Parent, Options) :-
+pengine_main(Parent, Options, Application) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
-    (   catch(maplist(process_create_option, Options), Error,
+    (   catch(maplist(process_create_option(Application), Options), Error,
 	      ( send_error(Error),
 		fail
 	      ))
@@ -684,13 +735,13 @@ fix_stream(Name) :-
 fix_stream(_).
 
 
-process_create_option(src_list(ClauseList)) :- !,
-	pengine_src_list(ClauseList).
-process_create_option(src_text(Text)) :- !,
-	pengine_src_text(Text).
-process_create_option(src_url(URL)) :- !,
-	pengine_src_url(URL).
-process_create_option(_).
+process_create_option(Application, src_list(ClauseList)) :- !,
+	pengine_src_list(ClauseList, Application).
+process_create_option(Application, src_text(Text)) :- !,
+	pengine_src_text(Text, Application).
+process_create_option(Application, src_url(URL)) :- !,
+	pengine_src_url(URL, Application).
+process_create_option(_, _).
 
 
 pengine_main_loop(ID) :-
@@ -802,7 +853,8 @@ more_solutions(Event, ID, Choice) :-
 %	prove the goal. It takes care of the chunk(N) option.
 
 ask(ID, Goal, Options) :-
-    expand_goal(pengine_sandbox:Goal, Goal1),
+    get_pengine_application(ID, Application),
+    expand_goal(Application:Goal, Goal1),
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
@@ -904,7 +956,8 @@ remote_pengine_create(BaseURL, Options) :-
     ->  assert(named_child(Name, ID))
     ;   true
     ),
-    pengine_register_remote(ID, BaseURL),
+    option(application(Application), Options, pengine_sandbox),
+    pengine_register_remote(ID, BaseURL, Application),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
@@ -1294,7 +1347,8 @@ http_pengine_create(Request) :-
     setting(max_session_pengines, MaxEngines),
     enforce_max_session_pengines(pre, MaxEngines, _),
     message_queue_create(From, []),
-    create(From, Pengine, CreateOptions, http),
+    option(application(Application), CreateOptions, pengine_sandbox),
+    create(From, Pengine, CreateOptions, http, Application),
     enforce_max_session_pengines(post, MaxEngines, Pengine),
     http_pengine_parent(Pengine, Queue),
     wait_and_output_result(Pengine, Queue, Format).
@@ -1553,9 +1607,11 @@ of  the  current  Pengine.   See   also    the   `src_list'   option  of
 pengine_create/1.
 */
 
-pengine_src_list(ClauseList) :-
-    maplist(expand_and_assert, ClauseList).
+pengine_src_list(ClauseList, Application) :-
+    maplist(app_expand_and_assert(Application), ClauseList).
 
+app_expand_and_assert(Application, ClauseList) :-
+    expand_and_assert(ClauseList, Application).
 
 /** pengine_src_text(+SrcText) is det
 
@@ -1565,10 +1621,10 @@ pengine_create/1.
 
 */
 
-pengine_src_text(Src) :-
+pengine_src_text(Src, Application) :-
     setup_call_cleanup(
 	open_chars_stream(Src, Stream),
-	read_source(Stream),
+	read_source(Stream, Application),
 	close(Stream)).
 
 
@@ -1578,43 +1634,46 @@ Asserts the clauses defined in URL in   the  private dynamic database of
 the current Pengine. See also the `src_url' option of pengine_create/1.
 */
 
-pengine_src_url(URL) :-
+pengine_src_url(URL, Application) :-
     setup_call_cleanup(
 	http_open(URL, Stream, []),
-	read_source(Stream),
+	read_source(Stream, Application),
 	close(Stream)).
 
-read_source(Stream) :-
+read_source(Stream, Application) :-
     read(Stream, Term),
-    read_source(Term, Stream).
+    read_source(Term, Application, Stream).
 
-read_source(end_of_file, _Stream) :- !.
-read_source(Term, Stream) :-
-    expand_and_assert(Term),
-    read_source(Stream).
+read_source(end_of_file, _Application, _Stream) :- !.
+read_source(Term, Application, Stream) :-
+    expand_and_assert(Term, Application),
+    read_source(Stream, Application).
 
 
-expand_and_assert(Term) :-
-    expand_term(Term, ExpandedTerm),
+expand_and_assert(Term, Application) :-
+    setup_call_cleanup(
+	'$set_source_module'(M, Application),
+	expand_term(Term, ExpandedTerm),
+	'$set_source_module'(_, M)),
     (   is_list(ExpandedTerm)
-    ->  maplist(assert_local, ExpandedTerm)
-    ;   assert_local(ExpandedTerm)
+    ->  maplist(assert_local(Application), ExpandedTerm)
+    ;   assert_local(Application, ExpandedTerm)
     ).
 
 
-assert_local(:-(Head, Body)) :- !,
+assert_local(Application, :-(Head, Body)) :- !,
     functor(Head, F, N),
-    thread_local(pengine_sandbox:(F/N)),
-    assert(pengine_sandbox:(Head :- Body)).
-assert_local(:-Body) :- !,
-    (   safe_goal(Body)
-    ->  call(Body)
+    thread_local(Application:(F/N)),
+    assert(Application:(Head :- Body)).
+assert_local(Application, (:-Body)) :- !,
+    (   safe_goal(Application:Body)
+    ->  call(Application:Body)
     ;   true
     ).
-assert_local(Fact) :-
+assert_local(Application, Fact) :-
     functor(Fact, F, N),
-    thread_local(pengine_sandbox:(F/N)),
-    assert(pengine_sandbox:Fact).
+    thread_local(Application:(F/N)),
+    assert(Application:Fact).
 
 
 /*================= Utilities =======================
