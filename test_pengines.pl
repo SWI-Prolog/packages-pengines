@@ -175,6 +175,12 @@ test(simple, Results = [a,b,c]) :-
 	]),
     collect(X, p1(X), Results, []),
     assertion(no_more_pengines).
+test(self, true) :-
+    pengine_create([]),
+    collect(X, pengine_self(X), Results, []),
+    Results = [Self],
+    assertion(atom(Self)),
+    assertion(no_more_pengines).
 test(noapp, [Results = [a,b,c],blocked('Create error loops')]) :-
     pengine_create(
 	[ application(nopapp)
