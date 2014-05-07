@@ -1136,10 +1136,13 @@ pengine_event_loop(failure(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
     ignore(call(Closure, failure(ID))),
     pengine_event_loop(Closure, Created, Options).
-pengine_event_loop(error(ID, Msg), Closure, Created, Options) :-
-    debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Msg)]),
-    ignore(call(Closure, error(ID, Msg))),
-    pengine_event_loop(Closure, Created, Options).
+pengine_event_loop(error(ID, Error), Closure, Created, Options) :-
+    debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Error)]),
+    (	call(Closure, error(ID, Error))
+    ->	pengine_event_loop(Closure, Created, Options)
+    ;	maplist(pengine_destroy, Created),
+	throw(Error)
+    ).
 pengine_event_loop(stop(ID), Closure, Created, Options) :-
     debug(pengine(transition), '~q: 7 = /~q => 2', [ID, stop]),
     ignore(call(Closure, stop(ID))),
