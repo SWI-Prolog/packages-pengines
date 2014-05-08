@@ -105,6 +105,9 @@ has_phantomjs :-
 
 test(simple, Lines == [a,b,c,d,e,f,g]) :-
 	test_js('simple.html', Lines).
+test(sepresults, Lines == ['1', '2', '3', '4', a, b, c, d]) :-
+	test_js('sepresults.html', Lines0),
+	sort(Lines0, Lines).
 
 :- end_tests(js_pengines).
 
