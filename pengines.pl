@@ -722,6 +722,12 @@ create0(Queue, Child, Options, URL, Application) :-
     -> true
     ;  existence_error(pengine_application, Application)
     ),
+    aggregate_all(count, child(_,_), Count),
+    setting(Application:slave_limit, Max),
+    (	Count >= Max
+    ->	throw(error(resource_error(max_pengines), _))
+    ;   true
+    ),
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
     thread_create(
         pengine_main(Queue, PengineOptions, Application), ChildThread,
