@@ -114,9 +114,6 @@ from Prolog or JavaScript.
 :- predicate_options(pengine_stop/2, 2,
 		     [ pass_to(pengine_send/3, 3)
 		     ]).
-:- predicate_options(pengine_output/2, 2,
-		     [ pass_to(pengine_send/3, 3)
-		     ]).
 :- predicate_options(pengine_respond/3, 2,
 		     [ pass_to(pengine_send/3, 3)
 		     ]).
@@ -1776,7 +1773,7 @@ sandbox:safe_primitive(pengine:pengine_output(_)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_ask(_, _, _)).
-
+sandbox:safe_primitive(pengine:pengine_pull_response(_,_)).
 
 sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
 	extend_goal(Closure, [_], Closure1).
