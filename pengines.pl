@@ -448,7 +448,7 @@ Destroys the pengine NameOrID.
 pengine_destroy(ID) :-
     catch(pengine_send(ID, request(destroy)),
 	  error(existence_error(pengine, ID), _),
-	  true).
+	  retractall(child(_,ID))).
 
 
 /*================= pengines administration =======================
@@ -1015,8 +1015,11 @@ remote_pengine_create(BaseURL, Options) :-
     ),
     option(name(Name), Options, ID),
     assert(child(Name, ID)),
-    option(application(Application), PengineOptions, pengine_sandbox),
-    pengine_register_remote(ID, BaseURL, Application),
+    (	functor(Reply, create, _)	% actually created
+    ->	option(application(Application), PengineOptions, pengine_sandbox),
+	pengine_register_remote(ID, BaseURL, Application)
+    ;	true
+    ),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
@@ -1405,11 +1408,16 @@ http_pengine_create(Request) :-
     ),
     dict_to_options(Dict, CreateOptions),
     option(application(Application), CreateOptions, pengine_sandbox),
-    allowed(Request, Application),
-    message_queue_create(From, []),
-    create(From, Pengine, CreateOptions, http, Application),
-    http_pengine_parent(Pengine, Queue),
-    wait_and_output_result(Pengine, Queue, Format).
+    (	current_application(Application)
+    ->  allowed(Request, Application),
+	message_queue_create(From, []),
+	create(From, Pengine, CreateOptions, http, Application),
+	http_pengine_parent(Pengine, Queue),
+	wait_and_output_result(Pengine, Queue, Format)
+    ;	Error = existence_error(pengine_application, Application),
+	uuid(ID),
+        output_result(Format, error(ID, error(Error, _)))
+    ).
 
 dict_to_options(Dict, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),

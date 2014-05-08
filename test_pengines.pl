@@ -183,6 +183,14 @@ test(simple_app, Results = [a,b,c]) :-
 	]),
     collect(X, p1(X), Results, []),
     assertion(no_more_pengines).
+test(noapp, error(existence_error(pengine_application, nopapp))) :-
+    pengine_server(Server),
+    pengine_create(
+	[ server(Server),
+	  application(nopapp)
+	]),
+    collect(X, p1(X), _Results, []),
+    assertion(no_more_pengines).
 
 :- end_tests(remote_pengines).
 
@@ -268,7 +276,8 @@ no_more_pengines :-
     ;	between(1, 10, _),
 	sleep(0.01)
     ),
-    \+ pengine:current_pengine(_,_,_,_,_), !.
+    \+ pengine:current_pengine(_,_,_,_,_),
+    \+ pengine:child(_,_), !.
 
 
 		 /*******************************
