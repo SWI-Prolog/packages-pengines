@@ -35,7 +35,6 @@
             pengine_event/2,			% -Event, +Options
             pengine_input/2,			% +Prompt, -Term
             pengine_output/1,			% +Term
-            pengine_output/2,			% +Term, +Options
             pengine_respond/3,			% +Pengine, +Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
@@ -245,17 +244,8 @@ Any remaining options are passed to http_open/3.
 
 pengine_send(Target, Event, Options) :-
     must_be(atom, Target),
-    arg(1, Event, ID),
-    pengine_send2(Target, pengine_event(ID, Event), Options).
+    pengine_send2(Target, Event, Options).
 
-pengine_send2(parent, Event0, Options) :- !,
-    pengine_parent(Queue),
-    (   Event0 = output(_, _)
-    ->  Event = Event0
-    ;   pengine_self(Self),
-	Event = output(Self, Event0)
-    ),
-    delay_message(queue(Queue), Event, Options).
 pengine_send2(self, Event, Options) :- !,
     thread_self(Queue),
     delay_message(queue(Queue), Event, Options).
@@ -275,20 +265,30 @@ delay_message(Target, Event, Options) :-
     send_message(Target, Event, Options).
 
 send_message(queue(Queue), Event, _) :-
-    thread_send_message(Queue, Event).
+    thread_send_message(Queue, pengine_request(Event)).
 send_message(pengine(Pengine), Event, Options) :-
     (	pengine_remote(Pengine, Server)
     ->	remote_pengine_send(Server, Pengine, Event, Options)
     ;	pengine_thread(Pengine, Thread),
-	thread_send_message(Thread, Event)
+	thread_send_message(Thread, pengine_request(Event))
     ;	existence_error(pengine, Pengine)
     ).
+
+%%	pengine_request(-Request) is det.
+%
+%	To be used by a  pengine  to   wait  for  the next request. Such
+%	messages are placed in the queue by pengine_send/2.
+
+pengine_request(Request) :-
+    thread_get_message(pengine_request(Request)).
+
 
 %%	pengine_reply(+Event) is det.
 %%	pengine_reply(+Queue, +Event) is det.
 %
 %	Reply Event to the parent of the   current  Pengine or the given
-%	Queue.
+%	Queue.  Such  events  are  read   by    the   other   side  with
+%	pengine_event/1.
 
 pengine_reply(Event) :-
     nb_getval(pengine_parent, Queue),
@@ -351,13 +351,13 @@ Defined in terms of pengine_send/3, like so:
 ==
 pengine_ask(ID, Query, Options) :-
     partition(pengine_ask_option, Options, AskOptions, SendOptions),
-    pengine_send(ID, request(ask(Query, AskOptions)), SendOptions).
+    pengine_send(ID, ask(Query, AskOptions), SendOptions).
 ==
 */
 
 pengine_ask(ID, Query, Options) :-
     partition(pengine_ask_option, Options, AskOptions, SendOptions),
-    pengine_send(ID, request(ask(Query, AskOptions)), SendOptions).
+    pengine_send(ID, ask(Query, AskOptions), SendOptions).
 
 
 pengine_ask_option(template(_)).
@@ -398,12 +398,12 @@ Defined in terms of pengine_send/3, as follows:
 
 ==
 pengine_next(ID, Options) :-
-    pengine_send(ID, request(next), Options).
+    pengine_send(ID, next, Options).
 ==
 
 */
 
-pengine_next(ID, Options) :- pengine_send(ID, request(next), Options).
+pengine_next(ID, Options) :- pengine_send(ID, next, Options).
 
 
 /** pengine_stop(+NameOrID, +Options) is det
@@ -415,11 +415,11 @@ Defined in terms of pengine_send/3, like so:
 
 ==
 pengine_stop(ID, Options) :-
-    pengine_send(ID, request(stop), Options).
+    pengine_send(ID, stop, Options).
 ==
 */
 
-pengine_stop(ID, Options) :- pengine_send(ID, request(stop), Options).
+pengine_stop(ID, Options) :- pengine_send(ID, stop, Options).
 
 
 /** pengine_abort(+NameOrID) is det
@@ -446,7 +446,7 @@ Destroys the pengine NameOrID.
 */
 
 pengine_destroy(ID) :-
-    catch(pengine_send(ID, request(destroy)),
+    catch(pengine_send(ID, destroy),
 	  error(existence_error(pengine, ID), _),
 	  retractall(child(_,ID))).
 
@@ -637,25 +637,12 @@ pengine_name(Id, Name) :-
 
 /** pengine_output(+Term) is det
 
-Same as pengine_output(Term, []).
-
+Sends Term to the parent pengine or thread.
 */
 
-pengine_output(Term) :- pengine_output(Term, []).
-
-
-/** pengine_output(+Term, Options) is det
-
-Sends Term to the  parent  pengine  or   thread.  Defined  in  terms  of
-pengine_send/3, like so:
-
-==
-pengine_output(Term, Options) :-
-    pengine_send(parent, Term, Options).
-==
-*/
-
-pengine_output(Term, Options) :- pengine_send(parent, Term, Options).
+pengine_output(Term) :-
+    pengine_self(Me),
+    pengine_reply(output(Me, Term)).
 
 
 /** pengine_debug(+Format, +Args) is det
@@ -838,11 +825,11 @@ pengine_main_loop(ID) :-
 %	  Solve Goal.
 
 guarded_main_loop(ID) :-
-    pengine_event(Event),
-    (   Event = request(destroy)
+    pengine_request(Request),
+    (   Request = destroy
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
 	pengine_terminate(ID)
-    ;   Event = request(ask(Goal, Options))
+    ;   Request = ask(Goal, Options)
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
     ;   debug(pengine(transition), '~q: 2 = ~q => 2', [ID, protocol_error]),
@@ -900,7 +887,7 @@ solve(_, _, _).				% leave a choice point
 %	  of the previous goal asked for.
 
 more_solutions(ID, Choice) :-
-    pengine_event(request(Event)),
+    pengine_request(Event),
     more_solutions(Event, ID, Choice).
 
 more_solutions(stop, ID, _Choice) :- !,
@@ -959,14 +946,14 @@ pengine_pull_response(_ID, _Options).
 /** pengine_input(+Prompt, -Term) is det
 
 Sends Prompt to the parent pengine and waits for input. Note that Prompt may be
-anÿ term, atomic or complex.
+any term, atomic or complex.
 */
 
 pengine_input(Prompt, Term) :-
     pengine_self(Self),
     nb_getval(pengine_parent, Parent),
     pengine_reply(Parent, prompt(Self, Prompt)),
-    pengine_event(input(Term)).
+    pengine_request(input(Term)).
 
 
 /** pengine_respond(+Pengine, +Input, +Options) is det
@@ -1491,7 +1478,7 @@ http_pengine_send(Request) :-
 	  Event1 = error(ID, Error)),
     (	pengine_thread(ID, Thread)
     ->	http_pengine_parent(ID, Queue),
-	thread_send_message(Thread, Event1),
+	thread_send_message(Thread, pengine_request(Event1)),
 	wait_and_output_result(ID, Queue, Format)
     ;	atom(ID)
     ->	output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
@@ -1499,14 +1486,14 @@ http_pengine_send(Request) :-
     ).
 
 fix_bindings(json,
-	     request(ask(Goal, Options)), _ID, Bindings,
-	     request(ask(Goal, NewOptions))) :- !,
+	     ask(Goal, Options), _ID, Bindings,
+	     ask(Goal, NewOptions)) :- !,
     option(template(Template), Options, Bindings),
     option(chunk(Paging), Options, 1),
     NewOptions = [template(Template), chunk(Paging)].
 fix_bindings('json-s',
-	     request(ask(Goal, Options)), _ID, Bindings,
-	     request(ask(Goal, NewOptions))) :- !,
+	     ask(Goal, Options), _ID, Bindings,
+	     ask(Goal, NewOptions)) :- !,
     option(template(Template), Options, Bindings),
     option(chunk(Paging), Options, 1),
     NewOptions = [template(Template), chunk(Paging)].
@@ -1785,7 +1772,7 @@ sandbox:safe_primitive(pengine:pengine_create(_)).
 sandbox:safe_primitive(pengine:pengine_event(_, _)).
 sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_, _)).
-sandbox:safe_primitive(pengine:pengine_output(_, _)).
+sandbox:safe_primitive(pengine:pengine_output(_)).
 sandbox:safe_primitive(pengine:pengine_debug(_,_)).
 sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_ask(_, _, _)).

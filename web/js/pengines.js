@@ -93,13 +93,13 @@ function Pengine(callbacks) {
     }
     // Public functions
     this.ask = function(query, options) {
-        send('request(ask(' + query + ', ' + options_to_list(options) + '))');
+        send('ask(' + query + ', ' + options_to_list(options) + ')');
     }
     this.next = function() {
-        send('request(next)');
+        send('next');
     }
     this.stop = function() {
-        send('request(stop)');
+        send('stop');
     }
     this.respond = function(input) {
         send('input(' + input + ')');
@@ -113,12 +113,12 @@ function Pengine(callbacks) {
 	      '&format=' + format, process_response);
     }
     this.destroy = function() {
-        send('request(destroy)');
+        send('destroy');
     }
     $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
-	     "data": JSON.stringify({ 
+	     "data": JSON.stringify({
                       src_text: source() + "\n" + src,
                       format: format
 				    }),
