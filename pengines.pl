@@ -36,7 +36,7 @@
             pengine_input/2,			% +Prompt, -Term
             pengine_output/1,			% +Term
             pengine_output/2,			% +Term, +Options
-            pengine_respond/3,	    % +Pengine, +Input, +Options
+            pengine_respond/3,			% +Pengine, +Input, +Options
             pengine_debug/2,			% +Format, +Args
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
@@ -722,11 +722,15 @@ create0(Queue, Child, Options, URL, Application) :-
     -> true
     ;  existence_error(pengine_application, Application)
     ),
-    aggregate_all(count, child(_,_), Count),
-    setting(Application:slave_limit, Max),
-    (	Count >= Max
-    ->	throw(error(resource_error(max_pengines), _))
-    ;   true
+    (	URL \== http			% pengine is _not_ a child of the
+					% HTTP server thread
+    ->	aggregate_all(count, child(_,_), Count),
+	setting(Application:slave_limit, Max),
+	(   Count >= Max
+	->  throw(error(resource_error(max_pengines), _))
+	;   true
+	)
+    ;	true
     ),
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
     thread_create(
