@@ -63,12 +63,12 @@ from Prolog or JavaScript.
 
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
-:- use_module(library(http/http_session)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_stream)).
 :- use_module(library(http/http_wrapper)).
 :- use_module(library(http/http_cors)).
+:- use_module(library(thread_pool)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -701,6 +701,16 @@ local_pengine_create(Options) :-
     assert(child(Name, Child)).
 
 
+%%	thread_pool:create_pool(+Application) is det.
+%
+%	On demand creation of a thread pool for a pengine application.
+
+thread_pool:create_pool(Application) :-
+    current_application(Application),
+    setting(Application:thread_pool_size, Size),
+    setting(Application:thread_pool_stacks, Stacks),
+    thread_pool_create(Application, Size, Stacks).
+
 %%	create(+Queue, -Child, +Options, +URL, +Application) is det.
 %
 %	Create a new pengine thread.
@@ -733,11 +743,12 @@ create0(Queue, Child, Options, URL, Application) :-
     ;	true
     ),
     partition(pengine_create_option, Options, PengineOptions, RestOptions),
-    thread_create(
+    thread_create_in_pool(
+	Application,
         pengine_main(Queue, PengineOptions, Application), ChildThread,
         [ at_exit(pengine_done)
         | RestOptions
-    ]),
+	]),
     pengine_register_local(Child, ChildThread, Queue, URL, Application),
     thread_send_message(ChildThread, pengine_registered(Child)),
     (   option(id(Id), Options)
