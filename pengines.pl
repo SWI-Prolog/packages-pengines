@@ -1470,6 +1470,8 @@ http_pengine_send(Request) :-
     ->	http_pengine_parent(ID, Queue),
 	thread_send_message(Thread, Event1),
 	wait_and_output_result(ID, Queue, Format)
+    ;	atom(ID)
+    ->	output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
     ;	http_404([], Request)
     ).
 
