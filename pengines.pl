@@ -745,6 +745,7 @@ pengine_create_option(src_text(_)).
 pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
+pengine_create_option(application(_)).
 
 
 %%	pengine_done is det.
@@ -1014,7 +1015,7 @@ remote_pengine_create(BaseURL, Options) :-
     ),
     option(name(Name), Options, ID),
     assert(child(Name, ID)),
-    option(application(Application), Options, pengine_sandbox),
+    option(application(Application), PengineOptions, pengine_sandbox),
     pengine_register_remote(ID, BaseURL, Application),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
@@ -1031,14 +1032,14 @@ options_to_dict(Options, Dict) :-
     dict_create(Dict, _, Options1).
 
 prolog_option(Option0, Option) :-
-    prolog_option(Option0), !,
+    create_option_type(Option0, term), !,
     Option0 =.. [Name,Value],
     format(string(String), '~k', [Value]),
     Option =.. [Name,String].
 prolog_option(Option, Option).
 
-prolog_option(src_list(_)).
-
+create_option_type(src_list(_),    term).
+create_option_type(application(_), atom).
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
     term_to_atom(Event, EventAtom),
@@ -1418,8 +1419,13 @@ pairs_create_options([], []).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), !,
-    (   prolog_option(Opt)
-    ->  atom_to_term(V0, V, _)
+    (   create_option_type(Opt, Type)
+    ->  (   Type == term
+	->  atom_to_term(V0, V, _)
+	;   Type == atom
+	->  atom_string(V, V0)
+	;   assertion(false)
+	)
     ;   V = V0
     ),
     pairs_create_options(T0, T).
