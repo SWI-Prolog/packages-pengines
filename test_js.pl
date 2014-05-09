@@ -97,6 +97,13 @@ has_phantomjs :-
 			     access(execute)
 			   ]).
 
+check_phantomjs :-
+	has_phantomjs, !.
+check_phantomjs :-
+	format(user_error,
+	       'No phantomjs in $PATH, skipping JavaScript tests', []).
+
+:- initialization check_phantomjs.
 
 :- begin_tests(js_pengines,
 	       [ setup(start_pengine_server(_Port)),
