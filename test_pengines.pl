@@ -28,7 +28,8 @@
 */
 
 :- module(test_pengines,
-	  [ test_pengines/0
+	  [ test_pengines/0,
+	    pengine_server/0			% start server
 	  ]).
 
 % setup paths to load relevant packages from development environment
@@ -292,6 +293,12 @@ no_more_pengines :-
 	pengine_server_port/1.
 
 pengine_server(URL) :-
+	debugging(pengine(external_server)), !,
+	start_external_server(URL).
+pengine_server(URL) :-
+	local_server(URL).
+
+local_server(URL) :-
 	start_pengine_server(Port),
 	format(atom(URL), 'http://localhost:~d', [Port]).
 
@@ -302,6 +309,42 @@ start_pengine_server(Port) :-
 	asserta(pengine_server_port(Port)).
 
 stop_pengine_server :-
+	pengine_server_pid(PID), !,
+	process_kill(PID, hup),
+	process_wait(PID, _Status).		% getting status 2??
+%	assertion(Status == exit(0)).
+stop_pengine_server :-
 	retract(pengine_server_port(Port)), !,
 	http_stop_server(Port, []).
 stop_pengine_server.
+
+
+		 /*******************************
+		 *	 EXTERNAL SERVER		*
+		 *******************************/
+
+:- dynamic pengine_server_pid/1.
+
+start_external_server(URL) :-
+	current_prolog_flag(executable, SWIPL),
+	process_create(SWIPL,
+		       [ '-q', '-f', 'test_pengines.pl',
+			 '-g', 'pengine_server'
+		       ],
+		       [ stdout(pipe(Out)),
+			 process(PID)
+		       ]),
+	read_line_to_string(Out, URL),
+	assertion(string_concat('http://', _, URL)),
+	asserta(pengine_server_pid(PID)),
+	on_signal(hup, _, hangup).
+
+hangup(_Signal) :-
+	format(user_error, 'Got hangup~n', []),
+	thread_send_message(main, done).
+
+pengine_server :-
+	local_server(URL),
+	writeln(URL),
+	thread_get_message(Done),
+	format(user_error, 'Got ~p', [Done]).
