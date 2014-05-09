@@ -97,6 +97,7 @@ from Prolog or JavaScript.
 		     [ id(-atom),
 		       name(atom),
 		       application(atom),
+		       destroy(boolean),
 		       server(atom),
 		       src_list(list),
 		       src_text(any),		% text
@@ -461,48 +462,48 @@ pengine_destroy(ID) :-
 %	  - remote(URL)
 
 :- dynamic
-	current_pengine/5.		% Id, ParentId, Thread, URL, Application
+	current_pengine/6.		% Id, ParentId, Thread, URL, App, Destroy
 :- volatile
-	current_pengine/5.
+	current_pengine/6.
 
 :- thread_local
 	child/2.			% ?Name, ?Child
 
-%%	pengine_register_local(-Id, +Thread, +Queue, +URL, +Application) is det.
-%%	pengine_register_remote(+Id, +URL, +Queue, +Application) is det.
+%%	pengine_register_local(-Id, +Thread, +Queue, +URL, +App, +Destroy) is det.
+%%	pengine_register_remote(+Id, +URL, +Queue, +App, +Destroy) is det.
 %%	pengine_unregister(+Id) is det.
 
-pengine_register_local(Id, Thread, Queue, URL, Application) :-
+pengine_register_local(Id, Thread, Queue, URL, Application, Destroy) :-
     uuid(Id),
-    asserta(current_pengine(Id, Queue, Thread, URL, Application)).
+    asserta(current_pengine(Id, Queue, Thread, URL, Application, Destroy)).
 
-pengine_register_remote(Id, URL, Application) :-
+pengine_register_remote(Id, URL, Application, Destroy) :-
     thread_self(Queue),
-    asserta(current_pengine(Id, Queue, 0, URL, Application)).
+    asserta(current_pengine(Id, Queue, 0, URL, Application, Destroy)).
 
 pengine_unregister(Id) :-
-    retractall(current_pengine(Id, _, _, _, _)).
+    retractall(current_pengine(Id, _, _, _, _, _)).
 
 pengine_self(Id) :-
     thread_self(Thread),
-    current_pengine(Id, _Parent, Thread, _URL, _Application).
+    current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy).
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
 
 http_pengine_parent(Pengine, Parent) :-
-    current_pengine(Pengine, Parent, Thread, _URL, _Application),
+    current_pengine(Pengine, Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0, !.
 
 pengine_thread(Pengine, Thread) :-
-    current_pengine(Pengine, _Parent, Thread, _URL, _Application),
+    current_pengine(Pengine, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0, !.
 
 pengine_remote(Pengine, URL) :-
-    current_pengine(Pengine, _Parent, 0, URL, _Application).
+    current_pengine(Pengine, _Parent, 0, URL, _Application, _Destroy).
 
 get_pengine_application(Pengine, Application) :-
-    current_pengine(Pengine, _Parent, _, _URL, Application).
+    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy).
 
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
@@ -610,17 +611,22 @@ pengines the live in the calling Prolog process. Defined properties are:
     Thread id of the running pengine.
   * application(Application)
     Pengine runs the given application
+  * destroy(Destroy)
+    Destroy is =true= if the pengines is destroyed automatically
+    after completing the query.
 */
 
 
 pengine_property(Id, parent(Parent)) :-
-    current_pengine(Id, Parent, _Thread, _URL, _Application).
+    current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property(Id, self(Id)) :-
-    current_pengine(Id, _Parent, _Thread, _URL, _Application).
+    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property(Id, remote(Server)) :-
-    current_pengine(Id, _Parent, 0, Server, _Application).
+    current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
 pengine_property(Id, application(Application)) :-
-    current_pengine(Id, _Parent, _Thread, _Server, Application).
+    current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
+pengine_property(Id, destroy(Destroy)) :-
+    current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
 
 /** pengine_name(?Id, ?Name) is nondet.
 
@@ -733,7 +739,8 @@ create0(Queue, Child, Options, URL, Application) :-
         [ at_exit(pengine_done)
         | RestOptions
 	]),
-    pengine_register_local(Child, ChildThread, Queue, URL, Application),
+    option(destroy(Destroy), PengineOptions, true),
+    pengine_register_local(Child, ChildThread, Queue, URL, Application, Destroy),
     thread_send_message(ChildThread, pengine_registered(Child)),
     (   option(id(Id), Options)
     ->  Id = Child
@@ -745,6 +752,7 @@ pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
 pengine_create_option(application(_)).
+pengine_create_option(destroy(_)).
 
 
 %%	pengine_done is det.
@@ -857,18 +865,22 @@ solve(Template, Goal, ID) :-
             ->  pengine_reply(success(ID, Template, true)),
                 more_solutions(ID, Choice)
             ;   !,			% commit
-		pengine_reply(success(ID, Template, false)),
-                guarded_main_loop(ID)
+		destroy_or_continue(success(ID, Template, false))
             )
         ;   !,				% commit
-	    pengine_reply(error(ID, Error)),
-            guarded_main_loop(ID)
+	    destroy_or_continue(error(ID, Error))
         )
     ;   !,				% commit
-	pengine_reply(failure(ID)),
-        guarded_main_loop(ID)
+	destroy_or_continue(failure(ID))
     ).
 solve(_, _, _).				% leave a choice point
+
+
+destroy_or_continue(Event) :-
+    pengine_reply(Event),
+    arg(1, Event, ID),
+    guarded_main_loop(ID).
+
 
 %%	more_solutions(+Pengine, +Choice)
 %
@@ -1016,7 +1028,8 @@ remote_pengine_create(BaseURL, Options) :-
     assert(child(Name, ID)),
     (	functor(Reply, create, _)	% actually created
     ->	option(application(Application), PengineOptions, pengine_sandbox),
-	pengine_register_remote(ID, BaseURL, Application)
+	option(destroy(Destroy), PengineOptions, true),
+	pengine_register_remote(ID, BaseURL, Application, Destroy)
     ;	true
     ),
     thread_self(Queue),
