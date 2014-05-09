@@ -1412,7 +1412,8 @@ http_pengine_create(Request) :-
 	message_queue_create(From, []),
 	create(From, Pengine, CreateOptions, http, Application),
 	http_pengine_parent(Pengine, Queue),
-	wait_and_output_result(Pengine, Queue, Format)
+	setting(Application:time_limit, TimeLimit),
+	wait_and_output_result(Pengine, Queue, Format, TimeLimit)
     ;	Error = existence_error(pengine_application, Application),
 	uuid(ID),
         output_result(Format, error(ID, error(Error, _)))
@@ -1440,7 +1441,7 @@ pairs_create_options([_|T0], T) :-
     pairs_create_options(T0, T).
 
 
-%%	wait_and_output_result(+Pengine, +Queue, +Format)
+%%	wait_and_output_result(+Pengine, +Queue, +Format, +TimeLimit)
 %
 %	Wait for the Pengine's Queue and if  there is a message, send it
 %	to the requestor using  output_result/1.   If  Pengine  does not
@@ -1448,9 +1449,7 @@ pairs_create_options([_|T0], T) :-
 %	Pengine is aborted and the  result is error(time_limit_exceeded,
 %	_).
 
-wait_and_output_result(Pengine, Queue, Format) :-
-    get_pengine_application(Pengine, Application),
-    setting(Application:time_limit, TimeLimit),
+wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
     (   thread_get_message(Queue, pengine_event(_, Event),
 			   [ timeout(TimeLimit)
 			   ]),
@@ -1475,8 +1474,10 @@ http_pengine_send(Request) :-
 	  Event1 = error(ID, Error)),
     (	pengine_thread(ID, Thread)
     ->	http_pengine_parent(ID, Queue),
+	get_pengine_application(ID, Application),
+	setting(Application:time_limit, TimeLimit),
 	thread_send_message(Thread, pengine_request(Event1)),
-	wait_and_output_result(ID, Queue, Format)
+	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	atom(ID)
     ->	output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
     ;	http_404([], Request)
@@ -1502,7 +1503,9 @@ http_pengine_pull_response(Request) :-
                 format(Format, [default(prolog)])
             ]),
     (	http_pengine_parent(ID, Queue)
-    ->	wait_and_output_result(ID, Queue, Format)
+    ->	get_pengine_application(ID, Application),
+	setting(Application:time_limit, TimeLimit),
+	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
 
@@ -1512,8 +1515,10 @@ http_pengine_abort(Request) :-
                 format(Format, [default(prolog)])
             ]),
     (	http_pengine_parent(ID, Queue)
-    ->	pengine_abort(ID),
-	wait_and_output_result(ID, Queue, Format)
+    ->	get_pengine_application(ID, Application),
+	setting(Application:time_limit, TimeLimit),
+        pengine_abort(ID),
+	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
 
