@@ -101,7 +101,7 @@ check_phantomjs :-
 	has_phantomjs, !.
 check_phantomjs :-
 	format(user_error,
-	       'No phantomjs in $PATH, skipping JavaScript tests', []).
+	       'No phantomjs in $PATH, skipping JavaScript tests~n', []).
 
 :- initialization check_phantomjs.
 
