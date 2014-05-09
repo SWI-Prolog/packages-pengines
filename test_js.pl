@@ -48,6 +48,7 @@
 
 :- use_module(library(plunit)).
 :- use_module(library(pengines)).
+:- use_module(pengine_sandbox:library(pengines)).
 :- use_module(library(process)).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_files)).
