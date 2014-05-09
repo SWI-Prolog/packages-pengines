@@ -494,7 +494,12 @@ pengine_register_remote(Id, URL, Application, Destroy) :-
     asserta(current_pengine(Id, Queue, 0, URL, Application, Destroy)).
 
 pengine_unregister(Id) :-
-    retractall(current_pengine(Id, _, _, _, _, _)).
+    thread_self(Me),
+    retractall(current_pengine(Id, _, Me, _, _, _)).
+
+pengine_unregister_remote(Id) :-
+    retractall(current_pengine(Id, Parent, 0, _, _, _)),
+    message_queue_destroy(Parent).
 
 pengine_self(Id) :-
     thread_self(Thread),
@@ -719,6 +724,7 @@ thread_pool:create_pool(Application) :-
 %
 %	@arg Queue is the queue (or thread handle) to report to
 %	@arg Child is the identifier of the created pengine.
+%	@arg URL is one of =local= or =http=
 
 create(Queue, Child, Options, URL, Application) :-
     catch(create0(Queue, Child, Options, URL, Application),
@@ -1153,7 +1159,7 @@ pengine_event(Event, Options) :-
 
 update_remote_destroy(destroy(Id)) :-
     pengine_remote(Id, _Server), !,
-    pengine_unregister(Id).
+    pengine_unregister_remote(Id).
 update_remote_destroy(_).
 
 
