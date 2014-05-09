@@ -889,10 +889,14 @@ solve(_, _, _).				% leave a choice point
 
 
 destroy_or_continue(Event) :-
-    pengine_reply(Event),
     arg(1, Event, ID),
-    guarded_main_loop(ID).
-
+    (	pengine_property(ID, destroy(true))
+    ->	thread_self(Me),
+	thread_detach(Me),
+        pengine_reply(destroy(ID, Event))
+    ;   pengine_reply(Event),
+	guarded_main_loop(ID)
+    ).
 
 %%	more_solutions(+Pengine, +Choice)
 %
@@ -1226,6 +1230,9 @@ pengine_event_loop(stop(ID), Closure, Options) :-
     debug(pengine(transition), '~q: 7 = /~q => 2', [ID, stop]),
     ignore(call(Closure, stop(ID))),
     pengine_event_loop(Closure, Options).
+pengine_event_loop(destroy(ID, Event), Closure, Options) :-
+    pengine_event_loop(Event, Closure, Options),
+    pengine_event_loop(destroy(ID), Closure, Options).
 pengine_event_loop(destroy(ID), Closure, Options) :-
     retractall(child(_,ID)),
     debug(pengine(transition), '~q: 1 = /~q => 0', [ID, destroy]),
@@ -1263,50 +1270,56 @@ pengine_rpc(URL, Query, QOptions) :-
     meta_options(is_meta, QOptions, Options),
     term_variables(Query, Vars),
     Template =.. [v|Vars],
+    State = destroy(true),
     setup_call_cleanup(
 	pengine_create([ server(URL),
 			 id(Id)
 		       | Options
 		       ]),
-	wait_event(Query, Template, [listen(Id)|Options]),
-	pengine_destroy_and_wait(Id)).
+	wait_event(Query, Template, State, [listen(Id)|Options]),
+	pengine_destroy_and_wait(State, Id)).
 
-pengine_destroy_and_wait(Id) :-
+pengine_destroy_and_wait(destroy(true), Id) :- !,
     pengine_destroy(Id),
     pengine_event(destroy(Id)),
     retractall(child(_,Id)).
+pengine_destroy_and_wait(_, _).
 
-wait_event(Query, Template, Options) :-
+wait_event(Query, Template, State, Options) :-
     pengine_event(Event, Options),
     debug(pengine(event), 'Received ~p', [Event]),
-    process_event(Event, Query, Template, Options).
+    process_event(Event, Query, Template, State, Options).
 
-process_event(create(ID, _), Query, Template, Options) :-
+process_event(create(ID, _), Query, Template, State, Options) :-
     pengine_ask(ID, Query, [template(Template)|Options]),
-    wait_event(Query, Template, Options).
-process_event(error(_ID, Error), _Query, _Template, _Options) :-
+    wait_event(Query, Template, State, Options).
+process_event(error(_ID, Error), _Query, _Template, _, _Options) :-
     throw(Error).
-process_event(failure(_ID), _Query, _Template, _Options) :-
+process_event(failure(_ID), _Query, _Template, _, _Options) :-
     fail.
-process_event(prompt(ID, Prompt), Query, Template, Options) :-
+process_event(prompt(ID, Prompt), Query, Template, State, Options) :-
     pengine_rpc_prompt(ID, Prompt, Reply),
     pengine_send(ID, input(Reply)),
-    wait_event(Query, Template, Options).
-process_event(output(ID, Term), Query, Template, Options) :-
+    wait_event(Query, Template, State, Options).
+process_event(output(ID, Term), Query, Template, State, Options) :-
     pengine_rpc_output(ID, Term),
     pengine_pull_response(ID, Options),
-    wait_event(Query, Template, Options).
-process_event(debug(ID, Message), Query, Template, Options) :-
+    wait_event(Query, Template, State, Options).
+process_event(debug(ID, Message), Query, Template, State, Options) :-
     debug(pengine(debug), '~w', [Message]),
     pengine_pull_response(ID, Options),
-    wait_event(Query, Template, Options).
-process_event(success(_ID, Solutions, false), _Query, Template, _Options) :- !,
+    wait_event(Query, Template, State, Options).
+process_event(success(_ID, Solutions, false), _Query, Template, _, _Options) :- !,
     member(Template, Solutions).
-process_event(success(ID, Solutions, true), Query, Template, Options) :-
+process_event(success(ID, Solutions, true), Query, Template, State, Options) :-
     (	member(Template, Solutions)
     ;   pengine_next(ID, Options),
-	wait_event(Query, Template, Options)
+	wait_event(Query, Template, State, Options)
     ).
+process_event(destroy(ID, Event), Query, Template, State, Options) :- !,
+    retractall(child(_,ID)),
+    nb_setarg(1, State, false),
+    process_event(Event, Query, Template, State, Options).
 
 pengine_rpc_prompt(ID, Prompt, Term) :-
     prompt(ID, Prompt, Term0), !,
@@ -1549,84 +1562,46 @@ http_pengine_abort(Request) :-
     ).
 
 
-% Output
-
-output_result(prolog, Term) :-
-    to_prolog(Term).
-output_result(json, Term) :-
-    cors_enable,
-    to_json(Term).
-output_result('json-s', Term) :-
-    cors_enable,
-    to_json_s(Term).
-
-%%	to_prolog(+Term)
+%%	output_result(+Format, +EventTerm) is det.
 %
-%	Send a term in Prolog  syntax.   Should  we  use cycles(true) as
-%	well? What about attributes? Use copy_term/3?
+%	Formulate an HTTP response from a pengine event term. Format is
+%	one of =prolog=, =json= or =json-s=.
 
-to_prolog(Term) :-
+output_result(prolog, Event) :- !,
     format('Content-type: text/x-prolog~n~n'),
-    write_term(Term,
+    write_term(Event,
 	       [ quoted(true),
 		 ignore_ops(true),
 		 fullstop(true),
 		 nl(true)
 	       ]).
+output_result(Lang, Event) :-
+    json_lang(Lang), !,
+    event_term_to_json_data(Event, JSON, Lang),
+    reply_json(JSON).
 
-to_json(create(ID, Term0)) :-
-    term_to_json(Term0, Term),
-    reply_json(json([event=create, id=ID, data=Term])).
-to_json(stop(ID)) :-
-    reply_json(json([event=stop, id=ID])).
-to_json(success(ID, Bindings0, More)) :-
-    term_to_json(Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
-to_json(failure(ID)) :-
-    reply_json(json([event=failure, id=ID])).
-to_json(error(ID, Error0)) :-
-    message_to_string(Error0, Error),
-    reply_json(json([event=error, id=ID, data=Error])).
-to_json(output(ID, Term0)) :-
-    term_to_json(Term0, Json),
-    reply_json(json([event=output, id=ID, data=Json])).
-to_json(prompt(ID, Term0)) :-
-    term_to_json(Term0, Json),
-    reply_json(json([event=prompt, id=ID, data=Json])).
-to_json(debug(ID, Term)) :-
-    reply_json(json([event=debug, id=ID, data=Term])).
-to_json(abort(ID)) :-
-    reply_json(json([event=abort, id=ID])).
-to_json(destroy(ID)) :-
-    reply_json(json([event=destroy, id=ID])).
+json_lang(json).
+json_lang('json-s').
 
-
-to_json_s(create(ID, Term0)) :-
-    term_to_json(Term0, Term),
-    reply_json(json([event=create, id=ID, data=Term])).
-to_json_s(stop(ID)) :-
-    reply_json(json([event=stop, id=ID])).
-to_json_s(success(ID, Bindings0, More)) :-
-    maplist(solution_to_json, Bindings0, Bindings),
-    reply_json(json([event=success, id=ID, data=Bindings, more= @(More)])).
-to_json_s(failure(ID)) :-
-    reply_json(json([event=failure, id=ID])).
-to_json_s(error(ID, Error0)) :-
-    message_to_string(Error0, Error),
-    reply_json(json([event=error, id=ID, data=Error])).
-to_json_s(output(ID, Term0)) :-
-    term_to_json(Term0, Json),
-    reply_json(json([event=output, id=ID, data=Json])).
-to_json_s(prompt(ID, Term0)) :-
-    term_to_json(Term0, Json),
-    reply_json(json([event=prompt, id=ID, data=Json])).
-to_json_s(debug(ID, Term)) :-
-    reply_json(json([event=debug, id=ID, data=Term])).
-to_json_s(abort(ID)) :-
-    reply_json(json([event=abort, id=ID])).
-to_json_s(destroy(ID)) :-
-    reply_json(json([event=destroy, id=ID])).
-
+event_term_to_json_data(success(ID, Bindings0, More),
+			json([event=success, id=ID, data=Bindings, more= @(More)]),
+			json) :- !,
+    term_to_json(Bindings0, Bindings).
+event_term_to_json_data(success(ID, Bindings0, More),
+			json([event=success, id=ID, data=Bindings, more= @(More)]),
+			'json-s') :- !,
+    maplist(solution_to_json, Bindings0, Bindings).
+event_term_to_json_data(destroy(ID, Event),
+			json([event=destroy, id=ID, data=JSON]), Style) :- !,
+    event_term_to_json_data(Event, JSON, Style).
+event_term_to_json_data(EventTerm, json([event=F, id=ID]), _) :-
+    functor(EventTerm, F, 1), !,
+    arg(1, EventTerm, ID).
+event_term_to_json_data(EventTerm, json([event=F, id=ID, data=JSON]), _) :-
+    functor(EventTerm, F, 2),
+    arg(1, EventTerm, ID),
+    arg(2, EventTerm, Data),
+    term_to_json(Data, JSON).
 
 solution_to_json(BindingsIn, json(BindingsOut)) :-
     maplist(swap, BindingsIn, BindingsOut).

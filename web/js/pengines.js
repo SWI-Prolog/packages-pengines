@@ -83,6 +83,7 @@ function Pengine(callbacks) {
         } else if (obj.event === 'abort') {
             if (callbacks.onabort) callbacks.onabort.call(obj);
         } else if (obj.event === 'destroy') {
+	    if (obj.data) process_response(obj.data);
             if (callbacks.ondestroy) callbacks.ondestroy.call(obj);
         }
     };
