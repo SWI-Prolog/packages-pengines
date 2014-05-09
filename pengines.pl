@@ -1730,6 +1730,8 @@ assert_local(Application, :-(Head, Body)) :- !,
     functor(Head, F, N),
     thread_local(Application:(F/N)),
     assert(Application:(Head :- Body)).
+assert_local(Application, (:- dynamic(Preds))) :- !,
+    declare_dynamic(Preds, Application).
 assert_local(Application, (:-Body)) :- !,
     (   safe_goal(Application:Body)
     ->  call(Application:Body)
@@ -1739,6 +1741,24 @@ assert_local(Application, Fact) :-
     functor(Fact, F, N),
     thread_local(Application:(F/N)),
     assert(Application:Fact).
+
+%%	declare_dynamic(+Spec) is det.
+%
+%	Declare predicates as dynamic. This is   only  allowed without a
+%	module specification. In fact, dynamic predicates are defined as
+%	thread local.
+
+declare_dynamic(Var, _) :-
+    var(Var), !,
+    instantiation_error(Var).
+declare_dynamic((A,B), Application) :- !,
+    declare_dynamic(A, Application),
+    declare_dynamic(B, Application).
+declare_dynamic(Name/Arity, Application) :-
+    atom(Name), integer(Arity), !,
+    thread_local(Application:(Name/Arity)).
+declare_dynamic(NoPI, _) :-
+    type_error(predicate_indicator, NoPI).
 
 
 /*================= Utilities =======================
