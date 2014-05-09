@@ -17,6 +17,8 @@
                 ]),
                 pengine_event_loop(handler, []).
 
+	    :- dynamic seen_success/1.
+	    :- dynamic delay_next/1.
 
             handler(create(ID, _)) :-
                 (   pengine_name(ID, foo)
@@ -28,11 +30,25 @@
                 pengine_output(Sol),
 		pengine_destroy(ID).
             handler(success(ID, Sol, true)) :-
+	        (   seen_success(ID)
+		->  true
+		;   asserta(seen_success(ID)),
+		    forall(retract(delay_next(ID)),
+			   pengine_next(ID, []))
+		),
                 pengine_output(Sol),
                 (   pengine_name(ID, foo)
-                ->  pengine_next(bar, [])
+                ->  pengine_name(Bar, bar),
+		    (   seen_success(Bar)
+		    ->  pengine_next(bar, [])
+		    ;   assertz(delay_next(Bar))
+		    )
                 ;   pengine_name(ID, bar)
-                ->  pengine_next(foo, [])
+                ->  pengine_name(Foo, foo),
+		    (   seen_success(Foo)
+		    ->  pengine_next(foo, [])
+		    ;   assertz(delay_next(Foo))
+		    )
                 ).
 
         </script>
