@@ -145,6 +145,16 @@ from Prolog or JavaScript.
 % :- debug(pengine(transition)).
 :- debug(pengine(debug)).		% handle pengine_debug in pengine_rpc/3.
 
+goal_expansion(random_delay, Expanded) :-
+    (   debugging(pengine(delay))
+    ->	Expanded = do_random_delay
+    ;	Expanded = true
+    ).
+
+do_random_delay :-
+    Delay is random(20)/1000,
+    sleep(Delay).
+
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +),
 	pengine_event_loop(+, 1, +),
@@ -260,6 +270,7 @@ delay_message(Target, Event, Options) :-
 	  _AlarmID,
 	  [remove(true)]).
 delay_message(Target, Event, Options) :-
+    random_delay,
     send_message(Target, Event, Options).
 
 send_message(queue(Queue), Event, _) :-
@@ -293,6 +304,7 @@ pengine_reply(Event) :-
     pengine_reply(Queue, Event).
 
 pengine_reply(Queue, Event) :-
+    random_delay,
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
     arg(1, Event, ID),
     thread_send_message(Queue, pengine_event(ID, Event)).
@@ -1489,6 +1501,7 @@ http_pengine_send(Request) :-
     ->	http_pengine_parent(ID, Queue),
 	get_pengine_application(ID, Application),
 	setting(Application:time_limit, TimeLimit),
+	random_delay,
 	thread_send_message(Thread, pengine_request(Event1)),
 	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	atom(ID)

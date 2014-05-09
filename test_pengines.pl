@@ -45,6 +45,8 @@
 :- [library(charsio)].
 :- [charsio:library(memfile)].
 
+:- debug(pengine(delay)).
+
 % the regular things we need for testing.
 :- use_module(library(plunit)).
 :- use_module(library(lists)).

@@ -46,6 +46,8 @@
 :- [library(charsio)].
 :- [charsio:library(memfile)].
 
+:- debug(pengine(delay)).
+
 :- use_module(library(plunit)).
 :- use_module(library(pengines)).
 :- use_module(pengine_sandbox:library(pengines)).
