@@ -1211,13 +1211,18 @@ pengine_event(Event, Options) :-
     ),
     update_remote_destroy(Event).
 
-update_remote_destroy(destroy(Id)) :-
-    pengine_remote(Id, _Server), !,
-    pengine_unregister_remote(Id).
-update_remote_destroy(destroy(Id, _Event)) :-
-    pengine_remote(Id, _Server), !,
+update_remote_destroy(Event) :-
+    pengine_remote(Id, _Server),
+    destroy_event(Event), !,
     pengine_unregister_remote(Id).
 update_remote_destroy(_).
+
+destroy_event(destroy(_)).
+destroy_event(destroy(_,_)).
+destroy_event(create(_,Features)) :-
+    memberchk(answer(Answer), Features), !,
+    nonvar(Answer),
+    destroy_event(Answer).
 
 
 /** pengine_event_loop(:Closure, +Options) is det
@@ -1339,7 +1344,9 @@ pengine_rpc(URL, Query, QOptions) :-
     Template =.. [v|Vars],
     State = destroy(true),
     setup_call_catcher_cleanup(
-	pengine_create([ server(URL),
+	pengine_create([ ask(Query),
+			 template(Template),
+			 server(URL),
 			 id(Id)
 		       | Options
 		       ]),
@@ -1360,9 +1367,9 @@ wait_event(Query, Template, State, Options) :-
     debug(pengine(event), 'Received ~p', [Event]),
     process_event(Event, Query, Template, State, Options).
 
-process_event(create(ID, _), Query, Template, State, Options) :-
-    pengine_ask(ID, Query, [template(Template)|Options]),
-    wait_event(Query, Template, State, Options).
+process_event(create(_ID, Features), Query, Template, State, Options) :-
+    memberchk(answer(First), Features),
+    process_event(First,  Query, Template, State, Options).
 process_event(error(_ID, Error), _Query, _Template, _, _Options) :-
     throw(Error).
 process_event(failure(_ID), _Query, _Template, _, _Options) :-
