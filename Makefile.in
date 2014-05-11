@@ -10,6 +10,7 @@ DOCIMG=penarch.png pltpruncolour.png pltpsynch.png
 include ../Makefile.defs
 JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
+PHANTOMJS=@PHANTOMJS@
 
 LIBPL=		pengines.pl term_to_json.pl
 JS=		web/js/pengines.js
@@ -50,7 +51,9 @@ uninstall:
 
 check::
 		$(PL) -q -f test_pengines.pl -g test_pengines,halt -t 'halt(1)'
+ifneq ($(PHANTOMJS),:)
 		$(PL) -q -f test_js.pl -g test_js,halt -t 'halt(1)'
+endif
 
 
 ################################################################
@@ -73,7 +76,7 @@ termtojson.tex:	term_to_json.pl
 
 clean:
 		rm -f *~ *% config.log
-		rm -f pendoc.tex pengines.tex penlib.tex termtojson.tex
+		rm -f pendoc.tex pengines.tex penlib.tex termtojson.tex
 
 distclean:	clean
 		rm -f config.h config.cache config.status Makefile
