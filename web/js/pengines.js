@@ -27,6 +27,9 @@
 */
 
 function Pengine(callbacks) {
+    if ( typeof Pengine.ids == 'undefined' ) {
+        Pengine.ids = [];
+    }
     var goal = callbacks.goal;
     var src = callbacks.src ? callbacks.src : "";
     var format = callbacks.format ? callbacks.format : "json";
@@ -56,8 +59,15 @@ function Pengine(callbacks) {
     }
     function process_response(obj) {
         if (obj.event === 'create') {
-            that.id = encodeURIComponent(obj.id);
-            if (callbacks.oncreate) callbacks.oncreate.call(obj);
+	    Pengine.ids.push(obj.id);
+            if (Pengine.ids.length > obj.slave_limit) {
+		alert("Attempt to use too many slave pengines. The limit is :" + obj.slave_limit);
+		Pengine.destroy();
+	    } else {
+	        that.id = obj.id;
+		if (callbacks.oncreate) callbacks.oncreate.call(obj);
+		if (obj.answer) process_response(obj.answer);
+	    }
         } else if (obj.event === 'stop') {
             if (callbacks.onstop) callbacks.onstop.call(obj);
         } else if (obj.event === 'success') {
@@ -83,6 +93,9 @@ function Pengine(callbacks) {
         } else if (obj.event === 'abort') {
             if (callbacks.onabort) callbacks.onabort.call(obj);
         } else if (obj.event === 'destroy') {
+	    var index = Pengine.ids.indexOf(that.id);
+
+	    if ( index > -1 ) Pengine.ids.splice(index, 1);
 	    if (obj.data) process_response(obj.data);
             if (callbacks.ondestroy) callbacks.ondestroy.call(obj);
         }
@@ -116,6 +129,11 @@ function Pengine(callbacks) {
     this.destroy = function() {
         send('destroy');
     }
+    this.destroy_all = function() {
+        if ( Pengine.ids.length > 0 ) {
+	    $.ajax({url:server + 'pengine/destroy_all?ids=' + Pengine.ids});
+	}
+    }
     $.ajax(server + 'pengine/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
@@ -127,3 +145,9 @@ function Pengine(callbacks) {
 	     "type": "POST"
 	   });
 }
+
+window.onunload = function() {
+    try {
+        Pengine.destroy_all();
+    } catch(e) {}
+};
