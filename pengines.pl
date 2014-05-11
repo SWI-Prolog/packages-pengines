@@ -1094,8 +1094,31 @@ translate_local_source(Options, Options).
 
 
 options_to_dict(Options, Dict) :-
+    select_option(ask(Ask), Options, Options1),
+    select_option(template(Template), Options1, Options2), !,
+    no_numbered_var_in(Ask+Template),
+    findall(AskString-TemplateString,
+	    ask_template_to_strings(Ask, Template, AskString, TemplateString),
+	    [ AskString-TemplateString ]),
+    options_to_dict(Options2, Dict0),
+    Dict = Dict0.put(_{ask:AskString,template:TemplateString}).
+options_to_dict(Options, Dict) :-
     maplist(prolog_option, Options, Options1),
     dict_create(Dict, _, Options1).
+
+no_numbered_var_in(Term) :-
+    sub_term(Sub, Term),
+    subsumes_term('$VAR'(_), Sub), !,
+    domain_error(numbered_vars_free_term, Term).
+no_numbered_var_in(_).
+
+ask_template_to_strings(Ask, Template, AskString, TemplateString) :-
+    numbervars(Ask+Template, 0, _),
+    WOpts = [ numbervars(true), ignore_ops(true), quoted(true) ],
+    format(string(AskTemplate), '~W\n~W', [ Ask, WOpts,
+					    Template, WOpts
+					  ]),
+    split_string(AskTemplate, "\n", "", [AskString, TemplateString]).
 
 prolog_option(Option0, Option) :-
     create_option_type(Option0, term), !,
@@ -1105,6 +1128,8 @@ prolog_option(Option0, Option) :-
 prolog_option(Option, Option).
 
 create_option_type(src_list(_),    term).
+create_option_type(ask(_),         term).
+create_option_type(template(_),    term).
 create_option_type(application(_), atom).
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
@@ -1508,6 +1533,14 @@ dict_to_options(Dict, CreateOptions) :-
     pairs_create_options(Pairs, CreateOptions).
 
 pairs_create_options([], []).
+pairs_create_options(T0, [AskOpt, TemplateOpt|T]) :-
+    selectchk(ask-Ask, T0, T1),
+    selectchk(template-Template, T1, T2), !,
+    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
+    term_string(t(Ask1,Template1), AskTemplate),
+    AskOpt = ask(Ask1),
+    TemplateOpt = template(Template1),
+    pairs_create_options(T2, T).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), !,
@@ -1649,6 +1682,13 @@ event_term_to_json_data(success(ID, Bindings0, More),
 			json([event=success, id=ID, data=Bindings, more= @(More)]),
 			'json-s') :- !,
     maplist(solution_to_json, Bindings0, Bindings).
+event_term_to_json_data(create(ID, Features0),
+			json([event=create,id=ID|Features]), Style) :- !,
+    (	select(answer(First0), Features0, Features1)
+    ->	event_term_to_json_data(First0, First, Style),
+	Features = [answer(First)|Features1]
+    ;	Features = Features0
+    ).
 event_term_to_json_data(destroy(ID, Event),
 			json([event=destroy, id=ID, data=JSON]), Style) :- !,
     event_term_to_json_data(Event, JSON, Style).

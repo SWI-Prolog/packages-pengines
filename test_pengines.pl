@@ -212,6 +212,16 @@ test(noapp, error(existence_error(pengine_application, nopapp))) :-
 	]),
     collect(X, p1(X), _Results, []),
     assertion(no_more_pengines).
+test(ask_simple, Results = [a,b,c]) :-
+    pengine_server(Server),
+    pengine_create(
+	[ ask(p(X)),
+	  template(X),
+	  server(Server),
+	  src_text("p(a). p(b). p(c).")
+	]),
+    collect(Results, []),
+    assertion(no_more_pengines).
 
 :- end_tests(remote_pengines).
 
