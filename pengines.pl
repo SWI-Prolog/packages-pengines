@@ -493,13 +493,18 @@ pengine_register_remote(Id, URL, Application, Destroy) :-
     thread_self(Queue),
     asserta(current_pengine(Id, Queue, 0, URL, Application, Destroy)).
 
+%%	pengine_unregister(+Id)
+%
+%	Called by the pengine thread  destruction.   If  we are a remote
+%	pengine thread, our URL  equals  =http=   and  the  queue is the
+%	message queue used to send events to the HTTP workers.
+
 pengine_unregister(Id) :-
     thread_self(Me),
     retractall(current_pengine(Id, _, Me, _, _, _)).
 
 pengine_unregister_remote(Id) :-
-    retractall(current_pengine(Id, Parent, 0, _, _, _)),
-    message_queue_destroy(Parent).
+    retractall(current_pengine(Id, _Parent, 0, _, _, _)).
 
 pengine_self(Id) :-
     thread_self(Thread),
@@ -1497,13 +1502,24 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
     (   thread_get_message(Queue, pengine_event(_, Event),
 			   [ timeout(TimeLimit)
 			   ]),
-	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue])
+	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
+	destroy_queue(Event, Queue)
     ->  output_result(Format, Event)
     ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
     ).
 
+%%	destroy_queue(+Event, +Queue) is det.
+%
+%	Destroy the queue if Event is a destroy event (which is by
+%	definition the last event).
+
+destroy_queue(destroy(_), Queue) :- !,
+    message_queue_destroy(Queue).
+destroy_queue(destroy(_,_), Queue) :- !,
+    message_queue_destroy(Queue).
+destroy_queue(_, _).
 
 http_pengine_send(Request) :-
     http_parameters(Request,
