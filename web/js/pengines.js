@@ -129,9 +129,10 @@ function Pengine(callbacks) {
     this.destroy = function() {
         send('destroy');
     }
-    this.destroy_all = function() {
+    Pengine.destroy_all = function() {
         if ( Pengine.ids.length > 0 ) {
-	    $.ajax({url:server + 'pengine/destroy_all?ids=' + Pengine.ids});
+	    $.ajax({ url:server + 'pengine/destroy_all?ids=' + Pengine.ids
+		   });
 	}
     }
     $.ajax(server + 'pengine/create',
