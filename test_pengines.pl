@@ -110,6 +110,22 @@ test(name, Name == pippi) :-
     collect(_, fail, Results, []),
     assertion(Results == []),
     assertion(no_more_pengines).
+test(ask_simple, Results = [a,b,c]) :-
+    pengine_create(
+	[ ask(p(X)),
+	  template(X),
+	  src_text("p(a). p(b). p(c).")
+	]),
+    collect(Results, []),
+    assertion(no_more_pengines).
+test(ask_fail, Results = []) :-
+    pengine_create(
+	[ ask(p(X)),
+	  template(X),
+	  src_text("p(_) :- fail.")
+	]),
+    collect(Results, []),
+    assertion(no_more_pengines).
 
 :- end_tests(local_pengines).
 
@@ -247,6 +263,9 @@ papp:p1(c).
 %	  * stop_after(N)
 %	  Stop collecting results after N answers
 
+collect(Results, Options) :-
+    collect(-, -, Results, Options).
+
 collect(Template, Goal, Results, Options) :-
     (	select_option(stop_after(StopAfter), Options, Options1)
     ->	State = _{results:[], stop_after:StopAfter, options:Options1}
@@ -256,6 +275,7 @@ collect(Template, Goal, Results, Options) :-
     Results = State.results.
 
 collect_handler(Template, Goal, State, create(Id, _)) :-
+    Goal \== (-),
     pengine_ask(Id, Goal, [template(Template)|State.options]).
 collect_handler(_, _, State, success(Id, Values, More)) :-
     append(State.results, Values, R1),

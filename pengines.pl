@@ -99,6 +99,9 @@ from Prolog or JavaScript.
 		       application(atom),
 		       destroy(boolean),
 		       server(atom),
+		       ask(compound),
+		       template(compound),
+		       chunk(integer),
 		       src_list(list),
 		       src_text(any),		% text
 		       src_url(atom),
@@ -303,11 +306,18 @@ pengine_reply(Event) :-
     nb_getval(pengine_parent, Queue),
     pengine_reply(Queue, Event).
 
-pengine_reply(Queue, Event) :-
+pengine_reply(Queue, Event0) :-
+    wrap_first_answer(Event0, Event),
     random_delay,
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
     arg(1, Event, ID),
     thread_send_message(Queue, pengine_event(ID, Event)).
+
+wrap_first_answer(Event0, CreateEvent) :-
+    retract(wrap_first_answer_in_create_event(CreateEvent,
+					      [answer(Event0)])), !.
+wrap_first_answer(Event, Event).
+
 
 
 /** pengine_ask(+NameOrID, @Query, +Options) is det
@@ -776,6 +786,9 @@ pengine_create_option(src_url(_)).
 pengine_create_option(src_predicates(_)).
 pengine_create_option(application(_)).
 pengine_create_option(destroy(_)).
+pengine_create_option(ask(_)).
+pengine_create_option(template(_)).
+pengine_create_option(chunk(_)).
 
 
 %%	pengine_done is det.
@@ -798,6 +811,8 @@ pengine_done :-
 %	Run a pengine main loop. First acknowledges its creation and run
 %	pengine_main_loop/1.
 
+:- thread_local wrap_first_answer_in_create_event/2.
+
 pengine_main(Parent, Options, Application) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
@@ -806,7 +821,16 @@ pengine_main(Parent, Options, Application) :-
 	      ( send_error(Error),
 		fail
 	      ))
-    ->  pengine_reply(create(Self, _Template)),
+    ->  setting(Application:slave_limit, SlaveLimit),
+	CreateEvent = create(Self, [slave_limit(SlaveLimit)|Extra]),
+	(   option(ask(Query), Options)
+        ->  asserta(wrap_first_answer_in_create_event(CreateEvent, Extra)),
+	    option(template(Template), Options, Query),
+	    option(chunk(Chunk), Options, 1),
+	    pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
+	;   Extra = [],
+	    pengine_reply(CreateEvent)
+        ),
         pengine_main_loop(Self)
     ;   pengine_terminate(Self)
     ).
@@ -1214,9 +1238,14 @@ pengine_event_loop(Event, Closure, Options) :-
     ;	true
     ).
 
-pengine_process_event(create(ID, T), Closure, true, _Options) :-
+pengine_process_event(create(ID, T), Closure, Continue, Options) :-
     debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(T)]),
-    ignore(call(Closure, create(ID, T))).
+    (	select(answer(First), T, T1)
+    ->	ignore(call(Closure, create(ID, T1))),
+	pengine_process_event(First, Closure, Continue, Options)
+    ;	ignore(call(Closure, create(ID, T))),
+	Continue = true
+    ).
 pengine_process_event(output(ID, Msg), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, output(Msg)]),
     ignore(call(Closure, output(ID, Msg))),
