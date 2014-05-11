@@ -1284,19 +1284,22 @@ pengine_rpc(URL, Query, QOptions) :-
     term_variables(Query, Vars),
     Template =.. [v|Vars],
     State = destroy(true),
-    setup_call_cleanup(
+    setup_call_catcher_cleanup(
 	pengine_create([ server(URL),
 			 id(Id)
 		       | Options
 		       ]),
 	wait_event(Query, Template, State, [listen(Id)|Options]),
-	pengine_destroy_and_wait(State, Id)).
+	Why,
+	pengine_destroy_and_wait(State, Id, Why)).
 
-pengine_destroy_and_wait(destroy(true), Id) :- !,
+pengine_destroy_and_wait(destroy(true), Id, Why) :- !,
+    debug(pengine(destroy), 'Destroying RPC because of ~p', [Why]),
     pengine_destroy(Id),
     pengine_event(destroy(Id)),
     retractall(child(_,Id)).
-pengine_destroy_and_wait(_, _).
+pengine_destroy_and_wait(_, _, Why) :-
+    debug(pengine(destroy), 'Not destroying RPC (~p)', [Why]).
 
 wait_event(Query, Template, State, Options) :-
     pengine_event(Event, Options),
@@ -1332,6 +1335,7 @@ process_event(success(ID, Solutions, true), Query, Template, State, Options) :-
 process_event(destroy(ID, Event), Query, Template, State, Options) :- !,
     retractall(child(_,ID)),
     nb_setarg(1, State, false),
+    debug(pengine(destroy), 'State: ~p~n', [State]),
     process_event(Event, Query, Template, State, Options).
 
 pengine_rpc_prompt(ID, Prompt, Term) :-
@@ -1534,6 +1538,7 @@ http_pengine_send(Request) :-
 	  ),
 	  Error,
 	  Event1 = error(ID, Error)),
+    debug(pengine(event), 'HTTP send: ~p', [Event1]),
     (	pengine_thread(ID, Thread)
     ->	http_pengine_parent(ID, Queue),
 	get_pengine_application(ID, Application),
