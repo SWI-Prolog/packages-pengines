@@ -264,10 +264,8 @@ collect_handler(_, _, State, success(Id, Values, More)) :-
     ->	pengine_destroy(Id)
     ;	More == true
     ->	pengine_next(Id, [])
-    ;	pengine_destroy(Id)
+    ;	true
     ).
-collect_handler(_, _, _, failure(Id)) :-
-    pengine_destroy(Id).
 
 %%	no_more_pengines is semidet.
 %
