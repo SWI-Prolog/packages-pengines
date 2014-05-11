@@ -1522,6 +1522,8 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 :- http_handler(root(pengine/send),	     http_pengine_send,		 []).
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response, []).
 :- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
+:- http_handler(root(pengine/destroy_all),   http_pengine_destroy_all,	 []).
+
 :- http_handler(root(pengine/'pengines.js'),
 		http_reply_file(library('http/web/js/pengines.js'), []), []).
 
@@ -1671,6 +1673,14 @@ http_pengine_abort(Request) :-
     ;	http_404([], Request)
     ).
 
+http_pengine_destroy_all(Request) :-
+    http_parameters(Request,
+		    [ ids(IDsAtom, [])
+		    ]),
+    atomic_list_concat(IDs, ',', IDsAtom),
+    forall(member(ID, IDs),
+	   pengine_destroy(ID, [force(true)])),
+    reply_json("ok").
 
 %%	output_result(+Format, +EventTerm) is det.
 %
