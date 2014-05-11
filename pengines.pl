@@ -462,7 +462,11 @@ pengine_destroy(ID) :-
 pengine_destroy(ID, Options) :-
     option(force(true), Options), !,
     pengine_thread(ID, Thread),
-    catch(thread_signal(Thread, abort), _, true).
+    (	catch(thread_signal(Thread, abort),
+	      error(existence_error(thread, _), _), fail)
+    ->	thread_join(Thread, _)			% cannot detach because that
+    ;	true					% will result in a warning
+    ).
 pengine_destroy(ID, _) :-
     catch(pengine_send(ID, destroy),
 	  error(existence_error(pengine, ID), _),
