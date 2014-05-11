@@ -1634,6 +1634,9 @@ event_term_to_json_data(create(ID, Features0),
 event_term_to_json_data(destroy(ID, Event),
 			json([event=destroy, id=ID, data=JSON]), Style) :- !,
     event_term_to_json_data(Event, JSON, Style).
+event_term_to_json_data(error(ID, ErrorTerm),
+			json([event=error, id=ID, data=Message]), _) :- !,
+    message_to_string(ErrorTerm, Message).
 event_term_to_json_data(EventTerm, json([event=F, id=ID]), _) :-
     functor(EventTerm, F, 1), !,
     arg(1, EventTerm, ID).
