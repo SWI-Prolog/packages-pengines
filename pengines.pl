@@ -1512,6 +1512,8 @@ pengine_seek_agreement([URL0|URLs], Query, Options) :-
 :- http_handler(root(pengine/send),	     http_pengine_send,		 []).
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response, []).
 :- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
+:- http_handler(root(pengine/'pengines.js'),
+		http_reply_file(library('http/web/js/pengines.js'), []), []).
 
 
 http_pengine_create(Request) :-
