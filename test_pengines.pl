@@ -171,21 +171,25 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
-test(rpc_all, all(X == [1,2,3])) :-
+test(rpc_all, Xs == [1,2,3]) :-
     pengine_server(Server),
-    pengine_rpc(Server,
-		member(X, [1,2,3]),
-		[]).
+    findall(X, pengine_rpc(Server,
+			   member(X, [1,2,3]),
+			   []),
+	    Xs),
+    assertion(no_more_pengines).
 test(rpc_first, X == 1) :-
     pengine_server(Server),
     pengine_rpc(Server,
 		member(X, [1,2,3]),
-		[]), !.
-test(rpc_fail, fail) :-
+		[]), !,
+    assertion(no_more_pengines).
+test(rpc_fail, true) :-
     pengine_server(Server),
-    pengine_rpc(Server,
-		fail,
-		[]), !.
+    \+ pengine_rpc(Server,
+		   fail,
+		   []),
+    assertion(no_more_pengines).
 test(pengine_and_rpc, Results = [a,b,c]) :-
     pengine_server(Server),
     pengine_create(
