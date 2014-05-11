@@ -1350,7 +1350,7 @@ pengine_rpc(URL, Query, QOptions) :-
 			 id(Id)
 		       | Options
 		       ]),
-	wait_event(Query, Template, State, [listen(Id)|Options]),
+	wait_event(Template, State, [listen(Id)|Options]),
 	Why,
 	pengine_destroy_and_wait(State, Id, Why)).
 
@@ -1362,42 +1362,42 @@ pengine_destroy_and_wait(destroy(true), Id, Why) :- !,
 pengine_destroy_and_wait(_, _, Why) :-
     debug(pengine(destroy), 'Not destroying RPC (~p)', [Why]).
 
-wait_event(Query, Template, State, Options) :-
+wait_event(Template, State, Options) :-
     pengine_event(Event, Options),
     debug(pengine(event), 'Received ~p', [Event]),
-    process_event(Event, Query, Template, State, Options).
+    process_event(Event, Template, State, Options).
 
-process_event(create(_ID, Features), Query, Template, State, Options) :-
+process_event(create(_ID, Features), Template, State, Options) :-
     memberchk(answer(First), Features),
-    process_event(First,  Query, Template, State, Options).
-process_event(error(_ID, Error), _Query, _Template, _, _Options) :-
+    process_event(First, Template, State, Options).
+process_event(error(_ID, Error), _Template, _, _Options) :-
     throw(Error).
-process_event(failure(_ID), _Query, _Template, _, _Options) :-
+process_event(failure(_ID), _Template, _, _Options) :-
     fail.
-process_event(prompt(ID, Prompt), Query, Template, State, Options) :-
+process_event(prompt(ID, Prompt), Template, State, Options) :-
     pengine_rpc_prompt(ID, Prompt, Reply),
     pengine_send(ID, input(Reply)),
-    wait_event(Query, Template, State, Options).
-process_event(output(ID, Term), Query, Template, State, Options) :-
+    wait_event(Template, State, Options).
+process_event(output(ID, Term), Template, State, Options) :-
     pengine_rpc_output(ID, Term),
     pengine_pull_response(ID, Options),
-    wait_event(Query, Template, State, Options).
-process_event(debug(ID, Message), Query, Template, State, Options) :-
+    wait_event(Template, State, Options).
+process_event(debug(ID, Message), Template, State, Options) :-
     debug(pengine(debug), '~w', [Message]),
     pengine_pull_response(ID, Options),
-    wait_event(Query, Template, State, Options).
-process_event(success(_ID, Solutions, false), _Query, Template, _, _Options) :- !,
+    wait_event(Template, State, Options).
+process_event(success(_ID, Solutions, false), Template, _, _Options) :- !,
     member(Template, Solutions).
-process_event(success(ID, Solutions, true), Query, Template, State, Options) :-
+process_event(success(ID, Solutions, true), Template, State, Options) :-
     (	member(Template, Solutions)
     ;   pengine_next(ID, Options),
-	wait_event(Query, Template, State, Options)
+	wait_event(Template, State, Options)
     ).
-process_event(destroy(ID, Event), Query, Template, State, Options) :- !,
+process_event(destroy(ID, Event), Template, State, Options) :- !,
     retractall(child(_,ID)),
     nb_setarg(1, State, false),
     debug(pengine(destroy), 'State: ~p~n', [State]),
-    process_event(Event, Query, Template, State, Options).
+    process_event(Event, Template, State, Options).
 
 pengine_rpc_prompt(ID, Prompt, Term) :-
     prompt(ID, Prompt, Term0), !,
