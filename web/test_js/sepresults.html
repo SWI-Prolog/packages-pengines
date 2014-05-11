@@ -27,8 +27,7 @@
                 ->  pengine_ask(ID, bar(X), [template(X)])
                 ).
             handler(success(ID, Sol, false)) :-
-                pengine_output(Sol),
-		pengine_destroy(ID).
+                pengine_output(Sol).
             handler(success(ID, Sol, true)) :-
 	        (   seen_success(ID)
 		->  true
