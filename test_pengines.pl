@@ -47,6 +47,8 @@
 :- [charsio:library(memfile)].
 
 :- debug(pengine(delay)).
+% run pengine server for remote tests in a separate process.
+% :- debug(pengine(external_server)).
 
 % the regular things we need for testing.
 :- use_module(library(plunit)).
@@ -112,7 +114,7 @@ test(name, Name == pippi) :-
 :- end_tests(local_pengines).
 
 :- begin_tests(remote_pengines,
-	       [ setup(start_pengine_server(_Port)),
+	       [ setup(pengine_server(_URL)),
 		 cleanup(stop_pengine_server)
 	       ]).
 
@@ -297,14 +299,12 @@ pengine_server(URL) :-
 	local_server(URL).
 
 local_server(URL) :-
-	start_pengine_server(Port),
+	(   pengine_server_port(Port)
+	->  true
+	;   http_server(http_dispatch, [port(Port)]),
+	    asserta(pengine_server_port(Port))
+	),
 	format(atom(URL), 'http://localhost:~d', [Port]).
-
-start_pengine_server(Port) :-
-	pengine_server_port(Port), !.
-start_pengine_server(Port) :-
-	http_server(http_dispatch, [port(Port)]),
-	asserta(pengine_server_port(Port)).
 
 stop_pengine_server :-
 	pengine_server_pid(PID), !,
