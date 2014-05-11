@@ -47,9 +47,7 @@
             pengine_name/2,			% ?Pengine, ?Name
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
-            pengine_rpc/3,			% +Server, +Goal, +Options
-            pengine_ask_around/3,		% +list(Server), :Goal, +Options
-            pengine_seek_agreement/3		% +list(Server), :Goal, +Options
+            pengine_rpc/3			% +Server, +Goal, +Options
 	  ]).
 
 /** <module> Pengines: Web Logic Programming Made Easy
@@ -90,9 +88,7 @@ from Prolog or JavaScript.
 :- meta_predicate
 	pengine_create(:),
 	pengine_rpc(+, +, :),
-	pengine_event_loop(1, +),
-	pengine_ask_around(+, 0, +),
-	pengine_seek_agreement(+, 0, +).
+	pengine_event_loop(1, +).
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
@@ -137,14 +133,6 @@ from Prolog or JavaScript.
 		     ]).
 :- predicate_options(pengine_event_loop/2, 2,
 		     []).			% not yet implemented
-:- predicate_options(pengine_ask_around/3, 3,
-		     [ use_local(boolean),
-		       pass_to(pengine_rpc/3, 3)
-		     ]).
-:- predicate_options(pengine_seek_agreement/3, 3,
-		     [ use_local(boolean),
-		       pass_to(pengine_rpc/3, 3)
-		     ]).
 
 % :- debug(pengine(transition)).
 :- debug(pengine(debug)).		% handle pengine_debug in pengine_rpc/3.
@@ -1438,83 +1426,8 @@ pengine_rpc_output(_ID, Term) :-
 :- multifile output/2.
 
 
-/** pengine_ask_around(+URLs, +Query, +Options) is nondet
-
-Semantically equivalent to Query, except that the   query is run in (and
-in the Prolog contexts of)  the  pengine   servers  listed  in URLs, and
-(subject to an option) locally. Computes the _bag union_ of solutions to
-Query on backtracking.
-
-URLs is a list where each  element  is   either  a  URL (atom) or a pair
-URL-Options,  where  Options  is  a   list    of   options  accepted  by
-pengine_rpc/3. The options in such a   list override the general options
-in Options.
-
-Valid options are:
-
-    * use_local(+Boolean)
-      Boolean (=true= or =false=) determines if Query is run (at last)
-      also in the local Prolog context.
-
-*/
-
-pengine_ask_around(URLs, Goal, Options) :-
-    member(URL0, URLs),
-    (   URL0 = URL-OverrideOptions
-    ->  true
-    ;   URL = URL0,
-        OverrideOptions = []
-    ),
-    merge_options(OverrideOptions, Options, NewOptions),
-    catch(pengine_rpc(URL, Goal, NewOptions), _, fail).
-pengine_ask_around(_URLs, Goal, Options) :-
-    option(use_local(Default), Options, true),
-    (   Default
-    ->  catch(Goal, _, false)
-    ;   fail
-    ).
-
-
-/** pengine_seek_agreement(+URLs, +Query, +Options) is nondet
-
-Semantically equivalent to Query, except that the   query is run in (and
-in the Prolog contexts of)  the  pengine   servers  listed  in URLs, and
-(subject to an option)  locally.  Computes   the  _bag  intersection_ of
-solutions to Query on backtracking.
-
-URLs is a list where each element  is   either  a URL or a `-'-delimited
-pair of a URL and  a  list   of  options  accepted by pengine_rpc/3. The
-options in such a list override the general options in Options.
-
-Valid options are:
-
-    * use_local(+Boolean)
-      Boolean (=true= or =false=) determines if Query is run (at last)
-      also in the local Prolog context.
-
-*/
-
-pengine_seek_agreement([], Query, Options) :-
-    option(use_local(true), Options), !,
-    catch(Query, _, false).
-pengine_seek_agreement([], _Query, _Options).
-pengine_seek_agreement([URL0|URLs], Query, Options) :-
-    (   URL0 = URL-OverrideOptions
-    ->  true
-    ;   URL = URL0,
-        OverrideOptions = []
-    ),
-    merge_options(OverrideOptions, Options, NewOptions),
-    catch(pengine_rpc(URL, Query, NewOptions), _, fail),
-    pengine_seek_agreement(URLs, Query, Options).
-
-
-
-
-
 /*================= HTTP handlers =======================
 */
-
 
 %   Declare HTTP locations we serve and how.
 
