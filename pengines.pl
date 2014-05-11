@@ -1204,51 +1204,50 @@ pengine_event_loop(Closure, Options) :-
     pengine_event_loop(Event, Closure, Options).
 pengine_event_loop(_, _).
 
-pengine_event_loop(create(ID, T), Closure, Options) :-
+pengine_event_loop(Event, Closure, Options) :-
+    pengine_process_event(Event, Closure, Continue, Options),
+    (	Continue == true
+    ->	pengine_event_loop(Closure, Options)
+    ;	true
+    ).
+
+pengine_process_event(create(ID, T), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 1 = /~q => 2', [ID, create(T)]),
-    ignore(call(Closure, create(ID, T))),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(output(ID, Msg), Closure, Options) :-
+    ignore(call(Closure, create(ID, T))).
+pengine_process_event(output(ID, Msg), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, output(Msg)]),
     ignore(call(Closure, output(ID, Msg))),
-    pengine_pull_response(ID, []),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(debug(ID, Msg), Closure, Options) :-
+    pengine_pull_response(ID, []).
+pengine_process_event(debug(ID, Msg), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 4', [ID, debug(Msg)]),
     ignore(call(Closure, debug(ID, Msg))),
-    pengine_pull_response(ID, []),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(prompt(ID, Term), Closure, Options) :-
+    pengine_pull_response(ID, []).
+pengine_process_event(prompt(ID, Term), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
-    ignore(call(Closure, prompt(ID, Term))),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(success(ID, Sol, More), Closure, Options) :-
+    ignore(call(Closure, prompt(ID, Term))).
+pengine_process_event(success(ID, Sol, More), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
-    ignore(call(Closure, success(ID, Sol, More))),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(failure(ID), Closure, Options) :-
+    ignore(call(Closure, success(ID, Sol, More))).
+pengine_process_event(failure(ID), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
-    ignore(call(Closure, failure(ID))),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(error(ID, Error), Closure, Options) :-
+    ignore(call(Closure, failure(ID))).
+pengine_process_event(error(ID, Error), Closure, Continue, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Error)]),
     (	call(Closure, error(ID, Error))
-    ->	pengine_event_loop(Closure, Options)
+    ->	Continue = true
     ;	forall(child(_,Child), pengine_destroy(Child)),
 	throw(Error)
     ).
-pengine_event_loop(stop(ID), Closure, Options) :-
+pengine_process_event(stop(ID), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 7 = /~q => 2', [ID, stop]),
-    ignore(call(Closure, stop(ID))),
-    pengine_event_loop(Closure, Options).
-pengine_event_loop(destroy(ID, Event), Closure, Options) :-
-    pengine_event_loop(Event, Closure, Options),
-    pengine_event_loop(destroy(ID), Closure, Options).
-pengine_event_loop(destroy(ID), Closure, Options) :-
+    ignore(call(Closure, stop(ID))).
+pengine_process_event(destroy(ID, Event), Closure, Continue, Options) :-
+    pengine_process_event(Event, Closure, _, Options),
+    pengine_process_event(destroy(ID), Closure, Continue, Options).
+pengine_process_event(destroy(ID), Closure, true, _Options) :-
     retractall(child(_,ID)),
     debug(pengine(transition), '~q: 1 = /~q => 0', [ID, destroy]),
-    ignore(call(Closure, destroy(ID))),
-    pengine_event_loop(Closure, Options).
+    ignore(call(Closure, destroy(ID))).
 
 
 /** pengine_rpc(+URL, +Query) is nondet.
