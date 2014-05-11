@@ -40,6 +40,7 @@
             pengine_self/1,			% -Pengine
             pengine_pull_response/2,		% +Pengine, +Options
             pengine_destroy/1,			% +Pengine
+            pengine_destroy/2,			% +Pengine, +Options
             pengine_abort/1,			% +Pengine
 	    pengine_application/1,              % +Application
             pengine_property/2,			% ?Pengine, ?Property
@@ -458,14 +459,23 @@ pengine_abort(Pengine) :-
     catch(thread_signal(Thread, throw(abort_query)), _, true).
 
 
-/** pengine_destroy(+NameOrID) is det
+/** pengine_destroy(+NameOrID) is det.
+    pengine_destroy(+NameOrID, +Options) is det.
 
-Destroys the pengine NameOrID.
+Destroys the pengine NameOrID.  With the option force(true), the pengine
+is killed using abort/0 and pengine_destroy/2 succeeds.
 
 @tbd	Should abort the pengine if it is running a query.
 */
 
 pengine_destroy(ID) :-
+	pengine_destroy(ID, []).
+
+pengine_destroy(ID, Options) :-
+    option(force(true), Options), !,
+    pengine_thread(ID, Thread),
+    catch(thread_signal(Thread, abort), _, true).
+pengine_destroy(ID, _) :-
     catch(pengine_send(ID, destroy),
 	  error(existence_error(pengine, ID), _),
 	  retractall(child(_,ID))).
@@ -1899,6 +1909,7 @@ pengine_find_n(N, Template, Goal, List) :-
 %		reconsider this.
 
 sandbox:safe_primitive(pengine:pengine_create(_)).
+sandbox:safe_primitive(pengine:pengine_destroy(_,_)).
 sandbox:safe_primitive(pengine:pengine_event(_, _)).
 sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengine:pengine_input(_, _)).
