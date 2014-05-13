@@ -281,7 +281,14 @@ send_message(pengine(Pengine), Event, Options) :-
 %	messages are placed in the queue by pengine_send/2.
 
 pengine_request(Request) :-
-    thread_get_message(pengine_request(Request)).
+    pengine_self(Self),
+    get_pengine_application(Self, Application),
+    setting(Application:idle_limit, IdleLimit),
+    thread_self(Me),
+    (	thread_get_message(Me, pengine_request(Request), [timeout(IdleLimit)])
+    ->	true
+    ;	Request = destroy
+    ).
 
 
 %%	pengine_reply(+Event) is det.
@@ -537,7 +544,7 @@ pengine_remote(Pengine, URL) :-
     current_pengine(Pengine, _Parent, 0, URL, _Application, _Destroy).
 
 get_pengine_application(Pengine, Application) :-
-    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy).
+    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy), !.
 
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
@@ -579,6 +586,8 @@ pengine_application(Application) :-
 	   'Maximum number of local slave pengines a master pengine can create.').
 :- setting(time_limit, number, 30,
 	   'Maximum time to wait for output').
+:- setting(idle_limit, number, 300,
+	   'Pengine auto-destroys when idle for this time').
 :- setting(allow_from, list(atom), [*],
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
@@ -610,6 +619,10 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 			    setting(pengine:time_limit),
 			    'Maximum time to wait for output')),
 		TimeLimitSetting),
+    expand_term((:- setting(Application:idle_limit, number,
+			    setting(pengine:idle_limit),
+			    'Pengine auto-destroys when idle for this time')),
+		IdleLimitSetting),
     expand_term((:- setting(Application:allow_from, list(atom),
 			    setting(pengine:allow_from),
 			    'IP addresses from which remotes are allowed \c
@@ -625,6 +638,7 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 	      ThreadPoolStacksSetting,
 	      SlaveLimitSetting,
 	      TimeLimitSetting,
+	      IdleLimitSetting,
 	      AllowFromSetting,
 	      DenyFromSetting
 	    ], Expanded).
