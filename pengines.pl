@@ -946,6 +946,8 @@ destroy_or_continue(Event) :-
 	thread_detach(Me),
         pengine_reply(destroy(ID, Event))
     ;   pengine_reply(Event),
+	garbage_collect,		% minimise our footprint
+	trim_stacks,
 	guarded_main_loop(ID)
     ).
 
