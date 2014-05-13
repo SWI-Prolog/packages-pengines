@@ -134,6 +134,7 @@ function Pengine(options) {
 	    $.ajax({ url:server + 'pengine/destroy_all?ids=' + Pengine.ids,
 	             async: async === 'undefined' ? true : false
 		   });
+	    Pengine.ids = [];
 	}
     }
     // On creation
