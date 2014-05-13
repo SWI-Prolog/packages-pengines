@@ -1,0 +1,29 @@
+<html lang="en">
+    <head>
+        <script src="/jquery-2.0.3.min.js"></script>
+        <script src="/js/pengines.js"></script>
+        <script type="text/x-prolog">
+
+	   p(a).
+
+        </script>
+        <script>
+            var pengine = new Pengine({
+                oncreate: handleCreate,
+                onsuccess: handleSuccess
+            });
+            function handleCreate () {
+                pengine.ask('p(X), true', {
+                    template:'X'
+                });
+            }
+            function handleSuccess() {
+		console.log(this.data);
+		if ( this.more )
+                   pengine.next();
+            }
+        </script>
+    </head>
+    <body>
+    </body>
+</html>
