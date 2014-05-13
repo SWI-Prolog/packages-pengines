@@ -107,7 +107,7 @@ function Pengine(options) {
     }
     // Public functions
     this.ask = function(query, options) {
-        send('ask(' + query + ', ' + options_to_list(options) + ')');
+        send('ask((' + query + '), ' + options_to_list(options) + ')');
     }
     this.next = function() {
         send('next');
