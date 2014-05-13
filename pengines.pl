@@ -446,12 +446,16 @@ for new queries.
 @see pengine_destroy/1.
 */
 
-pengine_abort(Pengine) :-
-    pengine_remote(Pengine, Server), !,
-    remote_pengine_abort(Server, Pengine, []).
-pengine_abort(Pengine) :-
-    pengine_thread(Pengine, Thread),
-    catch(thread_signal(Thread, throw(abort_query)), _, true).
+pengine_abort(Name) :-
+    (	child(Name, Pengine)
+    ->	true
+    ;	Pengine = Name
+    ),
+    (	pengine_remote(Pengine, Server)
+    ->	remote_pengine_abort(Server, Pengine, [])
+    ;	pengine_thread(Pengine, Thread),
+	catch(thread_signal(Thread, throw(abort_query)), _, true)
+    ).
 
 
 /** pengine_destroy(+NameOrID) is det.
