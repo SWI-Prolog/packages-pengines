@@ -129,9 +129,10 @@ function Pengine(options) {
     this.destroy = function() {
         send('destroy');
     }
-    Pengine.destroy_all = function() {
+    Pengine.destroy_all = function(async) {
         if ( Pengine.ids.length > 0 ) {
-	    $.ajax({ url:server + 'pengine/destroy_all?ids=' + Pengine.ids
+	    $.ajax({ url:server + 'pengine/destroy_all?ids=' + Pengine.ids,
+	             async: async === 'undefined' ? true : false
 		   });
 	}
     }
