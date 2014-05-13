@@ -976,8 +976,7 @@ more_solutions(ID, Choice) :-
 
 more_solutions(stop, ID, _Choice) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
-    pengine_reply(stop(ID)),
-    guarded_main_loop(ID).
+    destroy_or_continue(stop(ID)).
 more_solutions(next, ID, _Choice) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
     fail.
