@@ -493,9 +493,11 @@ pengine_destroy(ID, _) :-
 %	  - remote(URL)
 
 :- dynamic
-	current_pengine/6.		% Id, ParentId, Thread, URL, App, Destroy
+	current_pengine/6,		% Id, ParentId, Thread, URL, App, Destroy
+	output_queue/3.			% Id, Queue, Time
 :- volatile
-	current_pengine/6.
+	current_pengine/6,
+	output_queue/3.
 
 :- thread_local
 	child/2.			% ?Name, ?Child
@@ -520,6 +522,10 @@ pengine_register_remote(Id, URL, Application, Destroy) :-
 
 pengine_unregister(Id) :-
     thread_self(Me),
+    (	current_pengine(Id, Queue, Me, http, _, _)
+    ->	with_mutex(pengine, sync_delay_destroy_queue(Id, Queue))
+    ;	true
+    ),
     retractall(current_pengine(Id, _, Me, _, _, _)).
 
 pengine_unregister_remote(Id) :-
@@ -1525,23 +1531,79 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
 			   [ timeout(TimeLimit)
 			   ]),
 	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
-	destroy_queue(Event, Queue)
+	destroy_queue(Pengine, Event, Queue)
     ->  output_result(Format, Event)
     ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
     ).
 
-%%	destroy_queue(+Event, +Queue) is det.
+%%	destroy_queue(+Pengine, +Event, +Queue) is det.
 %
-%	Destroy the queue if Event is a destroy event (which is by
-%	definition the last event).
+%	Destroy the output queue for Pengine.   We can destroy the queue
+%	if it is in _delayed mode_  (see pengine_unregister/1) and empty
+%	or if it is in normal mode and   the  event is the final destroy
+%	event.
+%
+%	@tbd	If the client does not request all output, the queue will
+%		not be destroyed.  We need some timeout and GC for that.
 
-destroy_queue(destroy(_), Queue) :- !,
-    message_queue_destroy(Queue).
-destroy_queue(destroy(_,_), Queue) :- !,
-    message_queue_destroy(Queue).
-destroy_queue(_, _).
+destroy_queue(ID, _, Queue) :-
+    output_queue(ID, Queue, _), !,
+    (	thread_peek_message(Queue, _)
+    ->	true
+    ;	retractall(output_queue(ID, Queue, _)),
+	message_queue_destroy(Queue)
+    ).
+destroy_queue(ID, Event, Queue) :-
+    debug(pengine(destroy), 'DESTROY? ~p', [Event]),
+    is_destroy_event(Event), !,
+    message_queue_property(Queue, size(Waiting)),
+    debug(pengine(destroy), 'Destroy ~p (waiting ~D)', [Queue, Waiting]),
+    with_mutex(pengine, sync_destroy_queue(ID, Queue)).
+destroy_queue(_, _, _).
+
+is_destroy_event(destroy(_)).
+is_destroy_event(destroy(_,_)).
+
+%%	sync_destroy_queue(+Pengine, +Queue) is det.
+%%	sync_delay_destroy_queue(+Pengine, +Queue) is det.
+%
+%	Handle destruction of the message queue connecting the HTTP side
+%	to the pengine. We cannot delete the queue when the pengine dies
+%	because the queue may contain output  events. Termination of the
+%	pengine and finishing the  HTTP  exchange   may  happen  in both
+%	orders. This means we need handle this using synchronization.
+%
+%	@tbd	If message queue handles were save, we could check the
+%		existence and get rid of output_queue_destroyed/1.  As
+%		is, they are small integer references, subject to the
+%		ABA issue.
+%
+%		(*) we exploit the recycling of message queue IDs ...
+
+:- dynamic output_queue_destroyed/1.
+
+sync_destroy_queue(ID, Queue) :-
+    (	output_queue(ID, Queue, _)
+    ->  true
+    ;	thread_peek_message(Queue, pengine_event(_, output(_,_)))
+    ->	debug(pengine(destroy), 'Delay destruction of ~p because of output',
+	      [Queue]),
+        get_time(Now),
+	asserta(output_queue(ID, Queue, Now))
+    ;	message_queue_destroy(Queue),
+	retractall(output_queue_destroyed(Queue)), % (*)
+	asserta(output_queue_destroyed(Queue))
+    ).
+
+sync_delay_destroy_queue(ID, Queue) :-
+    (   retract(output_queue_destroyed(Queue))
+    ->  true
+    ;   get_time(Now),
+	asserta(output_queue(ID, Queue, Now))
+    ).
+
 
 http_pengine_send(Request) :-
     http_parameters(Request,
@@ -1586,10 +1648,13 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    (	http_pengine_parent(ID, Queue)
-    ->	get_pengine_application(ID, Application),
-	setting(Application:time_limit, TimeLimit),
-	wait_and_output_result(ID, Queue, Format, TimeLimit)
+    (	(   http_pengine_parent(ID, Queue)
+	->  get_pengine_application(ID, Application),
+	    setting(Application:time_limit, TimeLimit)
+	;   output_queue(ID, Queue, _),
+	    TimeLimit = 0
+	)
+    ->	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
 
