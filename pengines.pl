@@ -1722,6 +1722,12 @@ event_term_to_json_data(destroy(ID, Event),
 event_term_to_json_data(error(ID, ErrorTerm),
 			json([event=error, id=ID, data=Message]), _) :- !,
     message_to_string(ErrorTerm, Message).
+event_term_to_json_data(output(ID, Term),
+			json([event=output, id=ID, data=Data]), 'json-s') :- !,
+    (	atomic(Term)
+    ->	Data = Term
+    ;	term_string(Term, Data)
+    ).
 event_term_to_json_data(EventTerm, json([event=F, id=ID]), _) :-
     functor(EventTerm, F, 1), !,
     arg(1, EventTerm, ID).
