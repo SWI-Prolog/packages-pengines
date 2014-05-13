@@ -468,9 +468,13 @@ is killed using abort/0 and pengine_destroy/2 succeeds.
 */
 
 pengine_destroy(ID) :-
-	pengine_destroy(ID, []).
+    pengine_destroy(ID, []).
 
-pengine_destroy(ID, Options) :-
+pengine_destroy(Name, Options) :-
+    (	child(Name, ID)
+    ->	true
+    ;	ID = Name
+    ),
     option(force(true), Options), !,
     (	pengine_thread(ID, Thread),
 	catch(thread_signal(Thread, abort),
