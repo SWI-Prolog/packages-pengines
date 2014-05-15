@@ -891,7 +891,8 @@ process_create_option(_, _).
 
 pengine_main_loop(ID) :-
     catch(guarded_main_loop(ID), abort_query,
-	  ( pengine_reply(abort(ID)),
+	  ( debug(pengine(abort), 'Aborting ~p', [ID]),
+	    pengine_reply(abort(ID)),
 	    pengine_main_loop(ID)
 	  )).
 
