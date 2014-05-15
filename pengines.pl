@@ -946,7 +946,10 @@ solve(Template, Goal, ID) :-
 		destroy_or_continue(success(ID, Template, false))
             )
         ;   !,				% commit
-	    destroy_or_continue(error(ID, Error))
+	    (	Error == abort_query
+	    ->	throw(Error)
+	    ;	destroy_or_continue(error(ID, Error))
+	    )
         )
     ;   !,				% commit
 	destroy_or_continue(failure(ID))
