@@ -116,7 +116,7 @@ function Pengine(options) {
         send('stop');
     }
     this.respond = function(input) {
-        send('input(' + input + ')');
+        send('input((' + input + '))');
     }
     this.pull_response = function() {
         $.get(server + 'pengine/pull_response?id=' + that.id +
