@@ -270,8 +270,8 @@ send_message(queue(Queue), Event, _) :-
 send_message(pengine(Pengine), Event, Options) :-
     (	pengine_remote(Pengine, Server)
     ->	remote_pengine_send(Server, Pengine, Event, Options)
-    ;	pengine_thread(Pengine, Thread),
-	thread_send_message(Thread, pengine_request(Event))
+    ;	pengine_thread(Pengine, Thread)
+    ->	thread_send_message(Thread, pengine_request(Event))
     ;	existence_error(pengine, Pengine)
     ).
 
