@@ -597,8 +597,8 @@ pengine_application(Application) :-
 :- setting(thread_pool_stacks, list(compound), [],
 	   'Maximum stack sizes for pengines this application can run.').
 :- setting(slave_limit, integer, 3,
-	   'Maximum number of local slave pengines a master pengine can create.').
-:- setting(time_limit, number, 30,
+	   'Maximum number of slave pengines a master pengine can create.').
+:- setting(time_limit, number, 300,
 	   'Maximum time to wait for output').
 :- setting(idle_limit, number, 300,
 	   'Pengine auto-destroys when idle for this time').
