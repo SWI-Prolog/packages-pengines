@@ -1488,7 +1488,7 @@ http_pengine_create(Request) :-
     option(application(Application), CreateOptions, pengine_sandbox),
     (	current_application(Application)
     ->  allowed(Request, Application),
-	message_queue_create(From, []),
+	message_queue_create(From, [max_size(25)]),
 	create(From, Pengine, CreateOptions, http, Application),
 	http_pengine_parent(Pengine, Queue),
 	setting(Application:time_limit, TimeLimit),
