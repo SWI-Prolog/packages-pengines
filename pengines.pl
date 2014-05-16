@@ -43,6 +43,7 @@
             pengine_destroy/2,			% +Pengine, +Options
             pengine_abort/1,			% +Pengine
 	    pengine_application/1,              % +Application
+	    current_pengine_application/1,      % ?Application
             pengine_property/2,			% ?Pengine, ?Property
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
@@ -586,6 +587,16 @@ pengine_application(Application) :-
 :- multifile
     system:term_expansion/2,
     current_application/1.
+
+%%	current_pengine_application(?Application) is nondet.
+%
+%	True when Application is a currently defined application.
+%
+%	@see pengine_application/1
+
+current_pengine_application(Application) :-
+    current_application(Application).
+
 
 % Default settings for all applications
 
