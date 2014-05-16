@@ -29,3 +29,8 @@ TESTING
 # Merging:
 
  - Base version: 7beedba82a0331891effe94e3fa79561b0ee6eaa
+
+# Prolog
+
+* Pengines consider predicates defines if they have ever been
+  defined by _some_ pengine.
