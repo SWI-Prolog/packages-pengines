@@ -91,7 +91,7 @@ from Prolog or JavaScript.
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
-		       name(atom),
+		       alias(atom),
 		       application(atom),
 		       destroy(boolean),
 		       server(atom),
@@ -160,11 +160,9 @@ do_random_delay :-
       term, its structure will remain undocumented and should not be
       relied on.
 
-    * name(+Name)
+    * alias(+Name)
       The pengine is named Name (an atom). A slave pengine (child) can
-      subsequently be referred to by this name, but only by its master
-      (parent). The atoms =parent= and =self= are reserved names and
-      must not be used here.
+      subsequently be referred to by this name.
 
     * application(+Application)
       Application in which the pengine runs.  See pengine_application/1.
@@ -760,7 +758,7 @@ local_pengine_create(Options) :-
     thread_self(Self),
     option(application(Application), Options, pengine_sandbox),
     create(Self, Child, Options, local, Application),
-    option(name(Name), Options, Child),
+    option(alias(Name), Options, Child),
     assert(child(Name, Child)).
 
 
@@ -830,6 +828,7 @@ pengine_create_option(destroy(_)).
 pengine_create_option(ask(_)).
 pengine_create_option(template(_)).
 pengine_create_option(chunk(_)).
+pengine_create_option(alias(_)).
 
 
 %%	pengine_done is det.
@@ -1120,7 +1119,7 @@ remote_pengine_create(BaseURL, Options) :-
     ->	ID = ID2
     ;	true
     ),
-    option(name(Name), Options, ID),
+    option(alias(Name), Options, ID),
     assert(child(Name, ID)),
     (	functor(Reply, create, _)	% actually created
     ->	option(application(Application), PengineOptions, pengine_sandbox),

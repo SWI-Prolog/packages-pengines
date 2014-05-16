@@ -8,11 +8,11 @@
 
             start :-
                 pengine_create(
-                    [   name(foo),
+                    [   alias(foo),
                         src_text("foo(a). foo(b). foo(c). foo(d).")
                 ]),
                 pengine_create(
-                    [   name(bar),
+                    [   alias(bar),
                         src_text("bar(1). bar(2). bar(3). bar(4).")
                 ]),
                 pengine_event_loop(handler, []).

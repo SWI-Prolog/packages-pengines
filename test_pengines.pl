@@ -103,10 +103,15 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     assertion(no_more_pengines).
 test(alias, Name == pippi) :-
     pengine_create(
-	[ name(pippi),
+	[ alias(pippi),
 	  id(Id)
 	]),
     pengine_property(Id, alias(Name)),
+    assertion(( pengine_property(Id, thread(Thread)),
+		(   thread_property(Thread, alias(ThreadAlias))
+		->  ThreadAlias \== Name
+		;   true
+		))),
     collect(_, fail, Results, []),
     assertion(Results == []),
     assertion(no_more_pengines).
