@@ -44,7 +44,6 @@
             pengine_abort/1,			% +Pengine
 	    pengine_application/1,              % +Application
             pengine_property/2,			% ?Pengine, ?Property
-            pengine_name/2,			% ?Pengine, ?Name
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
             pengine_rpc/3			% +Server, +Goal, +Options
@@ -689,33 +688,28 @@ properties are:
 */
 
 
-pengine_property(Id, self(Id)) :-
+pengine_property(Id, Prop) :-
+    nonvar(Id), nonvar(Prop),
+    pengine_property2(Id, Prop), !.
+pengine_property(Id, Prop) :-
+    pengine_property2(Id, Prop).
+
+pengine_property2(Id, self(Id)) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
-pengine_property(Id, alias(Alias)) :-
+pengine_property2(Id, alias(Alias)) :-
     child(Alias, Id),
-    Alias \== Id,
-    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
-pengine_property(Id, thread(Thread)) :-
+    Alias \== Id.
+pengine_property2(Id, thread(Thread)) :-
     current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0.
-pengine_property(Id, remote(Server)) :-
+pengine_property2(Id, remote(Server)) :-
     current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
-pengine_property(Id, application(Application)) :-
+pengine_property2(Id, application(Application)) :-
     current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
-pengine_property(Id, destroy(Destroy)) :-
+pengine_property2(Id, destroy(Destroy)) :-
     current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
-pengine_property(Id, parent(Parent)) :-
+pengine_property2(Id, parent(Parent)) :-
     current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
-
-/** pengine_name(?Id, ?Name) is nondet.
-
-True when pengine Id is a child pengine with the given Name.  The Name
-of a pengine may be specified as an option to pengine_create/1.
-*/
-
-pengine_name(Id, Name) :-
-   child(Name, Id),
-   Name \== Id.
 
 /** pengine_output(+Term) is det
 

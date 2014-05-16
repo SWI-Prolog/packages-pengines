@@ -101,12 +101,12 @@ test(two, Sorted = [a,b,c,d,e,f]) :-
     collect(X, p(X), Results, []),
     msort(Results, Sorted),
     assertion(no_more_pengines).
-test(name, Name == pippi) :-
+test(alias, Name == pippi) :-
     pengine_create(
 	[ name(pippi),
 	  id(Id)
 	]),
-    pengine_name(Id, Name),
+    pengine_property(Id, alias(Name)),
     collect(_, fail, Results, []),
     assertion(Results == []),
     assertion(no_more_pengines).

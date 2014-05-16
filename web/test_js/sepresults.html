@@ -21,9 +21,9 @@
 	    :- dynamic delay_next/1.
 
             handler(create(ID, _)) :-
-                (   pengine_name(ID, foo)
+                (   pengine_property(ID, alias(foo))
                 ->  pengine_ask(ID, foo(X), [template(X)])
-                ;   pengine_name(ID, bar)
+                ;   pengine_property(ID, alias(bar))
                 ->  pengine_ask(ID, bar(X), [template(X)])
                 ).
             handler(success(ID, Sol, false)) :-
@@ -36,14 +36,14 @@
 			   pengine_next(ID, []))
 		),
                 pengine_output(Sol),
-                (   pengine_name(ID, foo)
-                ->  pengine_name(Bar, bar),
+                (   pengine_property(ID, alias(foo))
+                ->  pengine_property(Bar, alias(bar)),
 		    (   seen_success(Bar)
 		    ->  pengine_next(bar, [])
 		    ;   assertz(delay_next(Bar))
 		    )
-                ;   pengine_name(ID, bar)
-                ->  pengine_name(Foo, foo),
+                ;   pengine_property(ID, alias(bar))
+                ->  pengine_property(Foo, alias(foo)),
 		    (   seen_success(Foo)
 		    ->  pengine_next(foo, [])
 		    ;   assertz(delay_next(Foo))
