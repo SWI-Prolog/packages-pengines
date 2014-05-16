@@ -662,33 +662,50 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 :- pengine_application(pengine_sandbox).
 
 
-/** pengine_property(+NameOrID, ?Property) is nondet.
+/** pengine_property(?Pengine, ?Property) is nondet.
 
 True when Property is a property of   the  given Pengine. Enumerates all
-pengines the live in the calling Prolog process. Defined properties are:
+pengines  that  are  known  to  the   calling  Prolog  process.  Defined
+properties are:
 
-  * parent(Thread)
-    Thread id for the parent (local) pengine.
-  * self(Thread)
-    Thread id of the running pengine.
+  * self(ID)
+    Identifier of the pengine.  This is the same as the first argument,
+    and can be used to enumerate all known pengines.
+  * alias(Name)
+    Name is the alias name of the pengine, as provided through the
+    `alias` option when creating the pengine.
+  * thread(Thread)
+    If the pengine is a local pengine, Thread is the Prolog thread
+    identifier of the pengine.
+  * remote(Server)
+    If the pengine is remote, the URL of the server.
   * application(Application)
     Pengine runs the given application
   * destroy(Destroy)
     Destroy is =true= if the pengines is destroyed automatically
     after completing the query.
+  * parent(Queue)
+    Message queue to which the (local) pengine reports.
 */
 
 
-pengine_property(Id, parent(Parent)) :-
-    current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property(Id, self(Id)) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
+pengine_property(Id, alias(Alias)) :-
+    child(Alias, Id),
+    Alias \== Id,
+    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
+pengine_property(Id, thread(Thread)) :-
+    current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy),
+    Thread \== 0.
 pengine_property(Id, remote(Server)) :-
     current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
 pengine_property(Id, application(Application)) :-
     current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
 pengine_property(Id, destroy(Destroy)) :-
     current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
+pengine_property(Id, parent(Parent)) :-
+    current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 
 /** pengine_name(?Id, ?Name) is nondet.
 
