@@ -149,8 +149,8 @@ do_random_delay :-
 
 :- meta_predicate			% internal meta predicates
 	solve(?, 0, +),
-	pengine_event_loop(+, 1, +),
-	pengine_find_n(+, ?, 0, -).
+	findnsols_no_empty(+, ?, 0, -),
+	pengine_event_loop(+, 1, +).
 
 /**  pengine_create(:Options) is det.
 
@@ -1039,12 +1039,15 @@ ask(ID, Goal, Options) :-
         option(chunk(N), Options, 1),
         (   N == 1
         ->  solve([Template], Goal1, ID)
-        ;   solve(Res, pengine_find_n(N, Template, Goal1, Res), ID)
+        ;   solve(Res, findnsols_no_empty(N, Template, Goal1, Res), ID)
         )
     ;   pengine_reply(error(ID, Error)),
 	guarded_main_loop(ID)
     ).
 
+findnsols_no_empty(N, Template, Goal, List) :-
+	findnsols(N, Template, Goal, List),
+	List \== [].
 
 /** pengine_pull_response(+Pengine, +Options) is det
 
@@ -1912,31 +1915,6 @@ declare_dynamic(Name/Arity, Application) :-
     thread_local(Application:(Name/Arity)).
 declare_dynamic(NoPI, _) :-
     type_error(predicate_indicator, NoPI).
-
-
-/*================= Utilities =======================
-*/
-
-/** pengine_find_n(+N, ?Template, +Goal, ?List) is nondet
-
-Acts as findall/3 but returns only the   first N bindings of Template to
-List, on backtracking another batch of N bindings, and so on.
-*/
-
-pengine_find_n(N, Template, Goal, List) :-
-    copy_term(Template-Goal, TemplateCopy-GoalCopy),
-    Counter = counter(0),
-    (   call(GoalCopy),
-        arg(1, Counter, N1),
-        N2 is N1 + 1,
-        nb_setarg(1, Counter, N2),
-        recordz(sols, TemplateCopy),
-        N2 == N,
-        nb_setarg(1, Counter, 0)
-    ;   true
-    ),
-    findall(Row, (recorded(sols, Row, Ref), erase(Ref)), List),
-    List \= [].
 
 
 		 /*******************************
