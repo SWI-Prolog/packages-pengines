@@ -211,14 +211,41 @@ An error will be returned if the pengine could not be created:
 */
 
 
-pengine_create(QOptions) :-
-    meta_options(is_meta, QOptions, Options),
+pengine_create(M:Options0) :-
+    translate_local_sources(Options0, Options, M),
     (   select_option(server(BaseURL), Options, RestOptions)
     ->  remote_pengine_create(BaseURL, RestOptions)
     ;   local_pengine_create(Options)
     ).
 
-is_meta(src_predicates).
+%%	translate_local_sources(+OptionsIn, -Options) is det.
+%
+%	Translate  the  `src_predicates`  and  `src_list`  options  into
+%	`src_text`. We need to do that   anyway for remote pengines. For
+%	local pengines, we could avoid  this   step,  but  there is very
+%	little point in transferring source to a local pengine anyway as
+%	local pengines can access any  Prolog   predicate  that you make
+%	visible to the application.
+
+translate_local_sources([], [], _).
+translate_local_sources([H0|T0], [H|T], M) :-
+    (   nonvar(H0),
+	translate_local_source(H0, H, M)
+    ->  true
+    ;   H = H0
+    ),
+    translate_local_sources(T0, T, M).
+
+translate_local_source(src_predicates(PIs), src_text(Source), M) :-
+    must_be(list, PIs),
+    with_output_to(string(Source),
+		   maplist(M:listing, PIs)).
+translate_local_source(src_list(Terms), src_text(Source), _) :-
+    must_be(list, Terms),
+    with_output_to(string(Source),
+		   forall(member(Term, Terms),
+			  format('~k .', [Term]))).
+
 
 /**  pengine_send(+NameOrID, +Term) is det
 
@@ -834,9 +861,7 @@ create0(Queue, Child, Options, URL, Application) :-
     ).
 
 pengine_create_option(src_text(_)).
-pengine_create_option(src_list(_)).
 pengine_create_option(src_url(_)).
-pengine_create_option(src_predicates(_)).
 pengine_create_option(application(_)).
 pengine_create_option(destroy(_)).
 pengine_create_option(ask(_)).
@@ -925,8 +950,6 @@ pengine_prepare_source(Module:Application, Options) :-
 	throw(prepare_source_failed)
     ).
 
-process_create_option(Application, src_list(ClauseList)) :- !,
-    pengine_src_list(ClauseList, Application).
 process_create_option(Application, src_text(Text)) :- !,
     pengine_src_text(Text, Application).
 process_create_option(Application, src_url(URL)) :- !,
@@ -1148,8 +1171,7 @@ replace_blobs(Term, Term).
 
 
 remote_pengine_create(BaseURL, Options) :-
-    partition(pengine_create_option, Options, PengineOptions0, RestOptions),
-    translate_local_source(PengineOptions0, PengineOptions),
+    partition(pengine_create_option, Options, PengineOptions, RestOptions),
     options_to_dict(PengineOptions, PostData),
     remote_post_rec(BaseURL, create, PostData, Reply, RestOptions),
     arg(1, Reply, ID),
@@ -1167,13 +1189,6 @@ remote_pengine_create(BaseURL, Options) :-
     ),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
-
-translate_local_source(PengineOptions0, PengineOptions) :-
-    select_option(src_predicates(M:List), PengineOptions0, PengineOptions1), !,
-    with_output_to(string(Text), M:maplist(listing, List)),
-    PengineOptions = [src_text(Text)|PengineOptions1].
-translate_local_source(Options, Options).
-
 
 options_to_dict(Options, Dict) :-
     select_option(ask(Ask), Options, Options1),
@@ -1209,7 +1224,6 @@ prolog_option(Option0, Option) :-
     Option =.. [Name,String].
 prolog_option(Option, Option).
 
-create_option_type(src_list(_),    term).
 create_option_type(ask(_),         term).
 create_option_type(template(_),    term).
 create_option_type(application(_), atom).
@@ -1845,19 +1859,6 @@ ip_pattern([S|T0], [N|T]) :-
 		 *	  COMPILE SOURCE	*
 		 *******************************/
 
-/** pengine_src_list(+ClauseList, +Module) is det
-
-Asserts the list of clauses ClauseList into  the private database of the
-current Pengine. This  predicate  processes   the  `src_list'  option of
-pengine_create/1.
-*/
-
-pengine_src_list(ClauseList, Module) :-
-    maplist(app_expand_and_assert(Module), ClauseList).
-
-app_expand_and_assert(Module, ClauseList) :-
-    expand_and_assert(ClauseList, Module).
-
 /** pengine_src_text(+SrcText, +Module) is det
 
 Asserts the clauses defined in SrcText in   the  private database of the
@@ -1898,47 +1899,6 @@ pengine_src_url(URL, Module) :-
 		     silent(true)
 		   ]),
 	close(Stream)).
-
-expand_and_assert(Term, Application) :-
-    setup_call_cleanup(
-	'$set_source_module'(M, Application),
-	expand_term(Term, ExpandedTerm),
-	'$set_source_module'(_, M)),
-    (   is_list(ExpandedTerm)
-    ->  maplist(assert_local(Application), ExpandedTerm)
-    ;   assert_local(Application, ExpandedTerm)
-    ).
-
-
-assert_local(Application, :-(Head, Body)) :- !,
-    assert(Application:(Head :- Body)).
-assert_local(Application, (:- dynamic(Preds))) :- !,
-    declare_dynamic(Preds, Application).
-assert_local(Application, (:-Body)) :- !,
-    (   safe_goal(Application:Body)
-    ->  call(Application:Body)
-    ;   true
-    ).
-assert_local(Application, Fact) :-
-    assert(Application:Fact).
-
-%%	declare_dynamic(+Spec) is det.
-%
-%	Declare predicates as dynamic. This is   only  allowed without a
-%	module specification. In fact, dynamic predicates are defined as
-%	thread local.
-
-declare_dynamic(Var, _) :-
-    var(Var), !,
-    instantiation_error(Var).
-declare_dynamic((A,B), Application) :- !,
-    declare_dynamic(A, Application),
-    declare_dynamic(B, Application).
-declare_dynamic(Name/Arity, Application) :-
-    atom(Name), integer(Arity), !,
-    dynamic(Application:(Name/Arity)).
-declare_dynamic(NoPI, _) :-
-    type_error(predicate_indicator, NoPI).
 
 
 		 /*******************************
