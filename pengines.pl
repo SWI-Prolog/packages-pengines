@@ -174,13 +174,13 @@ do_random_delay :-
       server located at URL.
 
     * src_list(+List_of_clauses)
-      Inject a list of Prolog clauses in the pengine.
+      Inject a list of Prolog clauses into the pengine.
 
     * src_text(+Atom_or_string)
-      Inject the clauses specified by a source text in the pengine.
+      Inject the clauses specified by a source text into the pengine.
 
     * src_url(+URL)
-      Inject the clauses specified in the file located at URL in the
+      Inject the clauses specified in the file located at URL into the
       pengine.
 
     * src_predicates(+List)
