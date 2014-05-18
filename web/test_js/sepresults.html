@@ -26,7 +26,7 @@
                 ;   pengine_property(ID, alias(bar))
                 ->  pengine_ask(ID, bar(X), [template(X)])
                 ).
-            handler(success(ID, Sol, false)) :-
+            handler(success(_ID, Sol, false)) :-
                 pengine_output(Sol).
             handler(success(ID, Sol, true)) :-
 	        (   seen_success(ID)
