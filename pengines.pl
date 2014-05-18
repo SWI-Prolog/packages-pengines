@@ -1841,59 +1841,63 @@ ip_pattern([S|T0], [N|T]) :-
 	ip_pattern(T0, T).
 
 
-/*================= Built-ins =======================
-*/
+		 /*******************************
+		 *	  COMPILE SOURCE	*
+		 *******************************/
 
+/** pengine_src_list(+ClauseList, +Module) is det
 
-/** pengine_src_list(+ClauseList) is det
-
-Asserts the list of clauses ClauseList   in the private dynamic database
-of  the  current  Pengine.   See   also    the   `src_list'   option  of
+Asserts the list of clauses ClauseList into  the private database of the
+current Pengine. This  predicate  processes   the  `src_list'  option of
 pengine_create/1.
 */
 
-pengine_src_list(ClauseList, Application) :-
-    maplist(app_expand_and_assert(Application), ClauseList).
+pengine_src_list(ClauseList, Module) :-
+    maplist(app_expand_and_assert(Module), ClauseList).
 
-app_expand_and_assert(Application, ClauseList) :-
-    expand_and_assert(ClauseList, Application).
+app_expand_and_assert(Module, ClauseList) :-
+    expand_and_assert(ClauseList, Module).
 
-/** pengine_src_text(+SrcText) is det
+/** pengine_src_text(+SrcText, +Module) is det
 
-Asserts the clauses defined in SrcText   in the private dynamic database
-of  the  current  Pengine.   See   also    the   `src_text'   option  of
+Asserts the clauses defined in SrcText in   the  private database of the
+current Pengine. This  predicate  processes   the  `src_text'  option of
 pengine_create/1.
-
 */
 
-pengine_src_text(Src, Application) :-
+pengine_src_text(Src, Module) :-
+    pengine_self(Self),
+    format(atom(ID), 'pengine://~w/src', [Self]),
     setup_call_cleanup(
 	open_chars_stream(Src, Stream),
-	read_source(Stream, Application),
+	load_files(Module:ID,
+		   [ stream(Stream),
+		     module(Module),
+		     sandboxed(true),
+		     silent(true)
+		   ]),
 	close(Stream)).
 
+/** pengine_src_url(+URL, +Module) is det
 
-/** pengine_src_url(+URL) is det
-
-Asserts the clauses defined in URL in   the  private dynamic database of
-the current Pengine. See also the `src_url' option of pengine_create/1.
+Asserts the clauses defined in  URL  in   the  private  database  of the
+current Pengine. This  predicate  processes   the  `src_url'  option  of
+pengine_create/1.
 */
 
-pengine_src_url(URL, Application) :-
+pengine_src_url(URL, Module) :-
+    pengine_self(Self),
+    uri_encoded(path, URL, Path),
+    format(atom(ID), 'pengine://~w/url/~w', [Self, Path]),
     setup_call_cleanup(
 	http_open(URL, Stream, []),
-	read_source(Stream, Application),
+	load_files(Module:ID,
+		   [ stream(Stream),
+		     module(Module),
+		     sandboxed(true),
+		     silent(true)
+		   ]),
 	close(Stream)).
-
-read_source(Stream, Application) :-
-    read(Stream, Term),
-    read_source(Term, Application, Stream).
-
-read_source(end_of_file, _Application, _Stream) :- !.
-read_source(Term, Application, Stream) :-
-    expand_and_assert(Term, Application),
-    read_source(Stream, Application).
-
 
 expand_and_assert(Term, Application) :-
     setup_call_cleanup(
