@@ -79,6 +79,7 @@ from Prolog or JavaScript.
 :- use_module(library(debug)).
 :- use_module(library(error)).
 :- use_module(library(sandbox)).
+:- use_module(library(modules)).
 :- use_module(library(term_to_json)).
 :- if(exists_source(library(uuid))).
 :- use_module(library(uuid)).
@@ -558,6 +559,8 @@ pengine_remote(Pengine, URL) :-
 get_pengine_application(Pengine, Application) :-
     current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy), !.
 
+get_pengine_module(Pengine, Pengine).
+
 :- if(\+current_predicate(uuid/1)).
 :- use_module(library(random)).
 uuid(Id) :-
@@ -864,27 +867,33 @@ pengine_done :-
 
 :- thread_local wrap_first_answer_in_create_event/2.
 
+:- meta_predicate
+	pengine_prepare_source(:, +).
+
 pengine_main(Parent, Options, Application) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
-    (   catch(maplist(process_create_option(Application), Options), Error,
-	      ( send_error(Error),
-		fail
-	      ))
-    ->  setting(Application:slave_limit, SlaveLimit),
-	CreateEvent = create(Self, [slave_limit(SlaveLimit)|Extra]),
-	(   option(ask(Query), Options)
-        ->  asserta(wrap_first_answer_in_create_event(CreateEvent, Extra)),
-	    option(template(Template), Options, Query),
-	    option(chunk(Chunk), Options, 1),
-	    pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
-	;   Extra = [],
-	    pengine_reply(CreateEvent)
-        ),
-        pengine_main_loop(Self)
-    ;   pengine_terminate(Self)
-    ).
+    catch(in_temporary_module(
+	      Self,
+	      pengine_prepare_source(Application, Options),
+	      pengine_create_and_loop(Self, Application, Options)),
+	  prepare_source_failed,
+	  pengine_terminate(Self)).
+
+pengine_create_and_loop(Self, Application, Options) :-
+    setting(Application:slave_limit, SlaveLimit),
+    CreateEvent = create(Self, [slave_limit(SlaveLimit)|Extra]),
+    (   option(ask(Query), Options)
+    ->  asserta(wrap_first_answer_in_create_event(CreateEvent, Extra)),
+	option(template(Template), Options, Query),
+	option(chunk(Chunk), Options, 1),
+	pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
+    ;   Extra = [],
+	pengine_reply(CreateEvent)
+    ),
+    pengine_main_loop(Self).
+
 
 %%	fix_streams is det.
 %
@@ -900,13 +909,28 @@ fix_stream(Name) :-
 	set_stream(user_output, alias(Name)).
 fix_stream(_).
 
+%%	pengine_prepare_source(:Application, +Options) is det.
+%
+%	Load the source into the pengine's module.
+%
+%	@throws =prepare_source_failed= if it failed to prepare the
+%		sources.
+
+pengine_prepare_source(Module:Application, Options) :-
+    add_import_module(Module, Application, start),
+    catch(maplist(process_create_option(Module), Options), Error, true),
+    (	var(Error)
+    ->	true
+    ;	send_error(Error),
+	throw(prepare_source_failed)
+    ).
 
 process_create_option(Application, src_list(ClauseList)) :- !,
-	pengine_src_list(ClauseList, Application).
+    pengine_src_list(ClauseList, Application).
 process_create_option(Application, src_text(Text)) :- !,
-	pengine_src_text(Text, Application).
+    pengine_src_text(Text, Application).
 process_create_option(Application, src_url(URL)) :- !,
-	pengine_src_url(URL, Application).
+    pengine_src_url(URL, Application).
 process_create_option(_, _).
 
 
@@ -1031,8 +1055,8 @@ more_solutions(Event, ID, Choice) :-
 %	prove the goal. It takes care of the chunk(N) option.
 
 ask(ID, Goal, Options) :-
-    get_pengine_application(ID, Application),
-    expand_goal(Application:Goal, Goal1),
+    get_pengine_module(ID, Module),
+    expand_goal(Module:Goal, Goal1),
     catch(safe_goal(Goal1), Error, true),
     (   var(Error)
     ->  option(template(Template), Options, Goal),
@@ -1883,8 +1907,6 @@ expand_and_assert(Term, Application) :-
 
 
 assert_local(Application, :-(Head, Body)) :- !,
-    functor(Head, F, N),
-    thread_local(Application:(F/N)),
     assert(Application:(Head :- Body)).
 assert_local(Application, (:- dynamic(Preds))) :- !,
     declare_dynamic(Preds, Application).
@@ -1894,8 +1916,6 @@ assert_local(Application, (:-Body)) :- !,
     ;   true
     ).
 assert_local(Application, Fact) :-
-    functor(Fact, F, N),
-    thread_local(Application:(F/N)),
     assert(Application:Fact).
 
 %%	declare_dynamic(+Spec) is det.
@@ -1912,7 +1932,7 @@ declare_dynamic((A,B), Application) :- !,
     declare_dynamic(B, Application).
 declare_dynamic(Name/Arity, Application) :-
     atom(Name), integer(Arity), !,
-    thread_local(Application:(Name/Arity)).
+    dynamic(Application:(Name/Arity)).
 declare_dynamic(NoPI, _) :-
     type_error(predicate_indicator, NoPI).
 
