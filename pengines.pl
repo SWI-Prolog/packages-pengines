@@ -1434,8 +1434,8 @@ pengine_create/1.
 pengine_rpc(URL, Query) :-
     pengine_rpc(URL, Query, []).
 
-pengine_rpc(URL, Query, QOptions) :-
-    meta_options(is_meta, QOptions, Options),
+pengine_rpc(URL, Query, M:Options0) :-
+    translate_local_sources(Options0, Options, M),
     term_variables(Query, Vars),
     Template =.. [v|Vars],
     State = destroy(true),
