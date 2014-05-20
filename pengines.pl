@@ -541,7 +541,7 @@ pengine_destroy(ID, _) :-
 %%	pengine_unregister(+Id) is det.
 
 pengine_register_local(Id, Thread, Queue, URL, Application, Destroy) :-
-    uuid(Id),
+    pengine_uuid(Id),
     asserta(current_pengine(Id, Queue, Thread, URL, Application, Destroy)).
 
 pengine_register_remote(Id, URL, Application, Destroy) :-
@@ -588,9 +588,12 @@ get_pengine_application(Pengine, Application) :-
 
 get_pengine_module(Pengine, Pengine).
 
-:- if(\+current_predicate(uuid/1)).
+:- if(current_predicate(uuid/1)).
+pengine_uuid(Id) :-
+    uuid(Id, [version(4)]).		% Version 4 is random.
+:- else.
 :- use_module(library(random)).
-uuid(Id) :-
+pengine_uuid(Id) :-
     Max is 1<<128,
     random_between(0, Max, Num),
     atom_number(Id, Num).
@@ -827,7 +830,7 @@ create(Queue, Child, Options, URL, Application) :-
 	  create_error(Queue, Child, Error)).
 
 create_error(Queue, Child, Error) :-
-    uuid(Child),
+    pengine_uuid(Child),
     pengine_reply(Queue, error(Child, Error)).
 
 create0(Queue, Child, Options, URL, Application) :-
@@ -1556,7 +1559,7 @@ http_pengine_create(Request) :-
 	setting(Application:time_limit, TimeLimit),
 	wait_and_output_result(Pengine, Queue, Format, TimeLimit)
     ;	Error = existence_error(pengine_application, Application),
-	uuid(ID),
+	pengine_uuid(ID),
         output_result(Format, error(ID, error(Error, _)))
     ).
 
