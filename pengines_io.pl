@@ -29,6 +29,7 @@
 
 :- module(pengines_io,
 	  [ pengine_writeln/1,		% +Term
+	    pengine_nl/0,
 	    pengine_format/1,		% +Format
 	    pengine_format/2,		% +Format, +Args
 
@@ -83,6 +84,14 @@ pengine_writeln(Line) :-
 	;   term_string(Line, String)
 	),
 	send_html(div(class(writeln), String)).
+
+
+%%	pengine_nl
+%
+%	Emit a <br/> to the pengine.
+
+pengine_nl :-
+	send_html(br([])).
 
 
 %%	pengine_write_term(+Term, +Options)
@@ -238,6 +247,7 @@ sandbox:safe_primitive(system:statistics(_,_)).
 		 *******************************/
 
 pengine_io_goal_expansion(writeln(X),	      pengine_writeln(X)).
+pengine_io_goal_expansion(nl,		      pengine_nl).
 pengine_io_goal_expansion(format(Fmt),	      pengine_format(Fmt)).
 pengine_io_goal_expansion(format(Fmt,Args),   pengine_format(Fmt,Args)).
 pengine_io_goal_expansion(read(X),	      pengine_read(X)).
