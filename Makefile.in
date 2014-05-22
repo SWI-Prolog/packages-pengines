@@ -12,7 +12,7 @@ JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
 PHANTOMJS=@PHANTOMJS@
 
-LIBPL=		pengines.pl term_to_json.pl
+LIBPL=		pengines.pl pengines_io.pl term_to_json.pl
 JS=		web/js/pengines.js
 
 all::
