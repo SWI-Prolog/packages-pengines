@@ -1704,19 +1704,35 @@ http_pengine_send(Request) :-
     ;	http_404([], Request)
     ).
 
-fix_bindings(json,
+%%	fix_bindings(+Format, +EventIn, -Event) is det.
+%
+%	Generate the template for json(-s) Format  from the variables in
+%	the asked Goal. Variables starting  with an underscore, followed
+%	by an capital letter are ignored from the template.
+
+fix_bindings(Format,
 	     ask(Goal, Options), _ID, Bindings,
-	     ask(Goal, NewOptions)) :- !,
-    option(template(Template), Options, Bindings),
-    option(chunk(Paging), Options, 1),
-    NewOptions = [template(Template), chunk(Paging)].
-fix_bindings('json-s',
-	     ask(Goal, Options), _ID, Bindings,
-	     ask(Goal, NewOptions)) :- !,
-    option(template(Template), Options, Bindings),
+	     ask(Goal, NewOptions)) :-
+    json_lang(Format), !,
+    template(Bindings, Template, Options),
     option(chunk(Paging), Options, 1),
     NewOptions = [template(Template), chunk(Paging)].
 fix_bindings(_, Command, _, _, Command).
+
+template(_, Template, Options) :-
+    option(template(Template), Options), !.
+template(Bindings, Template, _Options) :-
+    exclude(anon, Bindings, Template).
+
+anon(Name=_) :-
+    sub_atom(Name, 0, _, _, '_'),
+    sub_atom(Name, 1, 1, _, Next),
+    char_type(Next, upper).
+
+%%	http_pengine_pull_response(+Request)
+%
+%	HTTP handler for /pengine/pull_response.  Pulls possible pending
+%	messages from the pengine.
 
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
