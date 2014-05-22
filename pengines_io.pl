@@ -32,11 +32,23 @@
 	    pengine_format/1,		% +Format
 	    pengine_format/2,		% +Format, +Args
 
+	    pengine_write_term/2,	% +Term, +Options
+	    pengine_write/1,		% +Term
+	    pengine_writeq/1,		% +Term
+	    pengine_display/1,		% +Term
+	    pengine_print/1,		% +Term
+	    pengine_write_canonical/1,	% +Term
+
+	    pengine_listing/0,
+	    pengine_listing/1,		% +Spec
+
 	    pengine_read/1,		% -Term
 
 	    pengine_io_goal_expansion/2	% +Goal, -Expanded
 	  ]).
 :- use_module(library(pengines)).
+:- use_module(library(option)).
+:- use_module(library(error)).
 :- use_module(library(http/html_write)).
 :- html_meta send_html(html).
 
@@ -72,6 +84,41 @@ pengine_writeln(Line) :-
 	),
 	send_html(div(class(writeln), String)).
 
+
+%%	pengine_write_term(+Term, +Options)
+%
+%	Writes term as <span class=Class>Term</span>. In addition to the
+%	options of write_term/2, these options are processed:
+%
+%	  - class(+Class)
+%	    Specifies the class of the element.  Default is =write=.
+
+pengine_write_term(Term, Options) :-
+	option(class(Class), Options, write),
+	with_output_to(string(String), write_term(Term, Options)),
+	send_html(span(class(Class), String)).
+
+%%	pengine_write(+Term) is det.
+%%	pengine_writeq(+Term) is det.
+%%	pengine_display(+Term) is det.
+%%	pengine_print(+Term) is det.
+%%	pengine_write_canonical(+Term) is det.
+%
+%	Redirect the corresponding Prolog output predicates.
+
+pengine_write(Term) :-
+	pengine_write_term(Term, []).
+pengine_writeq(Term) :-
+	pengine_write_term(Term, [quoted(true), numbervars(true)]).
+pengine_display(Term) :-
+	pengine_write_term(Term, [quoted(true)]).
+pengine_print(Term) :-
+	current_prolog_flag(print_write_options, Options),
+	pengine_write_term(Term, Options).
+pengine_write_canonical(Term) :-
+	with_output_to(string(String), write_canonical(Term)),
+	send_html(span(class([write, cononical]), String)).
+
 %%	pengine_format(+Format) is det.
 %%	pengine_format(+Format, +Args) is det.
 %
@@ -84,6 +131,31 @@ pengine_format(Format, Args) :-
 	format(string(String), Format, Args),
 	split_string(String, "\n", "", Lines),
 	send_html(\lines(Lines)).
+
+
+		 /*******************************
+		 *	      LISTING		*
+		 *******************************/
+
+%%	pengine_listing
+%%	pengine_listing(+Spec)
+%
+%	List the content of the current pengine or a specified predicate
+%	in the pengine. Does not allow   for listing outside the pengine
+%	module.
+
+pengine_listing :-
+	pengine_listing(_).
+
+pengine_listing(Spec) :-
+	(   nonvar(Spec),
+	    Spec = M:_
+	->  permission_error(listing, module, M)
+	;   true
+	),
+	pengine_self(Module),
+	with_output_to(string(String), listing(Module:Spec)),
+	send_html(pre(class(listing), String)).
 
 
 		 /*******************************
@@ -155,15 +227,26 @@ send_html(HTML) :-
 	sandbox:safe_primitive/1.		% Goal
 
 sandbox:safe_primitive(pengines_io:send_html(_)).
+sandbox:safe_primitive(pengines_io:pengine_listing(_)).
+sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
+sandbox:safe_primitive(system:statistics(_,_)).
 
 
 		 /*******************************
 		 *	   REDEFINITION		*
 		 *******************************/
 
-pengine_io_goal_expansion(writeln(X),  pengine_writeln(X)).
-pengine_io_goal_expansion(format(X),   pengine_format(X)).
-pengine_io_goal_expansion(format(X,Y), pengine_format(X,Y)).
-pengine_io_goal_expansion(read(X),     pengine_read(X)).
+pengine_io_goal_expansion(writeln(X),	      pengine_writeln(X)).
+pengine_io_goal_expansion(format(Fmt),	      pengine_format(Fmt)).
+pengine_io_goal_expansion(format(Fmt,Args),   pengine_format(Fmt,Args)).
+pengine_io_goal_expansion(read(X),	      pengine_read(X)).
+pengine_io_goal_expansion(write_term(X,Opts), pengine_write_term(X,Opts)).
+pengine_io_goal_expansion(write(X),	      pengine_write(X)).
+pengine_io_goal_expansion(writeq(X),	      pengine_writeq(X)).
+pengine_io_goal_expansion(display(X),	      pengine_display(X)).
+pengine_io_goal_expansion(print(X),	      pengine_print(X)).
+pengine_io_goal_expansion(write_canonical(X), pengine_write_canonical(X)).
+pengine_io_goal_expansion(listing,	      pengine_listing).
+pengine_io_goal_expansion(listing(X),	      pengine_listing(X)).
 
