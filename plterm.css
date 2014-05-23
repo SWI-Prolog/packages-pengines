@@ -1,0 +1,19 @@
+/* Prolog term element styles.
+*/
+
+span.pl-ellipsis    {}
+span.pl-var	    {color:#8b0000;font-style:italic;}
+span.pl-atom	    {}
+span.pl-quoted-atom {color:#000080;}
+span.pl-string	    {color:#000080;}
+span.pl-int	    {}
+span.pl-float	    {}
+span.pl-curl	    {}
+span.pl-compound    {}
+span.pl-list	    {}
+span.pl-var-tail    {color:#8b0000;font-style:italic;}
+span.pl-nonvar-tail {color:#800;}
+span.pl-compound    {}
+span.pl-dict	    {}
+span.pl-key	    {font-weight:bold;}
+span.pl-constraint  {color:#008b8b;}
