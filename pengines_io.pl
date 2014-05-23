@@ -51,6 +51,7 @@
 :- use_module(library(option)).
 :- use_module(library(error)).
 :- use_module(library(http/html_write)).
+:- use_module(library(http/term_html)).
 :- html_meta send_html(html).
 
 /** <module> Provide Prolog I/O for HTML clients
@@ -79,11 +80,13 @@ application is prepared for using this module with the following code:
 %	Emit Term as <div class=writeln>Term</div>.
 
 pengine_writeln(Line) :-
-	(   atomic(Line)
-	->  String = Line
-	;   term_string(Line, String)
-	),
-	send_html(div(class(writeln), String)).
+	atomic(Line), !,
+	send_html(div(class(writeln), Line)).
+pengine_writeln(Term) :-
+	send_html(div(class(writeln),
+		      \term(Term,
+			    [ quoted(true)
+			    ]))).
 
 
 %%	pengine_nl
@@ -104,8 +107,7 @@ pengine_nl :-
 
 pengine_write_term(Term, Options) :-
 	option(class(Class), Options, write),
-	with_output_to(string(String), write_term(Term, Options)),
-	send_html(span(class(Class), String)).
+	send_html(span(class(Class), \term(Term,Options))).
 
 %%	pengine_write(+Term) is det.
 %%	pengine_writeq(+Term) is det.
@@ -133,6 +135,8 @@ pengine_write_canonical(Term) :-
 %
 %	As format/1,2. Emits a series  of   strings  with <br/> for each
 %	newline encountered in the string.
+%
+%	@tbd: handle ~w, ~q, etc using term//2.  How can we do that??
 
 pengine_format(Format) :-
 	pengine_format(Format, []).
