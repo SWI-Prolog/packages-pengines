@@ -9,22 +9,30 @@ DOC=pengines
 DOCIMG=penarch.png pltpruncolour.png pltpsynch.png
 include ../Makefile.defs
 JSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/js
+CSSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/css
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
 PHANTOMJS=@PHANTOMJS@
 
 LIBPL=		pengines.pl pengines_io.pl term_to_json.pl
+HTTPPL=		term_html.pl
 JS=		web/js/pengines.js
 
 all::
 		@echo "Nothing to be done for this package"
 
 install:	$(LIBPL) $(JS)
-		mkdir -p $(JSDIR)
+		mkdir -p $(JSDIR) $(CSSDIR)
 		for f in $(LIBPL); do \
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR); \
 		done
+		for f in $(HTTPPL); do \
+		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR)/http; \
+		done
 		for f in $(JS); do \
 		  $(INSTALL_DATA) $$f $(JSDIR); \
+		done
+		for f in $(CSS); do \
+		  $(INSTALL_DATA) $$f $(CSSDIR); \
 		done
 		$(MKINDEX)
 
@@ -51,6 +59,7 @@ uninstall:
 
 check::
 		$(PL) -q -f test_pengines.pl -g test_pengines,halt -t 'halt(1)'
+		$(PL) -q -f test_term_html.pl -g test_term_html,halt -t 'halt(1)'
 ifneq ($(PHANTOMJS),:)
 		$(PL) -q -f test_js.pl -g test_js,halt -t 'halt(1)'
 endif
