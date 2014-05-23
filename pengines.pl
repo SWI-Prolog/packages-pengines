@@ -1789,6 +1789,7 @@ output_result(prolog, Event) :- !,
 output_result(Lang, Event) :-
     json_lang(Lang), !,
     event_term_to_json_data(Event, JSON, Lang),
+    cors_enable,
     reply_json(JSON).
 
 json_lang(json).
