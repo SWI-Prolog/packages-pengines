@@ -16,6 +16,7 @@ PHANTOMJS=@PHANTOMJS@
 LIBPL=		pengines.pl pengines_io.pl term_to_json.pl
 HTTPPL=		term_html.pl
 JS=		web/js/pengines.js
+CSS=		web/css/plterm.css
 
 all::
 		@echo "Nothing to be done for this package"
