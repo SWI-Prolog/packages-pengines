@@ -17,3 +17,5 @@ span.pl-compound    {}
 span.pl-dict	    {}
 span.pl-key	    {font-weight:bold;}
 span.pl-constraint  {color:#008b8b;}
+
+div.writeln	    {color:#000;}
