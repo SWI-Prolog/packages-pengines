@@ -1540,6 +1540,8 @@ pengine_rpc_output(_ID, Term) :-
 
 :- http_handler(root(pengine/'pengines.js'),
 		http_reply_file(library('http/web/js/pengines.js'), []), []).
+:- http_handler(root(pengine/'plterm.css'),
+		http_reply_file(library('http/web/css/plterm.css'), []), []).
 
 
 http_pengine_create(Request) :-
