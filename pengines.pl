@@ -1844,7 +1844,7 @@ swap(N=V, N=A) :- term_to_atom(V, A).
 allowed(Request, Application) :-
 	setting(Application:allow_from, Allow),
 	match_peer(Request, Allow),
-	setting(deny_from, Deny),
+	setting(Application:deny_from, Deny),
 	\+ match_peer(Request, Deny), !.
 allowed(Request, _Application) :-
 	memberchk(request_uri(Here), Request),
