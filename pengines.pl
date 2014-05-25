@@ -1700,19 +1700,23 @@ http_pengine_send(Request) :-
 	    fix_bindings(Format, Event0, ID, Bindings, Event1)
 	  ),
 	  Error,
-	  Event1 = error(ID, Error)),
-    debug(pengine(event), 'HTTP send: ~p', [Event1]),
-    (	pengine_thread(ID, Thread)
-    ->	http_pengine_parent(ID, Queue),
-	get_pengine_application(ID, Application),
-	setting(Application:time_limit, TimeLimit),
-	random_delay,
-	thread_send_message(Thread, pengine_request(Event1)),
-	wait_and_output_result(ID, Queue, Format, TimeLimit)
-    ;	atom(ID)
-    ->	output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
-    ;	http_404([], Request)
+	  true),
+    (	var(Error)
+    ->	debug(pengine(event), 'HTTP send: ~p', [Event1]),
+	(   pengine_thread(ID, Thread)
+	->  http_pengine_parent(ID, Queue),
+	    get_pengine_application(ID, Application),
+	    setting(Application:time_limit, TimeLimit),
+	    random_delay,
+	    thread_send_message(Thread, pengine_request(Event1)),
+	    wait_and_output_result(ID, Queue, Format, TimeLimit)
+	;   atom(ID)
+	->  output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
+	;   http_404([], Request)
+	)
+    ;	output_result(Format, error(ID, Error))
     ).
+
 
 %%	fix_bindings(+Format, +EventIn, -Event) is det.
 %
