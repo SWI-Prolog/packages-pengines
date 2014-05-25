@@ -1821,26 +1821,26 @@ output_result(Lang, _Event) :-			% FIXME: allow for non-JSON format
 event_term_to_json_data(Event, JSON, Lang) :-
     event_to_json(Event, JSON, Lang), !.
 event_term_to_json_data(success(ID, Bindings0, More),
-			json([event=success, id=ID, data=Bindings, more= @(More)]),
+			json{event:success, id:ID, data:Bindings, more:More},
 			json) :- !,
     term_to_json(Bindings0, Bindings).
-event_term_to_json_data(create(ID, Features0),
-			json([event=create,id=ID|Features]), Style) :- !,
+event_term_to_json_data(create(ID, Features0), JSON, Style) :- !,
     (	select(answer(First0), Features0, Features1)
     ->	event_term_to_json_data(First0, First, Style),
 	Features = [answer(First)|Features1]
     ;	Features = Features0
-    ).
+    ),
+    dict_create(JSON, json, [event(create), id(ID)|Features]).
 event_term_to_json_data(destroy(ID, Event),
-			json([event=destroy, id=ID, data=JSON]), Style) :- !,
+			json{event:destroy, id:ID, data:JSON}, Style) :- !,
     event_term_to_json_data(Event, JSON, Style).
 event_term_to_json_data(error(ID, ErrorTerm),
-			json([event=error, id=ID, data=Message]), _) :- !,
+			json{event:error, id:ID, data:Message}, _) :- !,
     message_to_string(ErrorTerm, Message).
-event_term_to_json_data(EventTerm, json([event=F, id=ID]), _) :-
+event_term_to_json_data(EventTerm, json{event:F, id:ID}, _) :-
     functor(EventTerm, F, 1), !,
     arg(1, EventTerm, ID).
-event_term_to_json_data(EventTerm, json([event=F, id=ID, data=JSON]), _) :-
+event_term_to_json_data(EventTerm, json{event:F, id:ID, data:JSON}, _) :-
     functor(EventTerm, F, 2),
     arg(1, EventTerm, ID),
     arg(2, EventTerm, Data),
