@@ -30,7 +30,6 @@ function Pengine(options) {
     if ( typeof Pengine.ids == 'undefined' ) {
         Pengine.ids = [];
     }
-    var goal = options.goal;
     var src = options.src ? options.src : "";
     var format = options.format ? options.format : "json";
     var server = options.server !== undefined ? options.server : "/";
