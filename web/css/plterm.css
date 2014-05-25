@@ -17,5 +17,6 @@ span.pl-compound    {}
 span.pl-dict	    {}
 span.pl-key	    {font-weight:bold;}
 span.pl-constraint  {color:#008b8b;}
+span.pl-comment	    {color: #060; font-style: italic;}
 
 div.writeln	    {color:#000;}
