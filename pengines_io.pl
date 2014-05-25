@@ -233,6 +233,39 @@ send_html(HTML) :-
 
 
 		 /*******************************
+		 *	  OUTPUT FORMAT		*
+		 *******************************/
+
+%%	pengines:event_to_json(+Event, -JSON, +Format) is semidet.
+%
+%	Provide additional translations for  Prolog   terms  to  output.
+%	Defines formats are:
+%
+%	  * 'json-s'
+%	  _Simple_ or _string_ format: Prolog terms are sent using
+%	  quoted write.
+
+:- multifile
+	pengines:event_to_json/3.
+
+pengines:event_to_json(success(ID, Bindings0, More),
+		       json([event=success, id=ID, data=Bindings, more= @(More)]),
+		       'json-s') :- !,
+	maplist(solution_to_json, Bindings0, Bindings).
+pengines:event_to_json(output(ID, Term),
+		       json([event=output, id=ID, data=Data]), 'json-s') :- !,
+	(   atomic(Term)
+	->  Data = Term
+	;   term_string(Term, Data)
+	).
+
+solution_to_json(BindingsIn, json(BindingsOut)) :-
+    maplist(swap, BindingsIn, BindingsOut).
+
+swap(N=V, N=A) :- term_string(V, A).
+
+
+		 /*******************************
 		 *	    SANDBOXING		*
 		 *******************************/
 

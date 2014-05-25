@@ -91,6 +91,9 @@ from Prolog or JavaScript.
 	pengine_rpc(+, +, :),
 	pengine_event_loop(1, +).
 
+:- multifile
+	event_to_json/3.
+
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
 		       alias(atom),
@@ -104,7 +107,7 @@ from Prolog or JavaScript.
 		       src_text(any),		% text
 		       src_url(atom),
 		       src_predicates(list),
-		       format(oneof([prolog,json,'json-s']))
+		       format(atom)
 		     ]).
 :- predicate_options(pengine_ask/3, 3,
 		     [ template(any),
@@ -188,8 +191,10 @@ do_random_delay :-
       List is a list of predicate indicators.
 
     * format(+Format)
-      Determines the format of event responses. Format is an atom,
-      either =prolog= (default), =json=, or =json-s=.
+      Determines the format of event responses. Format is an atom.
+      The default format is =prolog=.  In addition, =json= is supported
+      and new formats can be added by defining event_to_json/3.  See
+      library(pengines_io).
 
 Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
 non-local pengines) and thread_create/3. Note   that for thread_create/3
@@ -1548,7 +1553,7 @@ http_pengine_create(Request) :-
     http_read_json_dict(Request, Dict),
     (	get_dict(format, Dict, FormatString)
     ->	atom_string(Format, FormatString),
-	must_be(oneof([prolog,json,'json-s']), Format)
+	valid_format(Format)
     ;	Format = prolog
     ),
     dict_to_options(Dict, CreateOptions),
@@ -1731,6 +1736,20 @@ anon(Name=_) :-
     sub_atom(Name, 1, 1, _, Next),
     char_type(Next, upper).
 
+%%	json_lang(+Format) is semidet.
+%
+%	True if Format is a JSON variation.
+
+json_lang(json) :- !.
+json_lang(Format) :-
+    sub_atom(Format, 0, _, _, 'json-').
+
+valid_format(prolog) :- !.
+valid_format(Format) :-
+	json_lang(Format), !.
+valid_format(Format) :-
+	domain_error(pengine_format, Format).
+
 %%	http_pengine_pull_response(+Request)
 %
 %	HTTP handler for /pengine/pull_response.  Pulls possible pending
@@ -1788,21 +1807,20 @@ output_result(prolog, Event) :- !,
 	       ]).
 output_result(Lang, Event) :-
     json_lang(Lang), !,
-    event_term_to_json_data(Event, JSON, Lang),
-    cors_enable,
-    reply_json(JSON).
+    (	event_term_to_json_data(Event, JSON, Lang)
+    ->	cors_enable,
+	reply_json(JSON)
+    ;	assertion(event_term_to_json_data(Event, _, Lang))
+    ).
+output_result(Lang, _Event) :-			% FIXME: allow for non-JSON format
+    domain_error(pengine_format, Lang).
 
-json_lang(json).
-json_lang('json-s').
-
+event_term_to_json_data(Event, JSON, Lang) :-
+    event_to_json(Event, JSON, Lang), !.
 event_term_to_json_data(success(ID, Bindings0, More),
 			json([event=success, id=ID, data=Bindings, more= @(More)]),
 			json) :- !,
     term_to_json(Bindings0, Bindings).
-event_term_to_json_data(success(ID, Bindings0, More),
-			json([event=success, id=ID, data=Bindings, more= @(More)]),
-			'json-s') :- !,
-    maplist(solution_to_json, Bindings0, Bindings).
 event_term_to_json_data(create(ID, Features0),
 			json([event=create,id=ID|Features]), Style) :- !,
     (	select(answer(First0), Features0, Features1)
@@ -1816,12 +1834,6 @@ event_term_to_json_data(destroy(ID, Event),
 event_term_to_json_data(error(ID, ErrorTerm),
 			json([event=error, id=ID, data=Message]), _) :- !,
     message_to_string(ErrorTerm, Message).
-event_term_to_json_data(output(ID, Term),
-			json([event=output, id=ID, data=Data]), 'json-s') :- !,
-    (	atomic(Term)
-    ->	Data = Term
-    ;	term_string(Term, Data)
-    ).
 event_term_to_json_data(EventTerm, json([event=F, id=ID]), _) :-
     functor(EventTerm, F, 1), !,
     arg(1, EventTerm, ID).
@@ -1831,10 +1843,21 @@ event_term_to_json_data(EventTerm, json([event=F, id=ID, data=JSON]), _) :-
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
 
-solution_to_json(BindingsIn, json(BindingsOut)) :-
-    maplist(swap, BindingsIn, BindingsOut).
+%%	event_to_json(+Event, -JSONTerm, +Lang) is semidet.
+%
+%	Hook that translates a Prlog Pengine event structure into a term
+%	suitable   for   reply_json/1,   according   to   the   language
+%	specification Lang. This can be used   to massage general Prolog
+%	terms, notably assosiated with   `success(ID,  Bindings0, More)`
+%	and `output(ID, Term)` into a format  suitable for processing at
+%	the client side.
 
-swap(N=V, N=A) :- term_to_atom(V, A).
+%:- multifile pengines:event_to_json/3.
+
+
+		 /*******************************
+		 *	  ACCESS CONTROL	*
+		 *******************************/
 
 %%	allowed(+Request, +Application) is det.
 %
