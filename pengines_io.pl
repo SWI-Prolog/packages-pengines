@@ -49,6 +49,9 @@
 	  ]).
 :- use_module(library(pengines)).
 :- use_module(library(option)).
+:- use_module(library(debug)).
+:- use_module(library(apply)).
+:- use_module(library(settings)).
 :- use_module(library(error)).
 :- use_module(library(http/html_write)).
 :- use_module(library(http/term_html)).
@@ -69,6 +72,9 @@ application is prepared for using this module with the following code:
 	pengine_io_goal_expansion(In, Out).
   ==
 */
+
+:- setting(write_options, list(any), [max_depth(1000)],
+	   'Additional options for stringifying Prolog results').
 
 
 		 /*******************************
@@ -244,25 +250,94 @@ send_html(HTML) :-
 %	  * 'json-s'
 %	  _Simple_ or _string_ format: Prolog terms are sent using
 %	  quoted write.
+%	  * 'json-html'
+%	  Serialize responses as HTML string.  This is intended for
+%	  applications that emulate the Prolog toplevel.  This format
+%	  carries the following data:
+%
+%	    - data
+%	      List if answers, where each answer is an object with
+%	      - variables
+%	        Array of objects, each describing a variable.  These
+%	        objects contain these fields:
+%	        - variables: Array of strings holding variable names
+%	        - value: HTML-ified value of the variables
+%	        - substitutions: Array of objects for substitutions
+%	          that break cycles holding:
+%		  - var: Name of the inserted variable
+%		  - value: HTML-ified value
+%	      - residuals
+%	        Array of strings representing HTML-ified residual goals.
 
 :- multifile
-	pengines:event_to_json/3.
+	pengine:event_to_json/3.
 
-pengines:event_to_json(success(ID, Bindings0, More),
-		       json([event=success, id=ID, data=Bindings, more= @(More)]),
+/* JSON-S */
+
+pengine:event_to_json(success(ID, Bindings0, More),
+		      json([event=success, id=ID, data=Bindings, more= @(More)]),
 		       'json-s') :- !,
 	maplist(solution_to_json, Bindings0, Bindings).
-pengines:event_to_json(output(ID, Term),
-		       json([event=output, id=ID, data=Data]), 'json-s') :- !,
+pengine:event_to_json(output(ID, Term),
+		      json([event=output, id=ID, data=Data]), 'json-s') :- !,
 	(   atomic(Term)
 	->  Data = Term
 	;   term_string(Term, Data)
 	).
 
 solution_to_json(BindingsIn, json(BindingsOut)) :-
-    maplist(swap, BindingsIn, BindingsOut).
+    maplist(term_string_value, BindingsIn, BindingsOut).
 
-swap(N=V, N=A) :- term_string(V, A).
+term_string_value(N=V, N=A) :- term_string(V, A).
+
+/* JSON-HTML */
+
+pengine:event_to_json(success(ID, Answers0, More),
+		      json{event:success,
+			   id:ID,
+			   data:Answers,
+			   more:More
+			  },
+		      'json-html') :- !,
+	maplist(map_answer, Answers0, Answers).
+pengine:event_to_json(output(ID, Term),
+		      json{event:output, id:ID, data:Data}, 'json-html') :- !,
+	(   atomic(Term)
+	->  Data = Term
+	;   term_html_string(Term, Data)
+	).
+
+map_answer(Bindings0, Answer) :-
+	prolog:translate_bindings(Bindings0, Bindings1, Residuals),
+	maplist(binding_to_html, Bindings1, VarBindings),
+	(   Residuals == []
+	->  Answer = json{variables:VarBindings}
+	;   maplist(term_html_string, Residuals, ResHTML),
+	    Answer = json{variables:VarBindings, residuals:ResHTML}
+	).
+
+
+binding_to_html(binding(Vars,Term,Substitutions), JSON) :-
+	JSON0 = json{variables:Vars, value:HTMLString},
+	term_html_string(Term, HTMLString),
+	(   Substitutions == []
+	->  JSON = JSON0
+	;   maplist(subst_to_html, Substitutions, HTMLSubst),
+	    JSON = JSON0.put(substitutions, HTMLSubst)
+	).
+
+term_html_string(Term, HTMLString) :-
+	setting(write_options, Options),
+	phrase(term(Term, [ quoted(true),
+			    numbervars(true)
+			  | Options
+			  ]), Tokens),
+	with_output_to(string(HTMLString), print_html(Tokens)).
+
+subst_to_html('$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
+	term_html_string(Value, HTMLString).
+subst_to_html(Term, _) :-
+	assertion(Term = '$VAR'(_)).
 
 
 		 /*******************************

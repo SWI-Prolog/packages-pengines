@@ -1365,6 +1365,9 @@ pengine_event_loop(Closure, Options) :-
     pengine_event_loop(Event, Closure, Options).
 pengine_event_loop(_, _).
 
+:- meta_predicate
+    pengine_process_event(+, 1, -, +).
+
 pengine_event_loop(Event, Closure, Options) :-
     pengine_process_event(Event, Closure, Continue, Options),
     (	Continue == true
