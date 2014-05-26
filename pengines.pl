@@ -728,6 +728,8 @@ properties are:
     If the pengine is remote, the URL of the server.
   * application(Application)
     Pengine runs the given application
+  * module(Module)
+    Temporary module used for running the Pengine.
   * destroy(Destroy)
     Destroy is =true= if the pengines is destroyed automatically
     after completing the query.
@@ -743,6 +745,8 @@ pengine_property(Id, Prop) :-
     pengine_property2(Id, Prop).
 
 pengine_property2(Id, self(Id)) :-
+    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
+pengine_property2(Id, module(Id)) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(Id, alias(Alias)) :-
     child(Alias, Id),
