@@ -89,9 +89,11 @@ pengine_writeln(Line) :-
 	atomic(Line), !,
 	send_html(div(class(writeln), Line)).
 pengine_writeln(Term) :-
+	pengine_module(Module),
 	send_html(div(class(writeln),
 		      \term(Term,
-			    [ quoted(true)
+			    [ quoted(true),
+			      module(Module)
 			    ]))).
 
 
@@ -113,7 +115,8 @@ pengine_nl :-
 
 pengine_write_term(Term, Options) :-
 	option(class(Class), Options, write),
-	send_html(span(class(Class), \term(Term,Options))).
+	pengine_module(Module),
+	send_html(span(class(Class), \term(Term,[module(Module)|Options]))).
 
 %%	pengine_write(+Term) is det.
 %%	pengine_writeq(+Term) is det.
@@ -238,6 +241,15 @@ send_html(HTML) :-
 	pengine_output(HTMlString).
 
 
+%%	pengine_module(-Module) is det.
+%
+%	Module (used for resolving operators).
+
+pengine_module(Module) :-
+	pengine_self(Pengine), !,
+	pengine_property(Pengine, module(Module)).
+pengine_module(user).
+
 		 /*******************************
 		 *	  OUTPUT FORMAT		*
 		 *******************************/
@@ -277,7 +289,7 @@ send_html(HTML) :-
 pengine:event_to_json(success(ID, Bindings0, More),
 		      json([event=success, id=ID, data=Bindings, more= @(More)]),
 		       'json-s') :- !,
-	maplist(solution_to_json, Bindings0, Bindings).
+	maplist(solution_to_json(ID), Bindings0, Bindings).
 pengine:event_to_json(output(ID, Term),
 		      json([event=output, id=ID, data=Data]), 'json-s') :- !,
 	(   atomic(Term)
@@ -285,10 +297,15 @@ pengine:event_to_json(output(ID, Term),
 	;   term_string(Term, Data)
 	).
 
-solution_to_json(BindingsIn, json(BindingsOut)) :-
-    maplist(term_string_value, BindingsIn, BindingsOut).
+solution_to_json(Pengine, BindingsIn, json(BindingsOut)) :-
+    maplist(term_string_value(Pengine), BindingsIn, BindingsOut).
 
-term_string_value(N=V, N=A) :- term_string(V, A).
+term_string_value(Pengine, N=V, N=A) :-
+	with_output_to(string(A),
+		       write_term(V,
+				  [ module(Pengine),
+				    quoted(true)
+				  ])).
 
 /* JSON-HTML */
 
@@ -299,44 +316,46 @@ pengine:event_to_json(success(ID, Answers0, More),
 			   more:More
 			  },
 		      'json-html') :- !,
-	maplist(map_answer, Answers0, Answers).
+	maplist(map_answer(ID), Answers0, Answers).
 pengine:event_to_json(output(ID, Term),
 		      json{event:output, id:ID, data:Data}, 'json-html') :- !,
 	(   atomic(Term)
 	->  Data = Term
-	;   term_html_string(Term, Data)
+	;   term_html_string(ID, Term, Data)
 	).
 
-map_answer(Bindings0, Answer) :-
+map_answer(ID, Bindings0, Answer) :-
 	prolog:translate_bindings(Bindings0, Bindings1, Residuals),
-	maplist(binding_to_html, Bindings1, VarBindings),
+	maplist(binding_to_html(ID), Bindings1, VarBindings),
 	(   Residuals == []
 	->  Answer = json{variables:VarBindings}
-	;   maplist(term_html_string, Residuals, ResHTML),
+	;   maplist(term_html_string(ID), Residuals, ResHTML),
 	    Answer = json{variables:VarBindings, residuals:ResHTML}
 	).
 
 
-binding_to_html(binding(Vars,Term,Substitutions), JSON) :-
+binding_to_html(ID, binding(Vars,Term,Substitutions), JSON) :-
 	JSON0 = json{variables:Vars, value:HTMLString},
-	term_html_string(Term, HTMLString),
+	term_html_string(ID, Term, HTMLString),
 	(   Substitutions == []
 	->  JSON = JSON0
-	;   maplist(subst_to_html, Substitutions, HTMLSubst),
+	;   maplist(subst_to_html(ID), Substitutions, HTMLSubst),
 	    JSON = JSON0.put(substitutions, HTMLSubst)
 	).
 
-term_html_string(Term, HTMLString) :-
+term_html_string(Pengine, Term, HTMLString) :-
 	setting(write_options, Options),
+%	pengine_property(Pengine, module(Module)),
 	phrase(term(Term, [ quoted(true),
-			    numbervars(true)
+			    numbervars(true),
+			    module(Pengine)
 			  | Options
 			  ]), Tokens),
 	with_output_to(string(HTMLString), print_html(Tokens)).
 
-subst_to_html('$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
-	term_html_string(Value, HTMLString).
-subst_to_html(Term, _) :-
+subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
+	term_html_string(ID, Value, HTMLString).
+subst_to_html(_, Term, _) :-
 	assertion(Term = '$VAR'(_)).
 
 
