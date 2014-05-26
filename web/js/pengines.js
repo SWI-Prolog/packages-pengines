@@ -60,7 +60,8 @@ function Pengine(options) {
         if (obj.event === 'create') {
 	    Pengine.ids.push(obj.id);
             if (Pengine.ids.length > obj.slave_limit) {
-		alert("Attempt to use too many slave pengines. The limit is :" + obj.slave_limit);
+		alert("Attempt to use too many slave pengines. "+
+		      "The limit is :" + obj.slave_limit);
 		Pengine.destroy();
 	    } else {
 	        that.id = obj.id;
@@ -80,13 +81,13 @@ function Pengine(options) {
 	        console.error(obj.data);
         } else if (obj.event === 'output') {
             if (options.onoutput) options.onoutput.call(obj);
-            that.pull_response();
+            that.pull_response(obj.id);
         } else if (obj.event === 'debug') {
             if (options.ondebug)
 	        options.ondebug.call(obj);
 	    else if (typeof(console) !== 'undefined')
 		console.log(obj.data);
-            that.pull_response();
+            that.pull_response(obj.id);
         } else if (obj.event === 'prompt') {
             if (options.onprompt) options.onprompt.call(obj);
         } else if (obj.event === 'abort') {
@@ -117,8 +118,9 @@ function Pengine(options) {
     this.respond = function(input) {
         send('input((' + input + '))');
     }
-    this.pull_response = function() {
-        $.get(server + 'pengine/pull_response?id=' + that.id +
+    this.pull_response = function(id) {
+	if ( typeof id === 'undefined' ) id = that.id;
+        $.get(server + 'pengine/pull_response?id=' + id +
 	      '&format=' + format, process_response);
     }
     this.abort = function() {

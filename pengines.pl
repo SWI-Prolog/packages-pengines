@@ -533,9 +533,11 @@ pengine_destroy(ID, _) :-
 
 :- dynamic
 	current_pengine/6,		% Id, ParentId, Thread, URL, App, Destroy
+	pengine_queue/4,		% Pengine, Queue, TimeOut, Time
 	output_queue/3.			% Id, Queue, Time
 :- volatile
 	current_pengine/6,
+	pengine_queue/4,
 	output_queue/3.
 
 :- thread_local
@@ -829,7 +831,10 @@ thread_pool:create_pool(Application) :-
 %	@arg URL is one of =local= or =http=
 
 create(Queue, Child, Options, URL, Application) :-
-    pengine_uuid(Child),
+    (	nonvar(Child)
+    ->	true
+    ;	pengine_uuid(Child)
+    ),
     catch(create0(Queue, Child, Options, URL, Application),
 	  Error,
 	  create_error(Queue, Child, Error)).
@@ -1562,10 +1567,12 @@ http_pengine_create(Request) :-
     option(application(Application), CreateOptions, pengine_sandbox),
     (	current_application(Application)
     ->  allowed(Request, Application),
-	message_queue_create(From, [max_size(25)]),
-	create(From, Pengine, CreateOptions, http, Application),
-	http_pengine_parent(Pengine, Queue),
+	pengine_uuid(Pengine),
+	message_queue_create(Queue, [max_size(25)]),
 	setting(Application:time_limit, TimeLimit),
+	get_time(Now),
+	asserta(pengine_queue(Pengine, Queue, TimeLimit, Now)),
+	create(Queue, Pengine, CreateOptions, http, Application),
 	wait_and_output_result(Pengine, Queue, Format, TimeLimit)
     ;	Error = existence_error(pengine_application, Application),
 	pengine_uuid(ID),
@@ -1686,7 +1693,8 @@ sync_delay_destroy_queue(ID, Queue) :-
     ->  true
     ;   get_time(Now),
 	asserta(output_queue(ID, Queue, Now))
-    ).
+    ),
+    retractall(pengine_queue(ID, Queue, _, _)).
 
 
 http_pengine_send(Request) :-
@@ -1703,9 +1711,7 @@ http_pengine_send(Request) :-
     (	var(Error)
     ->	debug(pengine(event), 'HTTP send: ~p', [Event1]),
 	(   pengine_thread(ID, Thread)
-	->  http_pengine_parent(ID, Queue),
-	    get_pengine_application(ID, Application),
-	    setting(Application:time_limit, TimeLimit),
+	->  pengine_queue(ID, Queue, TimeLimit, _),
 	    random_delay,
 	    thread_send_message(Thread, pengine_request(Event1)),
 	    wait_and_output_result(ID, Queue, Format, TimeLimit)
@@ -1766,9 +1772,8 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    (	(   http_pengine_parent(ID, Queue)
-	->  get_pengine_application(ID, Application),
-	    setting(Application:time_limit, TimeLimit)
+    (	(   pengine_queue(ID, Queue, TimeLimit, _)
+	->  true
 	;   output_queue(ID, Queue, _),
 	    TimeLimit = 0
 	)
@@ -1781,10 +1786,9 @@ http_pengine_abort(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
-    (	http_pengine_parent(ID, Queue)
-    ->	get_pengine_application(ID, Application),
-	setting(Application:time_limit, TimeLimit),
-        pengine_abort(ID),
+    (	pengine_thread(ID, _Thread),
+	pengine_queue(ID, Queue, TimeLimit, _)
+    ->	pengine_abort(ID),
 	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
