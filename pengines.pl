@@ -1704,10 +1704,14 @@ sync_delay_destroy_queue(ID, Queue) :-
 http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
-		      event(EventAtom, []),
+		      event(EventString, []),
 		      format(Format, [default(prolog)])
 		    ]),
-    catch(( atom_to_term(EventAtom, Event0, Bindings),
+    get_pengine_module(ID, Module), !,
+    catch(( term_string(Event0, EventString,
+			[ variable_names(Bindings),
+			  module(Module)
+			]),
 	    fix_bindings(Format, Event0, ID, Bindings, Event1)
 	  ),
 	  Error,
