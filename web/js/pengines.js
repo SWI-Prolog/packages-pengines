@@ -33,6 +33,7 @@ function Pengine(options) {
     var src = options.src ? options.src : "";
     var format = options.format ? options.format : "json";
     var server = options.server !== undefined ? options.server : "/";
+    this.options = options;
     this.id = null;
     var that = this;
     // Private functions
