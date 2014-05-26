@@ -1640,7 +1640,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
 %	or if it is in normal mode and   the  event is the final destroy
 %	event.
 %
-%	@tbd	If the client does not request all output, the queue will
+%	@tbd	If the client did not request all output, the queue will
 %		not be destroyed.  We need some timeout and GC for that.
 
 destroy_queue(ID, _, Queue) :-
