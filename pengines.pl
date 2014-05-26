@@ -541,12 +541,11 @@ pengine_destroy(ID, _) :-
 :- thread_local
 	child/2.			% ?Name, ?Child
 
-%%	pengine_register_local(-Id, +Thread, +Queue, +URL, +App, +Destroy) is det.
+%%	pengine_register_local(+Id, +Thread, +Queue, +URL, +App, +Destroy) is det.
 %%	pengine_register_remote(+Id, +URL, +Queue, +App, +Destroy) is det.
 %%	pengine_unregister(+Id) is det.
 
 pengine_register_local(Id, Thread, Queue, URL, Application, Destroy) :-
-    pengine_uuid(Id),
     asserta(current_pengine(Id, Queue, Thread, URL, Application, Destroy)).
 
 pengine_register_remote(Id, URL, Application, Destroy) :-
@@ -830,12 +829,12 @@ thread_pool:create_pool(Application) :-
 %	@arg URL is one of =local= or =http=
 
 create(Queue, Child, Options, URL, Application) :-
+    pengine_uuid(Child),
     catch(create0(Queue, Child, Options, URL, Application),
 	  Error,
 	  create_error(Queue, Child, Error)).
 
 create_error(Queue, Child, Error) :-
-    pengine_uuid(Child),
     pengine_reply(Queue, error(Child, Error)).
 
 create0(Queue, Child, Options, URL, Application) :-
