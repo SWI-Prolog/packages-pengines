@@ -105,14 +105,14 @@ compound({X}, Options) --> !,
 	html(span(class('pl-curl'), [ '{', \any(X, ArgOptions), '}' ])).
 compound(OpTerm, Options) -->
 	{ compound_name_arity(OpTerm, Name, 1),
-	  op1(Name, Type, Pri, ArgPri),
+	  op1(Name, Type, Pri, ArgPri, Options),
 	  \+ Options.get(ignore_ops) == true,
 	  arg_options(Options, ArgOptions)
 	}, !,
 	op1(Type, Pri, OpTerm, ArgPri, ArgOptions).
 compound(OpTerm, Options) -->
 	{ compound_name_arity(OpTerm, Name, 2),
-	  op2(Name, LeftPri, Pri, RightPri),
+	  op2(Name, LeftPri, Pri, RightPri, Options),
 	  \+ Options.get(ignore_ops) == true,
 	  arg_options(Options, ArgOptions)
 	}, !,
@@ -189,12 +189,13 @@ tail(Value, Options) -->
 	},
 	html(span(class(Class), \any(Value, Options))).
 
-%%	op1(+Name, -Type, -Priority, -ArgPriority) is semidet.
+%%	op1(+Name, -Type, -Priority, -ArgPriority, +Options) is semidet.
 %
 %	True if Name is an operator taking one argument of Type.
 
-op1(Name, Type, Pri, ArgPri) :-
-	current_op(Pri, OpType, Name),
+op1(Name, Type, Pri, ArgPri, Options) :-
+	operator_module(Module, Options),
+	current_op(Pri, OpType, Module:Name),
 	argpri(OpType, Type, Pri, ArgPri), !.
 
 argpri(fx, prefix,  Pri0, Pri) :- Pri is Pri0 - 1.
@@ -202,17 +203,27 @@ argpri(fy, prefix,  Pri,  Pri).
 argpri(xf, postfix, Pri0, Pri) :- Pri is Pri0 - 1.
 argpri(yf, postfix, Pri,  Pri).
 
-%%	op2(+Name, -LeftPri, -Pri, -RightPri) is semidet.
+%%	op2(+Name, -LeftPri, -Pri, -RightPri, +Options) is semidet.
 %
 %	True if Name is an operator taking two arguments of Type.
 
-op2(Name, LeftPri, Pri, RightPri) :-
-	current_op(Pri, Type, Name),
+op2(Name, LeftPri, Pri, RightPri, Options) :-
+	operator_module(Module, Options),
+	current_op(Pri, Type, Module:Name),
 	infix_argpri(Type, LeftPri, Pri, RightPri), !.
 
 infix_argpri(xfx, ArgPri, Pri, ArgPri) :- ArgPri is Pri - 1.
 infix_argpri(yfx, Pri, Pri, ArgPri) :- ArgPri is Pri - 1.
 infix_argpri(xfy, ArgPri, Pri, Pri) :- ArgPri is Pri - 1.
+
+%%	operator_module(-Module, +Options) is det.
+%
+%	Find the module for evaluating operators.
+
+operator_module(Module, Options) :-
+	Module = Options.get(module), !.
+operator_module(TypeIn, _) :-
+	'$module'(TypeIn, TypeIn).
 
 %%	op1(+Type, +Pri, +Term, +ArgPri, +Options)// is det.
 
@@ -331,7 +342,7 @@ end_code_type(List, Type, _) :-
 	Type = punct.
 end_code_type(OpTerm, Type, Options) :-
 	compound_name_arity(OpTerm, Name, 1),
-	op1(Name, Type, Pri, ArgPri),
+	op1(Name, Type, Pri, ArgPri, Options),
 	\+ Options.get(ignore_ops) == true, !,
 	(   Pri	> Options.priority
 	->  Type = punct
@@ -344,7 +355,7 @@ end_code_type(OpTerm, Type, Options) :-
 	).
 end_code_type(OpTerm, Type, Options) :-
 	compound_name_arity(OpTerm, Name, 2),
-	op2(Name, LeftPri, Pri, _RightPri),
+	op2(Name, LeftPri, Pri, _RightPri, Options),
 	\+ Options.get(ignore_ops) == true, !,
 	(   Pri	> Options.priority
 	->  Type = punct
