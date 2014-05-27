@@ -92,7 +92,8 @@ from Prolog or JavaScript.
 	pengine_event_loop(1, +).
 
 :- multifile
-	event_to_json/3.
+	event_to_json/3,		% +Event, -JSON, +Format
+	prepare_module/3.		% +Module, +Application, +Options
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
@@ -959,6 +960,7 @@ fix_stream(_).
 
 pengine_prepare_source(Module:Application, Options) :-
     add_import_module(Module, Application, start),
+    ignore(prepare_module(Module, Application, Options)),
     catch(maplist(process_create_option(Module), Options), Error, true),
     (	var(Error)
     ->	true
@@ -971,6 +973,26 @@ process_create_option(Application, src_text(Text)) :- !,
 process_create_option(Application, src_url(URL)) :- !,
     pengine_src_url(URL, Application).
 process_create_option(_, _).
+
+
+%%	prepare_module(+Module, +Application, +Options) is semidet.
+%
+%	Hook, called to initialize  the   temporary  private module that
+%	provides the working context of a pengine. This hook is executed
+%	by the pengine's thread.  Preparing the source consists of three
+%	steps:
+%
+%	  1. Add Application as (first) default import module for Module
+%	  2. Call this hook
+%	  3. Compile the source provided by the the `src_text` and
+%	     `src_url` options
+%
+%	@arg	Module is a new temporary module (see
+%		in_temporary_module/3) that may be (further) prepared
+%		by this hook.
+%	@arg1	Application (also a module) associated to the pengine.
+%	@arg1	Options is passed from the environment and should
+%		(currently) be ignored.
 
 
 pengine_main_loop(ID) :-
