@@ -45,6 +45,7 @@
 
 	    pengine_read/1,		% -Term
 
+	    pengine_bind_io_to_html/1,	% +Module
 	    pengine_io_goal_expansion/2	% +Goal, -Expanded
 	  ]).
 :- use_module(library(pengines)).
@@ -60,10 +61,27 @@
 /** <module> Provide Prolog I/O for HTML clients
 
 This module redefines some of  the   standard  Prolog  I/O predicates to
-behave transparently for HTML  clients.  This   works  by  rewriting the
-corresponding goals using goal_expansion/2 and use the new definition to
-re-route  I/O  via  pengine_input/2  and   pengine_output/1.  A  pengine
-application is prepared for using this module with the following code:
+behave transparently for HTML clients. It  provides two ways to redefine
+the standard predicates: using goal_expansion/2   and  by redefining the
+system predicates using redefine_system_predicate/1. The   latter is the
+preferred route because it gives a more   predictable  trace to the user
+and works regardless of the use of other expansion and meta-calling.
+
+*Redefining* works by redefining the system predicates in the context of
+the pengine's module. This  is  configured   using  the  following  code
+snippet.
+
+  ==
+  :- pengine_application(myapp).
+  :- use_module(myapp:library(pengines_io)).
+  pengines:prepare_module(Module, myapp, _Options) :-
+	pengines_io:pengine_bind_io_to_html(Module).
+  ==
+
+*Using goal_expansion/2* works by  rewriting   the  corresponding  goals
+using goal_expansion/2 and use the new   definition  to re-route I/O via
+pengine_input/2 and pengine_output/1. A pengine  application is prepared
+for using this module with the following code:
 
   ==
   :- pengine_application(myapp).
@@ -377,17 +395,46 @@ sandbox:safe_primitive(system:statistics(_,_)).
 		 *	   REDEFINITION		*
 		 *******************************/
 
-pengine_io_goal_expansion(writeln(X),	      pengine_writeln(X)).
-pengine_io_goal_expansion(nl,		      pengine_nl).
-pengine_io_goal_expansion(format(Fmt),	      pengine_format(Fmt)).
-pengine_io_goal_expansion(format(Fmt,Args),   pengine_format(Fmt,Args)).
-pengine_io_goal_expansion(read(X),	      pengine_read(X)).
-pengine_io_goal_expansion(write_term(X,Opts), pengine_write_term(X,Opts)).
-pengine_io_goal_expansion(write(X),	      pengine_write(X)).
-pengine_io_goal_expansion(writeq(X),	      pengine_writeq(X)).
-pengine_io_goal_expansion(display(X),	      pengine_display(X)).
-pengine_io_goal_expansion(print(X),	      pengine_print(X)).
-pengine_io_goal_expansion(write_canonical(X), pengine_write_canonical(X)).
-pengine_io_goal_expansion(listing,	      pengine_listing).
-pengine_io_goal_expansion(listing(X),	      pengine_listing(X)).
+io_predicate(writeln(_)).
+io_predicate(nl).
+io_predicate(format(_)).
+io_predicate(format(_,_)).
+io_predicate(read(_)).
+io_predicate(write_term(_,_)).
+io_predicate(write(_)).
+io_predicate(writeq(_)).
+io_predicate(display(_)).
+io_predicate(print(_)).
+io_predicate(write_canonical(_)).
+io_predicate(listing).
+io_predicate(listing(_)).
 
+term_expansion(pengine_io_goal_expansion(_,_),
+	       Clauses) :-
+	findall(Clause, io_mapping(Clause), Clauses).
+
+io_mapping(pengine_io_goal_expansion(Head, Mapped)) :-
+	io_predicate(Head),
+	Head =.. [Name|Args],
+	atom_concat(pengine_, Name, BodyName),
+	Mapped =.. [BodyName|Args].
+
+pengine_io_goal_expansion(_, _).
+
+%%	pengine_bind_io_to_html(+Module)
+%
+%	Redefine the built-in predicates for IO   to  send HTML messages
+%	using pengine_output/1.
+
+pengine_bind_io_to_html(Module) :-
+	forall(io_predicate(Head),
+	       bind_io(Head, Module)).
+
+bind_io(Head, Module) :-
+	redefine_system_predicate(Module:Head),
+	functor(Head, Name, Arity),
+	Head =.. [Name|Args],
+	atom_concat(pengine_, Name, BodyName),
+	Body =.. [BodyName|Args],
+	assertz(Module:(Head :- Body)),
+	compile_predicates([Module:Name/Arity]).
