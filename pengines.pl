@@ -27,7 +27,7 @@
     the GNU General Public License.
 */
 
-:- module(pengine,
+:- module(pengines,
 	  [ pengine_create/1,			% +Options
             pengine_ask/3,			% +Pengine, :Query, +Options
             pengine_next/2,			% +Pengine. +Options
@@ -662,39 +662,39 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
     ;   true
     ),
     expand_term((:- setting(Application:thread_pool_size, integer,
-			    setting(pengine:thread_pool_size),
+			    setting(pengines:thread_pool_size),
 			    'Maximum number of pengines this \c
 			    application can run.')),
 		ThreadPoolSizeSetting),
     expand_term((:- setting(Application:thread_pool_stacks, list(compound),
-			    setting(pengine:thread_pool_stacks),
+			    setting(pengines:thread_pool_stacks),
 			    'Maximum stack sizes for pengines \c
 			    this application can run.')),
 		ThreadPoolStacksSetting),
     expand_term((:- setting(Application:slave_limit, integer,
-			    setting(pengine:slave_limit),
+			    setting(pengines:slave_limit),
 			    'Maximum number of local slave pengines \c
 			    a master pengine can create.')),
 		SlaveLimitSetting),
     expand_term((:- setting(Application:time_limit, number,
-			    setting(pengine:time_limit),
+			    setting(pengines:time_limit),
 			    'Maximum time to wait for output')),
 		TimeLimitSetting),
     expand_term((:- setting(Application:idle_limit, number,
-			    setting(pengine:idle_limit),
+			    setting(pengines:idle_limit),
 			    'Pengine auto-destroys when idle for this time')),
 		IdleLimitSetting),
     expand_term((:- setting(Application:allow_from, list(atom),
-			    setting(pengine:allow_from),
+			    setting(pengines:allow_from),
 			    'IP addresses from which remotes are allowed \c
 			    to connect')),
 		AllowFromSetting),
     expand_term((:- setting(Application:deny_from, list(atom),
-			    setting(pengine:deny_from),
+			    setting(pengines:deny_from),
 			    'IP addresses from which remotes are NOT \c
 			    allowed to connect')),
 		DenyFromSetting),
-    flatten([ pengine:current_application(Application),
+    flatten([ pengines:current_application(Application),
 	      ThreadPoolSizeSetting,
 	      ThreadPoolStacksSetting,
 	      SlaveLimitSetting,
@@ -1981,18 +1981,18 @@ pengine_src_url(URL, Module) :-
 %	@tbd	If at some point we allow for `unsafe' pengines, we must
 %		reconsider this.
 
-sandbox:safe_primitive(pengine:pengine_create(_)).
-sandbox:safe_primitive(pengine:pengine_destroy(_,_)).
-sandbox:safe_primitive(pengine:pengine_event(_, _)).
-sandbox:safe_primitive(pengine:pengine_send(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_input(_, _)).
-sandbox:safe_primitive(pengine:pengine_output(_)).
-sandbox:safe_primitive(pengine:pengine_debug(_,_)).
-sandbox:safe_primitive(pengine:pengine_rpc(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_ask(_, _, _)).
-sandbox:safe_primitive(pengine:pengine_pull_response(_,_)).
+sandbox:safe_primitive(pengines:pengine_create(_)).
+sandbox:safe_primitive(pengines:pengine_destroy(_,_)).
+sandbox:safe_primitive(pengines:pengine_event(_, _)).
+sandbox:safe_primitive(pengines:pengine_send(_, _, _)).
+sandbox:safe_primitive(pengines:pengine_input(_, _)).
+sandbox:safe_primitive(pengines:pengine_output(_)).
+sandbox:safe_primitive(pengines:pengine_debug(_,_)).
+sandbox:safe_primitive(pengines:pengine_rpc(_, _, _)).
+sandbox:safe_primitive(pengines:pengine_ask(_, _, _)).
+sandbox:safe_primitive(pengines:pengine_pull_response(_,_)).
 
-sandbox:safe_meta(pengine:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
+sandbox:safe_meta(pengines:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
 	extend_goal(Closure, [_], Closure1).
 
 extend_goal(Var, _, _) :-

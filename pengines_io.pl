@@ -282,15 +282,15 @@ pengine_module(user).
 %	        Array of strings representing HTML-ified residual goals.
 
 :- multifile
-	pengine:event_to_json/3.
+	pengines:event_to_json/3.
 
 /* JSON-S */
 
-pengine:event_to_json(success(ID, Bindings0, More),
+pengines:event_to_json(success(ID, Bindings0, More),
 		      json([event=success, id=ID, data=Bindings, more= @(More)]),
 		       'json-s') :- !,
 	maplist(solution_to_json(ID), Bindings0, Bindings).
-pengine:event_to_json(output(ID, Term),
+pengines:event_to_json(output(ID, Term),
 		      json([event=output, id=ID, data=Data]), 'json-s') :- !,
 	(   atomic(Term)
 	->  Data = Term
@@ -309,16 +309,16 @@ term_string_value(Pengine, N=V, N=A) :-
 
 /* JSON-HTML */
 
-pengine:event_to_json(success(ID, Answers0, More),
-		      json{event:success,
-			   id:ID,
-			   data:Answers,
-			   more:More
-			  },
-		      'json-html') :- !,
+pengines:event_to_json(success(ID, Answers0, More),
+		       json{event:success,
+			    id:ID,
+			    data:Answers,
+			    more:More
+			   },
+		       'json-html') :- !,
 	maplist(map_answer(ID), Answers0, Answers).
-pengine:event_to_json(output(ID, Term),
-		      json{event:output, id:ID, data:Data}, 'json-html') :- !,
+pengines:event_to_json(output(ID, Term),
+		       json{event:output, id:ID, data:Data}, 'json-html') :- !,
 	(   atomic(Term)
 	->  Data = Term
 	;   term_html_string(ID, Term, Data)

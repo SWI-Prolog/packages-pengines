@@ -312,8 +312,8 @@ no_more_pengines :-
     ;	between(1, 10, _),
 	sleep(0.01)
     ),
-    \+ pengine:current_pengine(_,_,_,_,_,_),
-    \+ pengine:child(_,_), !.
+    \+ pengines:current_pengine(_,_,_,_,_,_),
+    \+ pengines:child(_,_), !.
 
 
 		 /*******************************
