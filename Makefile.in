@@ -27,7 +27,7 @@ install:	$(LIBPL) $(JS)
 		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR); \
 		done
 		for f in $(HTTPPL); do \
-		  $(INSTALL_DATA) $$f $(DESTDIR)$(PLLIBDIR)/http; \
+		  $(INSTALL_DATA) http/$$f $(DESTDIR)$(PLLIBDIR)/http; \
 		done
 		for f in $(JS); do \
 		  $(INSTALL_DATA) $$f $(JSDIR); \
