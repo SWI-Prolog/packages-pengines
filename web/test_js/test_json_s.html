@@ -1,0 +1,35 @@
+<html lang="en">
+    <!-- If there is no template, the result-set is an object whos
+         keys are the variables that do not start with '_'.
+    -->
+    <head>
+        <script src="/jquery-2.0.3.min.js"></script>
+        <script src="/js/pengines.js"></script>
+        <script type="text/x-prolog">
+
+	    data(1).
+	    data(a).
+	    data('a b').
+	    data("s").
+	    data(c(a)).
+
+        </script>
+        <script>
+            var pengine = new Pengine({
+                oncreate: handleCreate,
+                onsuccess: handleSuccess,
+                format: "json-s"
+            });
+            function handleCreate () {
+                pengine.ask('data(A)');
+            }
+            function handleSuccess() {
+		console.log(this.data[0].A);
+		if ( this.more )
+                   pengine.next();
+            }
+        </script>
+    </head>
+    <body>
+    </body>
+</html>

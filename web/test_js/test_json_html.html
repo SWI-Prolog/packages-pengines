@@ -1,0 +1,36 @@
+<html lang="en">
+    <!-- Test json-html output
+    -->
+    <head>
+        <script src="/jquery-2.0.3.min.js"></script>
+        <script src="/js/pengines.js"></script>
+        <script type="text/x-prolog">
+
+	    data(1).
+	    data(a).
+	    data('a b').
+	    data("s").
+	    data(c(a)).
+
+        </script>
+        <script>
+            var pengine = new Pengine({
+                oncreate: handleCreate,
+                onsuccess: handleSuccess,
+                format: "json-html"
+            });
+            function handleCreate () {
+                pengine.ask('data(A)');
+            }
+            function handleSuccess() {
+		//console.log(JSON.stringify(this.data[0].variables[0]));
+		console.log(this.data[0].variables[0].variables[0]);
+		console.log(this.data[0].variables[0].value);
+		if ( this.more )
+                   pengine.next();
+            }
+        </script>
+    </head>
+    <body>
+    </body>
+</html>

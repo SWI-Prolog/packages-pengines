@@ -56,6 +56,11 @@
 :- use_module(library(http/http_files)).
 :- use_module(library(http/http_dispatch)).
 
+:- pengine_application(swish).
+:- use_module(swish:library(pengines_io)).
+pengines:prepare_module(Module, swish, _Options) :-
+        pengines_io:pengine_bind_io_to_html(Module).
+
 % :- debug(http(request)).
 
 test_js :-
@@ -122,6 +127,20 @@ test(ask_syntax, Lines == [a]) :-
 test(sepresults, Lines == ['1', '2', '3', '4', a, b, c, d]) :-
 	test_js('sepresults.html', Lines0),
 	sort(Lines0, Lines).
+test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+	test_js('test_json_s.html', Lines).
+test(json_html, Lines == [ 'A',
+			   '<span class="pl-int">1</span>',
+			   'A',
+			   '<span class="pl-atom">a</span>',
+			   'A',
+			   '<span class="pl-quoted-atom">\'a b\'</span>',
+			   'A',
+			   '<span class="pl-string">"s"</span>',
+			   'A',
+			   '<span class="pl-compound"><span class="pl-functor">c</span>(<span class="pl-atom">a</span>)</span>'
+			 ]) :-
+	test_js('test_json_html.html', Lines).
 
 :- end_tests(js_pengines).
 
