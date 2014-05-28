@@ -1,0 +1,32 @@
+<html lang="en">
+    <!-- If there is no template, the result-set is an object whos
+         keys are the variables that do not start with '_'.
+    -->
+    <head>
+        <script src="/jquery-2.0.3.min.js"></script>
+        <script src="/js/pengines.js"></script>
+        <script type="text/x-prolog">
+
+	    weekday(1, sunday).
+	    weekday(2, monday).
+
+        </script>
+        <script>
+            var pengine = new Pengine({
+                oncreate: handleCreate,
+                onsuccess: handleSuccess
+            });
+            function handleCreate () {
+                pengine.ask('weekday(N,D)');
+            }
+            function handleSuccess() {
+		console.log(this.data[0].N);
+		console.log(this.data[0].D);
+		if ( this.more )
+                   pengine.next();
+            }
+        </script>
+    </head>
+    <body>
+    </body>
+</html>

@@ -1775,7 +1775,8 @@ fix_bindings(_, Command, _, _, Command).
 template(_, Template, Options) :-
     option(template(Template), Options), !.
 template(Bindings, Template, _Options) :-
-    exclude(anon, Bindings, Template).
+    exclude(anon, Bindings, Bindings1),
+    dict_create(Template, json, Bindings1).
 
 anon(Name=_) :-
     sub_atom(Name, 0, _, _, '_'),

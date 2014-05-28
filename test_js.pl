@@ -115,6 +115,8 @@ check_phantomjs :-
 
 test(simple, Lines == [a,b,c,d,e,f,g]) :-
 	test_js('simple.html', Lines).
+test(notemplate, Lines == ['1','sunday','2','monday']) :-
+	test_js('notemplate.html', Lines).
 test(ask_syntax, Lines == [a]) :-
 	test_js('ask_syntax.html', Lines).
 test(sepresults, Lines == ['1', '2', '3', '4', a, b, c, d]) :-
