@@ -1291,7 +1291,7 @@ remote_send_rec(Server, Action, Params, Reply, Options) :-
     server_url(Server, Action, Params, URL),
     http_open(URL, Stream, Options),	% putting this in setup_call_cleanup/3
     call_cleanup(			% makes it impossible to interrupt.
-	read(Stream, Reply),
+	read_prolog_reply(Stream, Reply),
 	close(Stream)).
 
 remote_post_rec(Server, Action, Data, Reply, Options) :-
@@ -1301,8 +1301,12 @@ remote_post_rec(Server, Action, Data, Reply, Options) :-
 	      | Options
 	      ]),
     call_cleanup(			% makes it impossible to interrupt.
-	read(Stream, Reply),
+	read_prolog_reply(Stream, Reply),
 	close(Stream)).
+
+read_prolog_reply(In, Reply) :-
+    set_stream(In, encoding(utf8)),
+    read(In, Reply).
 
 server_url(Server, Action, Params, URL) :-
     uri_components(Server, Components0),
@@ -1838,7 +1842,7 @@ http_pengine_destroy_all(Request) :-
 %	one of =prolog=, =json= or =json-s=.
 
 output_result(prolog, Event) :- !,
-    format('Content-type: text/x-prolog~n~n'),
+    format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
     write_term(Event,
 	       [ quoted(true),
 		 ignore_ops(true),
