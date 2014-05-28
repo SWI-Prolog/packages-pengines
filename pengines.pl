@@ -990,8 +990,8 @@ process_create_option(_, _).
 %	@arg	Module is a new temporary module (see
 %		in_temporary_module/3) that may be (further) prepared
 %		by this hook.
-%	@arg1	Application (also a module) associated to the pengine.
-%	@arg1	Options is passed from the environment and should
+%	@arg	Application (also a module) associated to the pengine.
+%	@arg	Options is passed from the environment and should
 %		(currently) be ignored.
 
 
