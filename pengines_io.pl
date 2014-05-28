@@ -304,10 +304,10 @@ pengine_module(user).
 
 /* JSON-S */
 
-pengines:event_to_json(success(ID, Bindings0, More),
-		      json([event=success, id=ID, data=Bindings, more= @(More)]),
+pengines:event_to_json(success(ID, Answers0, More),
+		       json{event:success, id:ID, data:Answers, more:More},
 		       'json-s') :- !,
-	maplist(solution_to_json(ID), Bindings0, Bindings).
+	maplist(answer_to_json_strings(ID), Answers0, Answers).
 pengines:event_to_json(output(ID, Term),
 		      json([event=output, id=ID, data=Data]), 'json-s') :- !,
 	(   atomic(Term)
@@ -315,10 +315,17 @@ pengines:event_to_json(output(ID, Term),
 	;   term_string(Term, Data)
 	).
 
-solution_to_json(Pengine, BindingsIn, json(BindingsOut)) :-
-    maplist(term_string_value(Pengine), BindingsIn, BindingsOut).
+%%	answer_to_json_strings(+Pengine, +AnswerDictIn, -AnswerDict).
+%
+%	Translate answer dict with Prolog term   values into answer dict
+%	with string values.
 
-term_string_value(Pengine, N=V, N=A) :-
+answer_to_json_strings(Pengine, DictIn, DictOut) :-
+	dict_pairs(DictIn, Tag, Pairs),
+	maplist(term_string_value(Pengine), Pairs, BindingsOut),
+	dict_pairs(DictOut, Tag, BindingsOut).
+
+term_string_value(Pengine, N-V, N-A) :-
 	with_output_to(string(A),
 		       write_term(V,
 				  [ module(Pengine),
@@ -343,14 +350,20 @@ pengines:event_to_json(output(ID, Term),
 	).
 
 map_answer(ID, Bindings0, Answer) :-
-	prolog:translate_bindings(Bindings0, Bindings1, ID:Residuals),
-	maplist(binding_to_html(ID), Bindings1, VarBindings),
+	dict_bindings(Bindings0, Bindings1),
+	prolog:translate_bindings(Bindings1, Bindings2, ID:Residuals),
+	maplist(binding_to_html(ID), Bindings2, VarBindings),
 	(   Residuals == []
 	->  Answer = json{variables:VarBindings}
 	;   maplist(term_html_string(ID), Residuals, ResHTML),
 	    Answer = json{variables:VarBindings, residuals:ResHTML}
 	).
 
+dict_bindings(Dict, Bindings) :-
+	dict_pairs(Dict, _Tag, Pairs),
+	maplist(pair_eq, Pairs, Bindings).
+
+pair_eq(N-V, N=V).
 
 binding_to_html(ID, binding(Vars,Term,Substitutions), JSON) :-
 	JSON0 = json{variables:Vars, value:HTMLString},
