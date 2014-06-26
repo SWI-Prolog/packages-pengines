@@ -1958,6 +1958,7 @@ pengine_create/1.
 
 pengine_src_text(Src, Module) :-
     pengine_self(Self),
+    Module:style_check(-atom),
     format(atom(ID), 'pengine://~w/src', [Self]),
     setup_call_cleanup(
 	open_chars_stream(Src, Stream),
