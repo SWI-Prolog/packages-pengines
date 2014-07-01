@@ -1782,7 +1782,7 @@ template(Bindings, Template, _Options) :-
 anon(Name=_) :-
     sub_atom(Name, 0, _, _, '_'),
     sub_atom(Name, 1, 1, _, Next),
-    char_type(Next, upper).
+    char_type(Next, prolog_var_start).
 
 %%	json_lang(+Format) is semidet.
 %
