@@ -1022,7 +1022,7 @@ guarded_main_loop(ID) :-
     ->  debug(pengine(transition), '~q: 2 = ~q => 3', [ID, ask(Goal)]),
         ask(ID, Goal, Options)
     ;   debug(pengine(transition), '~q: 2 = ~q => 2', [ID, protocol_error]),
-        %pengine_reply(error(ID, error(protocol_error, _))),
+        pengine_reply(error(ID, error(protocol_error, _))),
         guarded_main_loop(ID)
     ).
 
