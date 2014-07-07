@@ -225,7 +225,7 @@ pengine_create(M:Options0) :-
     ;   local_pengine_create(Options)
     ).
 
-%%	translate_local_sources(+OptionsIn, -Options) is det.
+%%	translate_local_sources(+OptionsIn, -Options, +Module) is det.
 %
 %	Translate  the  `src_predicates`  and  `src_list`  options  into
 %	`src_text`. We need to do that   anyway for remote pengines. For
@@ -233,25 +233,38 @@ pengine_create(M:Options0) :-
 %	little point in transferring source to a local pengine anyway as
 %	local pengines can access any  Prolog   predicate  that you make
 %	visible to the application.
+%
+%	Multiple sources are concatenated  to  end   up  with  a  single
+%	src_text option.
 
-translate_local_sources([], [], _).
-translate_local_sources([H0|T0], [H|T], M) :-
-    (   nonvar(H0),
-	translate_local_source(H0, H, M)
-    ->  true
-    ;   H = H0
-    ),
-    translate_local_sources(T0, T, M).
+translate_local_sources(OptionsIn, Options, Module) :-
+    translate_local_sources(OptionsIn, Sources, Options2, Module),
+    (	Sources == []
+    ->	Options = Options2
+    ;	Sources = [Source]
+    ->	Options = [src_text(Source)|Options2]
+    ;	atomics_to_string(Sources, Source)
+    ->	Options = [src_text(Source)|Options2]
+    ).
 
-translate_local_source(src_predicates(PIs), src_text(Source), M) :-
+translate_local_sources([], [], [], _).
+translate_local_sources([H0|T], [S0|S], Options, M) :-
+    nonvar(H0),
+    translate_local_source(H0, S0, M), !,
+    translate_local_sources(T, S, Options, M).
+translate_local_sources([H|T0], S, [H|T], M) :-
+    translate_local_sources(T0, S, T, M).
+
+translate_local_source(src_predicates(PIs), Source, M) :-
     must_be(list, PIs),
     with_output_to(string(Source),
 		   maplist(M:listing, PIs)).
-translate_local_source(src_list(Terms), src_text(Source), _) :-
+translate_local_source(src_list(Terms), Source, _) :-
     must_be(list, Terms),
     with_output_to(string(Source),
 		   forall(member(Term, Terms),
 			  format('~k .', [Term]))).
+translate_local_source(src_text(Source), Source, _).
 
 
 /**  pengine_send(+NameOrID, +Term) is det
