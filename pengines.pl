@@ -1636,6 +1636,11 @@ pairs_create_options(T0, [AskOpt, TemplateOpt|T]) :-
     AskOpt = ask(Ask1),
     TemplateOpt = template(Template1),
     pairs_create_options(T2, T).
+pairs_create_options([ask-String|T0], [ask(Ask),template(Template)|T]) :- !,
+    term_string(Ask, String, [variable_names(Bindings)]),
+    exclude(anon, Bindings, Bindings1),
+    dict_create(Template, json, Bindings1),
+    pairs_create_options(T0, T).
 pairs_create_options([N-V0|T0], [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), !,
