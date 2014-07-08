@@ -263,7 +263,7 @@ translate_local_source(src_list(Terms), Source, _) :-
     must_be(list, Terms),
     with_output_to(string(Source),
 		   forall(member(Term, Terms),
-			  format('~k .', [Term]))).
+			  format('~k .~n', [Term]))).
 translate_local_source(src_text(Source), Source, _).
 
 
