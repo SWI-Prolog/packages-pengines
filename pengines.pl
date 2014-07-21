@@ -1586,11 +1586,24 @@ pengine_rpc_output(_ID, Term) :-
 /*================= HTTP handlers =======================
 */
 
-%   Declare HTTP locations we serve and how.
+%   Declare  HTTP  locations  we  serve  and   how.  Note  that  we  use
+%   time_limit(inifinite) because pengines have their  own timeout. Also
+%   note that we use spawn. This  is   needed  because we can easily get
+%   many clients waiting for  some  action   on  a  pengine to complete.
+%   Without spawning, we would quickly exhaust   the  worker pool of the
+%   HTTP server.
+%
+%   FIXME: probably we should wait for a   short time for the pengine on
+%   the default worker thread. Only of  that   time  has expired, we can
+%   call http_spawn/2 to continue waiting on   a  new thread. That would
+%   improve the performance and reduce the usage of threads.
 
-:- http_handler(root(pengine/create),	     http_pengine_create,	 []).
-:- http_handler(root(pengine/send),	     http_pengine_send,		 []).
-:- http_handler(root(pengine/pull_response), http_pengine_pull_response, []).
+:- http_handler(root(pengine/create),	     http_pengine_create,
+		[ time_limit(infinite), spawn([]) ]).
+:- http_handler(root(pengine/send),	     http_pengine_send,
+		[ time_limit(infinite), spawn([]) ]).
+:- http_handler(root(pengine/pull_response), http_pengine_pull_response,
+		[ time_limit(infinite), spawn([]) ]).
 :- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
 :- http_handler(root(pengine/destroy_all),   http_pengine_destroy_all,	 []).
 
