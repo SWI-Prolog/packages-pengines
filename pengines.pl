@@ -1680,12 +1680,16 @@ pairs_create_options([_|T0], T) :-
 %	_).
 
 wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
-    (   thread_get_message(Queue, pengine_event(_, Event),
-			   [ timeout(TimeLimit)
-			   ]),
-	debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
-	destroy_queue(Pengine, Event, Queue)
-    ->  output_result(Format, Event)
+    (   catch(thread_get_message(Queue, pengine_event(_, Event),
+				 [ timeout(TimeLimit)
+				 ]),
+	      Error, true)
+    ->  (   var(Error)
+	->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
+	    destroy_queue(Pengine, Event, Queue),
+	    output_result(Format, Event)
+	;   output_result(Format, died(Pengine))
+	)
     ;   output_result(Format, error(Pengine,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
@@ -1727,6 +1731,12 @@ is_destroy_event(destroy(_,_)).
 %	because the queue may contain output  events. Termination of the
 %	pengine and finishing the  HTTP  exchange   may  happen  in both
 %	orders. This means we need handle this using synchronization.
+%
+%	  * sync_delay_destroy_queue(+Pengine, +Queue)
+%	  Called (indirectly) from pengine_done/1 if the pengine's
+%	  thread dies.
+%	  * sync_destroy_queue(+Pengine, +Queue)
+%	  Called from destroy_queue/3, from wait_and_output_result/4.
 %
 %	@tbd	If message queue handles were save, we could check the
 %		existence and get rid of output_queue_destroyed/1.  As
@@ -1847,6 +1857,13 @@ http_pengine_pull_response(Request) :-
     ->	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
+
+%%	http_pengine_abort(+Request)
+%
+%	HTTP handler for /pengine/abort. Note that  abort may be sent at
+%	any time and the reply may  be   handled  by a pull_response. In
+%	that case, our  pengine  has  already   died  before  we  get to
+%	wait_and_output_result/4.
 
 http_pengine_abort(Request) :-
     http_parameters(Request,

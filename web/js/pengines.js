@@ -92,6 +92,7 @@ function Pengine(options) {
         } else if (obj.event === 'prompt') {
             if (options.onprompt) options.onprompt.call(obj);
         } else if (obj.event === 'abort') {
+	    that.aborted = true;
             if (options.onabort) options.onabort.call(obj);
         } else if (obj.event === 'destroy') {
 	    var index = Pengine.ids.indexOf(that.id);
@@ -99,7 +100,15 @@ function Pengine(options) {
 	    if ( index > -1 ) Pengine.ids.splice(index, 1);
 	    if (obj.data) process_response(obj.data);
             if (options.ondestroy) options.ondestroy.call(obj);
-        }
+        } else if (obj.event === 'died') {
+	    if ( !that.aborted ) {
+	        obj.data = "Pengine has died";
+	        if (options.onerror)
+		    options.onerror.call(obj);
+		else if (typeof(console) !== 'undefined')
+		    console.error(obj.data);
+	    }
+	}
     };
     function send(event) {
         var event = encodeURIComponent(event);
