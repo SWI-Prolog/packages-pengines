@@ -2057,17 +2057,23 @@ pengine_src_url(URL, Module) :-
 %	@tbd	If at some point we allow for `unsafe' pengines, we must
 %		reconsider this.
 
-sandbox:safe_primitive(pengines:pengine_create(_)).
 sandbox:safe_primitive(pengines:pengine_destroy(_,_)).
 sandbox:safe_primitive(pengines:pengine_event(_, _)).
 sandbox:safe_primitive(pengines:pengine_send(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_input(_, _)).
 sandbox:safe_primitive(pengines:pengine_output(_)).
 sandbox:safe_primitive(pengines:pengine_debug(_,_)).
-sandbox:safe_primitive(pengines:pengine_rpc(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_ask(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_pull_response(_,_)).
 
+%%	sandbox:safe_meta(+Goal, -Called) is semidet.
+%
+%	Declare the pengine  meta-predicates  as   safe.  Note  that the
+%	pengine calling predicates  are  safe   because  the  safety  is
+%	guaranteed by the recieving pengine.
+
+sandbox:safe_meta(pengines:pengine_create(_), []).
+sandbox:safe_meta(pengines:pengine_rpc(_, _, _), []).
 sandbox:safe_meta(pengines:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
 	extend_goal(Closure, [_], Closure1).
 

@@ -395,10 +395,18 @@ subst_to_html(_, Term, _) :-
 		 *******************************/
 
 :- multifile
-	sandbox:safe_primitive/1.		% Goal
+	sandbox:safe_primitive/1,	% Goal
+	sandbox:safe_meta/2.		% Goal, Called
 
-sandbox:safe_primitive(pengines_io:send_html(_)).
+sandbox:safe_primitive(pengines_io:pengine_format(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_listing(_)).
+sandbox:safe_primitive(pengines_io:pengine_nl).
+sandbox:safe_primitive(pengines_io:pengine_print(_)).
+sandbox:safe_primitive(pengines_io:pengine_write(_)).
+sandbox:safe_primitive(pengines_io:pengine_write_canonical(_)).
+sandbox:safe_primitive(pengines_io:pengine_write_term(_,_)).
+sandbox:safe_primitive(pengines_io:pengine_writeln(_)).
+sandbox:safe_primitive(pengines_io:pengine_writeq(_)).
 sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
 sandbox:safe_primitive(system:statistics(_,_)).
