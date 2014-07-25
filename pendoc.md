@@ -123,7 +123,7 @@ pengine_ask/3 with the option template(X) would instead produce the output
 =a=, =b= and =c=.
 
 ==
-:- use_module(pengines).
+:- use_module(library(pengines)).
 
 main :-
     pengine_create([
@@ -196,7 +196,7 @@ remotely by means of pengine_rpc/2,  yet   behave  exactly  as if called
 locally:
 
 ==
-?- use_module(pengines).
+?- use_module(library(pengines)).
 
 ?- member(X, [a, b, c, d]),
    pengine_rpc('http://pengines.org', p(X), [
