@@ -1903,11 +1903,23 @@ output_result(Lang, Event) :-
     json_lang(Lang), !,
     (	event_term_to_json_data(Event, JSON, Lang)
     ->	cors_enable,
+	disable_client_cache,
 	reply_json(JSON)
     ;	assertion(event_term_to_json_data(Event, _, Lang))
     ).
 output_result(Lang, _Event) :-			% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
+
+%%	disable_client_cache
+%
+%	Make sure the client will not cache our page.
+%
+%	@see http://stackoverflow.com/questions/49547/making-sure-a-web-page-is-not-cached-across-all-browsers
+
+disable_client_cache :-
+    format('Cache-Control: no-cache, no-store, must-revalidate\r\n\c
+            Pragma: no-cache\r\n\c
+	    Expires: 0\r\n').
 
 event_term_to_json_data(Event, JSON, Lang) :-
     event_to_json(Event, JSON, Lang), !.
