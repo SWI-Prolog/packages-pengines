@@ -228,7 +228,7 @@ test(ask_simple, Results = [a,b,c]) :-
 test(ask_simple_no_template, Results = [p(a),p(b),p(c)]) :-
     pengine_server(Server),
     pengine_create(
-	[ ask(p(X)),
+	[ ask(p(_X)),
 	  server(Server),
 	  src_text("p(a). p(b). p(c).")
 	]),
