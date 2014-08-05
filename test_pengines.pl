@@ -225,6 +225,15 @@ test(ask_simple, Results = [a,b,c]) :-
 	]),
     collect(Results, []),
     assertion(no_more_pengines).
+test(rpc_nested, Xs == [1,2,3]) :-
+    pengine_server(Server),
+    findall(X, pengine_rpc(Server,
+			   pengine_rpc(Server,
+				       member(X, [1,2,3]),
+				       []),
+			   []),
+	    Xs),
+    assertion(no_more_pengines).
 
 :- end_tests(remote_pengines).
 
@@ -320,6 +329,7 @@ no_more_pengines :-
 		 *	    HTTP SERVER		*
 		 *******************************/
 
+:- pengine_sandbox:use_module(library(pengines)).
 :- http_handler(/, http_reply_from_files(web, []), [prefix]).
 
 :- dynamic

@@ -48,7 +48,7 @@
             pengine_property/2,			% ?Pengine, ?Property
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
-            pengine_rpc/3			% +Server, +Goal, +Options
+            pengine_rpc/3			% +Server, :Goal, +Options
 	  ]).
 
 /** <module> Pengines: Web Logic Programming Made Easy
@@ -358,7 +358,7 @@ pengine_reply(Queue, Event0) :-
 
 wrap_first_answer(ID, Event0, CreateEvent) :-
 	wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)]),
-	arg(1, CreateEvent, ID), !,	
+	arg(1, CreateEvent, ID), !,
     retract(wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)])).
 wrap_first_answer(_ID, Event, Event).
 
