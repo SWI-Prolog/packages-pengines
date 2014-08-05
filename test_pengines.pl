@@ -225,6 +225,15 @@ test(ask_simple, Results = [a,b,c]) :-
 	]),
     collect(Results, []),
     assertion(no_more_pengines).
+test(ask_simple_no_template, Results = [p(a),p(b),p(c)]) :-
+    pengine_server(Server),
+    pengine_create(
+	[ ask(p(X)),
+	  server(Server),
+	  src_text("p(a). p(b). p(c).")
+	]),
+    collect(Results, []),
+    assertion(no_more_pengines).
 test(rpc_nested, Xs == [1,2,3]) :-
     pengine_server(Server),
     findall(X, pengine_rpc(Server,
