@@ -344,21 +344,23 @@ pengine_request(Request) :-
 %	Queue.  Such  events  are  read   by    the   other   side  with
 %	pengine_event/1.
 
+
 pengine_reply(Event) :-
     nb_getval(pengine_parent, Queue),
     pengine_reply(Queue, Event).
 
 pengine_reply(Queue, Event0) :-
-    wrap_first_answer(Event0, Event),
+    arg(1, Event0, ID),
+    wrap_first_answer(ID, Event0, Event),
     random_delay,
-    debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
-    arg(1, Event, ID),
+	debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
     thread_send_message(Queue, pengine_event(ID, Event)).
 
-wrap_first_answer(Event0, CreateEvent) :-
-    retract(wrap_first_answer_in_create_event(CreateEvent,
-					      [answer(Event0)])), !.
-wrap_first_answer(Event, Event).
+wrap_first_answer(ID, Event0, CreateEvent) :-
+	wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)]),
+	arg(1, CreateEvent, ID), !,	
+    retract(wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)])).
+wrap_first_answer(_ID, Event, Event).
 
 
 
