@@ -1622,15 +1622,12 @@ pengine_rpc_output(_ID, Term) :-
 
 http_pengine_create(Request) :-
     http_read_json_dict(Request, Dict),
-    (	get_dict(format, Dict, FormatString)
-    ->	atom_string(Format, FormatString),
-	valid_format(Format)
-    ;	Format = prolog
-    ),
-    dict_to_options(Dict, CreateOptions),
-    option(application(Application), CreateOptions, pengine_sandbox),
+    dict_atom_option(format, Dict, Format, prolog),
+    dict_atom_option(application, Dict, Application, pengine_sandbox),
+    valid_format(Format),
     (	current_application(Application)
     ->  allowed(Request, Application),
+	dict_to_options(Dict, Application, CreateOptions),
 	pengine_uuid(Pengine),
 	message_queue_create(Queue, [max_size(25)]),
 	setting(Application:time_limit, TimeLimit),
@@ -1643,25 +1640,37 @@ http_pengine_create(Request) :-
         output_result(Format, error(ID, error(Error, _)))
     ).
 
-dict_to_options(Dict, CreateOptions) :-
-    dict_pairs(Dict, _, Pairs),
-    pairs_create_options(Pairs, CreateOptions).
+dict_atom_option(Key, Dict, Atom, Default) :-
+	(   get_dict(Key, Dict, String)
+	->  atom_string(Atom, String)
+	;   Atom = Default
+	).
 
-pairs_create_options([], []).
-pairs_create_options(T0, [AskOpt, TemplateOpt|T]) :-
+dict_to_options(Dict, Application, CreateOptions) :-
+    dict_pairs(Dict, _, Pairs),
+    pairs_create_options(Pairs, Application, CreateOptions).
+
+pairs_create_options([], _, []).
+pairs_create_options(T0, App, [AskOpt, TemplateOpt|T]) :-
     selectchk(ask-Ask, T0, T1),
     selectchk(template-Template, T1, T2), !,
     format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
-    term_string(t(Ask1,Template1), AskTemplate),
+    term_string(t(Ask1,Template1), AskTemplate,
+		[ module(App)
+		]),
     AskOpt = ask(Ask1),
     TemplateOpt = template(Template1),
-    pairs_create_options(T2, T).
-pairs_create_options([ask-String|T0], [ask(Ask),template(Template)|T]) :- !,
-    term_string(Ask, String, [variable_names(Bindings)]),
+    pairs_create_options(T2, App, T).
+pairs_create_options([ask-String|T0], App,
+		     [ask(Ask),template(Template)|T]) :- !,
+    term_string(Ask, String,
+		[ variable_names(Bindings),
+		  module(App)
+		]),
     exclude(anon, Bindings, Bindings1),
     dict_create(Template, json, Bindings1),
-    pairs_create_options(T0, T).
-pairs_create_options([N-V0|T0], [Opt|T]) :-
+    pairs_create_options(T0, App, T).
+pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), !,
     (   create_option_type(Opt, Type)
@@ -1673,9 +1682,9 @@ pairs_create_options([N-V0|T0], [Opt|T]) :-
 	)
     ;   V = V0
     ),
-    pairs_create_options(T0, T).
-pairs_create_options([_|T0], T) :-
-    pairs_create_options(T0, T).
+    pairs_create_options(T0, App, T).
+pairs_create_options([_|T0], App, T) :-
+    pairs_create_options(T0, App, T).
 
 
 %%	wait_and_output_result(+Pengine, +Queue, +Format, +TimeLimit)
