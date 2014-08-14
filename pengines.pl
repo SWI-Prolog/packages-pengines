@@ -108,8 +108,7 @@ from Prolog or JavaScript.
 		       src_list(list),
 		       src_text(any),		% text
 		       src_url(atom),
-		       src_predicates(list),
-		       format(atom)
+		       src_predicates(list)
 		     ]).
 :- predicate_options(pengine_ask/3, 3,
 		     [ template(any),
@@ -191,12 +190,6 @@ do_random_delay :-
     * src_predicates(+List)
       Send the local predicates denoted by List to the remote pengine.
       List is a list of predicate indicators.
-
-    * format(+Format)
-      Determines the format of event responses. Format is an atom.
-      The default format is =prolog=.  In addition, =json= is supported
-      and new formats can be added by defining event_to_json/3.  See
-      library(pengines_io).
 
 Remaining  options  are  passed  to  http_open/3  (meaningful  only  for
 non-local pengines) and thread_create/3. Note   that for thread_create/3
