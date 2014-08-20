@@ -617,7 +617,7 @@ pengine_uuid(Id) :-
 
 /** pengine_application(+Application) is det.
 
-Directive that must be used to declarate  a module a pengine application
+Directive that must be used to declarate  a pengine application
 module. The module may not  be  associated   to  any  file.  The default
 application is =pengine_sandbox=.  The  example   below  creates  a  new
 application =address_book= and imports the  API   defined  in the module
@@ -1158,7 +1158,7 @@ pengine_pull_response(_ID, _Options).
 /** pengine_input(+Prompt, -Term) is det
 
 Sends Prompt to the parent pengine and waits for input. Note that Prompt may be
-any term, atomic or complex.
+any term, compound as well as atomic.
 */
 
 pengine_input(Prompt, Term) :-
@@ -1594,7 +1594,7 @@ pengine_rpc_output(_ID, Term) :-
 %   HTTP server.
 %
 %   FIXME: probably we should wait for a   short time for the pengine on
-%   the default worker thread. Only of  that   time  has expired, we can
+%   the default worker thread. Only if  that   time  has expired, we can
 %   call http_spawn/2 to continue waiting on   a  new thread. That would
 %   improve the performance and reduce the usage of threads.
 
@@ -1683,7 +1683,7 @@ pairs_create_options([_|T0], App, T) :-
 %%	wait_and_output_result(+Pengine, +Queue, +Format, +TimeLimit)
 %
 %	Wait for the Pengine's Queue and if  there is a message, send it
-%	to the requestor using  output_result/1.   If  Pengine  does not
+%	to the requester using  output_result/1.   If  Pengine  does not
 %	answer within the time specified   by  the setting =time_limit=,
 %	Pengine is aborted and the  result is error(time_limit_exceeded,
 %	_).
@@ -1960,10 +1960,10 @@ event_term_to_json_data(EventTerm, json{event:F, id:ID, data:JSON}, _) :-
 
 %%	event_to_json(+Event, -JSONTerm, +Lang) is semidet.
 %
-%	Hook that translates a Prlog Pengine event structure into a term
+%	Hook that translates a Pengine event structure into a term
 %	suitable   for   reply_json/1,   according   to   the   language
 %	specification Lang. This can be used   to massage general Prolog
-%	terms, notably assosiated with   `success(ID,  Bindings0, More)`
+%	terms, notably associated with   `success(ID,  Bindings0, More)`
 %	and `output(ID, Term)` into a format  suitable for processing at
 %	the client side.
 
