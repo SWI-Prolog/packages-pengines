@@ -58,6 +58,7 @@ function Pengine(options) {
         return opts + "]";
     }
     function process_response(obj) {
+        obj.pengine = that;
         if (obj.event === 'create') {
 	    Pengine.ids.push(obj.id);
             if (Pengine.ids.length > obj.slave_limit) {
