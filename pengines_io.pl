@@ -452,6 +452,7 @@ pengine_bind_io_to_html(Module) :-
 	       bind_io(Head, Module)).
 
 bind_io(Head, Module) :-
+	prompt(_, ''),
 	redefine_system_predicate(Module:Head),
 	functor(Head, Name, Arity),
 	Head =.. [Name|Args],
