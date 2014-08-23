@@ -1598,6 +1598,8 @@ pengine_rpc_output(_ID, Term) :-
 %   call http_spawn/2 to continue waiting on   a  new thread. That would
 %   improve the performance and reduce the usage of threads.
 
+:- http_handler(root(pengine),		     http_404([]),
+		[ id(pengines) ]).
 :- http_handler(root(pengine/create),	     http_pengine_create,
 		[ time_limit(infinite), spawn([]) ]).
 :- http_handler(root(pengine/send),	     http_pengine_send,

@@ -32,7 +32,7 @@ function Pengine(options) {
     }
     var src = options.src ? options.src : "";
     var format = options.format ? options.format : "json";
-    var server = options.server !== undefined ? options.server : "/";
+    var server = options.server !== undefined ? options.server : "/pengine";
     this.options = options;
     this.id = null;
     var that = this;
@@ -113,7 +113,7 @@ function Pengine(options) {
     };
     function send(event) {
         var event = encodeURIComponent(event);
-        $.get(server + 'pengine/send?id=' + that.id +
+        $.get(server + '/send?id=' + that.id +
 	      '&event=' + event + '&format=' + format, process_response);
     }
     // Public functions
@@ -131,11 +131,11 @@ function Pengine(options) {
     }
     this.pull_response = function(id) {
 	if ( typeof id === 'undefined' ) id = that.id;
-        $.get(server + 'pengine/pull_response?id=' + id +
+        $.get(server + '/pull_response?id=' + id +
 	      '&format=' + format, process_response);
     }
     this.abort = function() {
-        $.get(server + 'pengine/abort?id=' + that.id +
+        $.get(server + '/abort?id=' + that.id +
 	      '&format=' + format, process_response);
     }
     this.destroy = function() {
@@ -143,7 +143,7 @@ function Pengine(options) {
     }
     Pengine.destroy_all = function(async) {
         if ( Pengine.ids.length > 0 ) {
-	    $.ajax({ url:server + 'pengine/destroy_all?ids=' + Pengine.ids,
+	    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
 	             async: async === 'undefined' ? true : false
 		   });
 	    Pengine.ids = [];
@@ -159,7 +159,7 @@ function Pengine(options) {
     if (options.chunk) createOptions["chunk"] = options.chunk;
     if (typeof options.destroy == "boolean" )
       createOptions["destroy"] = options.destroy;
-    $.ajax(server + 'pengine/create',
+    $.ajax(server + '/create',
 	   { "contentType": "application/json; charset=utf-8",
 	     "dataType": "json",
 	     "data": JSON.stringify(createOptions),
