@@ -42,6 +42,7 @@
 
 	    pengine_listing/0,
 	    pengine_listing/1,		% +Spec
+	    pengine_portray_clause/1,	% +Term
 
 	    pengine_read/1,		% -Term
 
@@ -54,6 +55,7 @@
 :- use_module(library(apply)).
 :- use_module(library(settings)).
 :- use_module(library(error)).
+:- use_module(library(listing)).
 :- use_module(library(http/html_write)).
 :- use_module(library(http/term_html)).
 :- html_meta send_html(html).
@@ -195,6 +197,10 @@ pengine_listing(Spec) :-
 	),
 	pengine_self(Module),
 	with_output_to(string(String), listing(Module:Spec)),
+	send_html(pre(class(listing), String)).
+
+pengine_portray_clause(Term) :-
+	with_output_to(string(String), portray_clause(Term)),
 	send_html(pre(class(listing), String)).
 
 
@@ -429,6 +435,7 @@ io_predicate(print(_)).
 io_predicate(write_canonical(_)).
 io_predicate(listing).
 io_predicate(listing(_)).
+io_predicate(portray_clause(_)).
 
 term_expansion(pengine_io_goal_expansion(_,_),
 	       Clauses) :-
