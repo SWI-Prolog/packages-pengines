@@ -60,13 +60,20 @@ function Pengine(options) {
     function process_response(obj) {
         obj.pengine = that;
         if (obj.event === 'create') {
+	    that.id = obj.id;
 	    Pengine.ids.push(obj.id);
             if (Pengine.ids.length > obj.slave_limit) {
-		alert("Attempt to use too many slave pengines. "+
-		      "The limit is :" + obj.slave_limit);
-		Pengine.destroy();
+		that.destroy();
+		obj.data = "Attempt to create too many pengines. "+
+		           "The limit is: " + obj.slave_limit;
+		obj.code = "too_many_pengines";
+		if (options.onerror)
+		    options.onerror.call(obj);
+		else if (typeof(console) !== 'undefined')
+		    console.error(obj.data);
+		else
+		    alert(obj.data);
 	    } else {
-	        that.id = obj.id;
 		if (options.oncreate) options.oncreate.call(obj);
 		if (obj.answer) process_response(obj.answer);
 	    }
