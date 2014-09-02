@@ -123,31 +123,37 @@ function Pengine(options) {
         $.get(server + '/send?id=' + that.id +
 	      '&event=' + event + '&format=' + format, process_response);
     }
-    // Public functions
-    this.ask = function(query, options) {
-        send('ask((' + query + '), ' + options_to_list(options) + ')');
-    }
-    this.next = function() {
-        send('next');
-    }
-    this.stop = function() {
-        send('stop');
-    }
-    this.respond = function(input) {
-        send('input((' + input + '))');
-    }
-    this.pull_response = function(id) {
-	if ( typeof id === 'undefined' ) id = that.id;
-        $.get(server + '/pull_response?id=' + id +
-	      '&format=' + format, process_response);
-    }
-    this.abort = function() {
-        $.get(server + '/abort?id=' + that.id +
-	      '&format=' + format, process_response);
-    }
-    this.destroy = function() {
-        send('destroy');
-    }
+
+    // Public methods
+    Pengine.prototype = {
+        ask: function(query, options) {
+	    send('ask((' + query + '), ' + options_to_list(options) + ')');
+	},
+	next: function() {
+	    send('next');
+	},
+        stop: function() {
+	    send('stop');
+	},
+	respond: function(input) {
+	    send('input((' + input + '))');
+	},
+        pull_response: function(id) {
+	    if ( typeof id === 'undefined' ) id = that.id;
+	    $.get(server + '/pull_response?id=' + id +
+		  '&format=' + format, process_response);
+	},
+	abort: function() {
+	    $.get(server + '/abort?id=' + that.id +
+		  '&format=' + format, process_response);
+	},
+        destroy: function() {
+	    send('destroy');
+	}
+    };
+    // JW: Why is this needed!?
+    $.extend(this, Pengine.prototype);
+
     Pengine.destroy_all = function(async) {
         if ( Pengine.ids.length > 0 ) {
 	    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
