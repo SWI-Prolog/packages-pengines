@@ -453,6 +453,8 @@ quote_op(Op, S, _Options) :-
 quote_op(Op, S, Options) :-
 	quote_atomic(Op, S, Options.put(embrace,never)).
 
+is_solo(Var) :-
+	var(Var), !, fail.
 is_solo(',').
 is_solo(';').
 is_solo('!').
