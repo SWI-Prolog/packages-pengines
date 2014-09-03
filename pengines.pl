@@ -1948,10 +1948,9 @@ event_term_to_json_data(create(ID, Features0), JSON, Style) :- !,
 event_term_to_json_data(destroy(ID, Event),
 			json{event:destroy, id:ID, data:JSON}, Style) :- !,
     event_term_to_json_data(Event, JSON, Style).
-event_term_to_json_data(error(ID, ErrorTerm),
-			json{event:error, id:ID,
-			     code:Code, data:Message}, _) :- !,
-    error_code(ErrorTerm, Code),
+event_term_to_json_data(error(ID, ErrorTerm), Error, _Style) :- !,
+    Error0 = json{event:error, id:ID, data:Message},
+    add_error_details(ErrorTerm, Error0, Error),
     message_to_string(ErrorTerm, Message).
 event_term_to_json_data(EventTerm, json{event:F, id:ID}, _) :-
     functor(EventTerm, F, 1), !,
@@ -1962,13 +1961,43 @@ event_term_to_json_data(EventTerm, json{event:F, id:ID, data:JSON}, _) :-
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
 
-error_code(error(Formal, _), Code) :-
+:- public add_error_details/3.
+
+%%  add_error_details(+Error, +JSON0, -JSON)
+%
+%   Add format error code and  location   information  to an error. Also
+%   used by pengines_io.pl.
+
+add_error_details(Error, JSON0, JSON) :-
+    add_error_code(Error, JSON0, JSON1),
+    add_error_location(Error, JSON1, JSON).
+
+%%  add_error_code(+Error, +JSON0, -JSON) is det.
+%
+%   Add a =code= field to JSON0 of Error is an ISO error term. The error
+%   code is the functor name of  the   formal  part  of the error, e.g.,
+%   =syntax_error=, =type_error=, etc.
+
+add_error_code(error(Formal, _), Error0, Error) :-
     callable(Formal), !,
-    functor(Formal, Code, _).
-error_code(Term, Code) :-
-    callable(Term), !,
-    functor(Term, Code, _).
-error_code(_, @(null)).
+    functor(Formal, Code, _),
+    Error = Error0.put(code, Code).
+add_error_code(_, Error, Error).
+
+%%  add_error_location(+Error, +JSON0, -JSON) is det.
+%
+%   Add a =location= property if the  error   can  be  associated with a
+%   source location. The location is an   object  with properties =file=
+%   and =line= and, if available, the character location in the line.
+
+add_error_location(error(_, file(Path, Line, -1, _CharNo)), Term0, Term) :-
+    atom(Path), integer(Line),
+    Term = Term0.put(_{location:_{file:Path, line:Line}}).
+add_error_location(error(_, file(Path, Line, Ch, _CharNo)), Term0, Term) :-
+    atom(Path), integer(Line), integer(Ch),
+    Term = Term0.put(_{location:_{file:Path, line:Line, ch:Ch}}).
+add_error_location(_, Term, Term).
+
 
 %%	event_to_json(+Event, -JSONTerm, +Lang) is semidet.
 %
