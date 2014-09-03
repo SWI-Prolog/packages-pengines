@@ -1645,7 +1645,7 @@ dict_to_options(Dict, Application, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),
     pairs_create_options(Pairs, Application, CreateOptions).
 
-pairs_create_options([], _, []).
+pairs_create_options([], _, []) :- !.
 pairs_create_options(T0, App, [AskOpt, TemplateOpt|T]) :-
     selectchk(ask-Ask, T0, T1),
     selectchk(template-Template, T1, T2), !,
