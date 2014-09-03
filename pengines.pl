@@ -1949,7 +1949,9 @@ event_term_to_json_data(destroy(ID, Event),
 			json{event:destroy, id:ID, data:JSON}, Style) :- !,
     event_term_to_json_data(Event, JSON, Style).
 event_term_to_json_data(error(ID, ErrorTerm),
-			json{event:error, id:ID, data:Message}, _) :- !,
+			json{event:error, id:ID,
+			     code:Code, data:Message}, _) :- !,
+    error_code(ErrorTerm, Code),
     message_to_string(ErrorTerm, Message).
 event_term_to_json_data(EventTerm, json{event:F, id:ID}, _) :-
     functor(EventTerm, F, 1), !,
@@ -1959,6 +1961,14 @@ event_term_to_json_data(EventTerm, json{event:F, id:ID, data:JSON}, _) :-
     arg(1, EventTerm, ID),
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
+
+error_code(error(Formal, _), Code) :-
+    callable(Formal), !,
+    functor(Formal, Code, _).
+error_code(Term, Code) :-
+    callable(Term), !,
+    functor(Term, Code, _).
+error_code(_, @(null)).
 
 %%	event_to_json(+Event, -JSONTerm, +Lang) is semidet.
 %

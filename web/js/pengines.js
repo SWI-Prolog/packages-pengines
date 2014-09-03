@@ -111,6 +111,7 @@ function Pengine(options) {
         } else if (obj.event === 'died') {
 	    if ( !that.aborted ) {
 	        obj.data = "Pengine has died";
+		obj.code = "died";
 	        if (options.onerror)
 		    options.onerror.call(obj);
 		else if (typeof(console) !== 'undefined')
