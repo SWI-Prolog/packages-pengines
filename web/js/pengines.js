@@ -118,6 +118,16 @@ function Pengine(options) {
 	    }
 	}
     };
+    /**
+     * Process the reply to a `pull_response`.  If the last answer was
+     * final, this question will be asked to a death pengine.  We do not
+     * consider this an error.
+     */
+    function process_pull_response(obj) {
+        obj.pengine = that;
+	if ( obj.event !== 'died')
+	    process_response(obj);
+    }
     function send(event) {
         var event = encodeURIComponent(event);
         $.get(server + '/send?id=' + that.id +
@@ -141,7 +151,7 @@ function Pengine(options) {
         pull_response: function(id) {
 	    if ( typeof id === 'undefined' ) id = that.id;
 	    $.get(server + '/pull_response?id=' + id +
-		  '&format=' + format, process_response);
+		  '&format=' + format, process_pull_response);
 	},
 	abort: function() {
 	    $.get(server + '/abort?id=' + that.id +
