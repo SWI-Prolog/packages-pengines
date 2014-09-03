@@ -215,11 +215,14 @@ pengine_portray_clause(Term) :-
 %	Send output from print_message/2 to   the  pengine. Messages are
 %	embedded in a <pre class=msg-Kind></pre> environment.
 
-user:message_hook(_Term, Kind, Lines) :-
+user:message_hook(Term, Kind, Lines) :-
 	Kind \== silent,
 	pengine_self(_),
 	atom_concat('msg-', Kind, Class),
-	send_html(pre(class(Class), \message_lines(Lines))).
+	phrase(html(pre(class(['prolog-message', Class]),
+			\message_lines(Lines))), Tokens),
+	with_output_to(string(HTMlString), print_html(Tokens)),
+	pengine_output(message(Term, Kind, HTMlString)).
 
 message_lines([]) --> [].
 message_lines([nl|T]) --> !,
@@ -308,18 +311,27 @@ pengine_module(user).
 :- multifile
 	pengines:event_to_json/3.
 
-/* JSON-S */
+%%	pengines:event_to_json(+PrologEvent, -JSONEvent, +Format)
+%
+%	If Format equals `'json-s'` or  `'json-html'`, emit a simplified
+%	JSON representation of the  data,   suitable  for notably SWISH.
+%	This deals with Prolog answers and output messages. If a message
+%	originates from print_message/3,  it   gets  several  additional
+%	properties:
+%
+%	  - message:Kind
+%	    Indicate the _kind_ of the message (=error=, =warning=,
+%	    etc.)
+%	  - location:_{file:File, line:Line, ch:CharPos}
+%	    If the message is related to a source location, indicate the
+%	    file and line and, if available, the character location.
 
 pengines:event_to_json(success(ID, Answers0, More),
 		       json{event:success, id:ID, data:Answers, more:More},
 		       'json-s') :- !,
 	maplist(answer_to_json_strings(ID), Answers0, Answers).
-pengines:event_to_json(output(ID, Term),
-		      json([event=output, id=ID, data=Data]), 'json-s') :- !,
-	(   atomic(Term)
-	->  Data = Term
-	;   term_string(Term, Data)
-	).
+pengines:event_to_json(output(ID, Term), JSON, 'json-s') :- !,
+	map_output(ID, Term, JSON).
 
 %%	answer_to_json_strings(+Pengine, +AnswerDictIn, -AnswerDict).
 %
@@ -341,19 +353,11 @@ term_string_value(Pengine, N-V, N-A) :-
 /* JSON-HTML */
 
 pengines:event_to_json(success(ID, Answers0, More),
-		       json{event:success,
-			    id:ID,
-			    data:Answers,
-			    more:More
-			   },
+		       json{event:success, id:ID, data:Answers, more:More},
 		       'json-html') :- !,
 	maplist(map_answer(ID), Answers0, Answers).
-pengines:event_to_json(output(ID, Term),
-		       json{event:output, id:ID, data:Data}, 'json-html') :- !,
-	(   atomic(Term)
-	->  Data = Term
-	;   term_html_string(ID, Term, Data)
-	).
+pengines:event_to_json(output(ID, Term), JSON, 'json-html') :- !,
+	map_output(ID, Term, JSON).
 
 map_answer(ID, Bindings0, Answer) :-
 	dict_bindings(Bindings0, Bindings1),
@@ -394,6 +398,21 @@ subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
 	term_html_string(ID, Value, HTMLString).
 subst_to_html(_, Term, _) :-
 	assertion(Term = '$VAR'(_)).
+
+
+%%	map_output(+ID, +Term, -JSON) is det.
+%
+%	Map an output term. This is the same for json-s and json-html.
+
+map_output(ID, message(Term, Kind, HTMLString), JSON) :-
+	atomic(HTMLString), !,
+	JSON0 = json{event:output, id:ID, message:Kind, data:HTMLString},
+	pengines:add_error_details(Term, JSON0, JSON).
+map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
+	(   atomic(Term)
+	->  Data = Term
+	;   term_string(Term, Data)
+	).
 
 
 		 /*******************************
