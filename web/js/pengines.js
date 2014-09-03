@@ -30,7 +30,7 @@ function Pengine(options) {
     if ( typeof Pengine.ids == 'undefined' ) {
         Pengine.ids = [];
     }
-    var src = options.src ? options.src : "";
+    var src = options.src ? [options.src] : [];
     var format = options.format ? options.format : "json";
     var server = options.server !== undefined ? options.server : "/pengine";
     this.options = options;
@@ -39,10 +39,9 @@ function Pengine(options) {
     // Private functions
     function source() {
         var scripts = document.getElementsByTagName('script');
-        var src = "";
         for (var i = 0; i < scripts.length; i++) {
             if (scripts[i].getAttribute('type') == 'text/x-prolog') {
-                src += '\n' + scripts[i].textContent;
+                src.push(scripts[i].textContent);
             }
         }
         return src;
@@ -175,7 +174,7 @@ function Pengine(options) {
     }
     // On creation
     var createOptions = {};
-    createOptions["src_text"] = source() + "\n" + src;
+    createOptions["src_text"] = source().join('\n');
     createOptions["format"] = format;
     if (options.application) createOptions["application"] = options.application;
     if (options.ask) createOptions["ask"] = options.ask;
