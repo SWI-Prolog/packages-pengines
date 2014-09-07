@@ -222,7 +222,11 @@ user:message_hook(Term, Kind, Lines) :-
 	phrase(html(pre(class(['prolog-message', Class]),
 			\message_lines(Lines))), Tokens),
 	with_output_to(string(HTMlString), print_html(Tokens)),
-	pengine_output(message(Term, Kind, HTMlString)).
+	(   source_location(File, Line)
+	->  Src = File:Line
+	;   Src = (-)
+	),
+	pengine_output(message(Term, Kind, HTMlString, Src)).
 
 message_lines([]) --> [].
 message_lines([nl|T]) --> !,
@@ -404,10 +408,15 @@ subst_to_html(_, Term, _) :-
 %
 %	Map an output term. This is the same for json-s and json-html.
 
-map_output(ID, message(Term, Kind, HTMLString), JSON) :-
+map_output(ID, message(Term, Kind, HTMLString, Src), JSON) :-
 	atomic(HTMLString), !,
 	JSON0 = json{event:output, id:ID, message:Kind, data:HTMLString},
-	pengines:add_error_details(Term, JSON0, JSON).
+	pengines:add_error_details(Term, JSON0, JSON1),
+	(   Src = File:Line,
+	    \+ JSON1.get(location) = _
+	->  JSON = JSON1.put(_{location:_{file:File, line:Line}})
+	;   JSON = JSON1
+	).
 map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
 	(   atomic(Term)
 	->  Data = Term
