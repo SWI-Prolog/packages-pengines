@@ -30,6 +30,7 @@
 :- module(pengines_io,
 	  [ pengine_writeln/1,		% +Term
 	    pengine_nl/0,
+	    pengine_flush_output/0,
 	    pengine_format/1,		% +Format
 	    pengine_format/2,		% +Format, +Args
 
@@ -124,6 +125,12 @@ pengine_writeln(Term) :-
 pengine_nl :-
 	send_html(br([])).
 
+%%	pengine_flush_output
+%
+%	No-op.  Pengines do not use output buffering (maybe they should
+%	though).
+
+pengine_flush_output.
 
 %%	pengine_write_term(+Term, +Options)
 %
@@ -452,6 +459,7 @@ sandbox:safe_primitive(system:statistics(_,_)).
 
 io_predicate(writeln(_)).
 io_predicate(nl).
+io_predicate(flush_output).
 io_predicate(format(_)).
 io_predicate(format(_,_)).
 io_predicate(read(_)).
