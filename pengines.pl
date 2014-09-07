@@ -1991,10 +1991,10 @@ add_error_code(_, Error, Error).
 %   and =line= and, if available, the character location in the line.
 
 add_error_location(error(_, file(Path, Line, -1, _CharNo)), Term0, Term) :-
-    atom(Path), integer(Line),
+    atom(Path), integer(Line), !,
     Term = Term0.put(_{location:_{file:Path, line:Line}}).
 add_error_location(error(_, file(Path, Line, Ch, _CharNo)), Term0, Term) :-
-    atom(Path), integer(Line), integer(Ch),
+    atom(Path), integer(Line), integer(Ch), !,
     Term = Term0.put(_{location:_{file:Path, line:Line, ch:Ch}}).
 add_error_location(_, Term, Term).
 
