@@ -57,6 +57,7 @@
 :- use_module(library(settings)).
 :- use_module(library(error)).
 :- use_module(library(listing)).
+:- use_module(library(sandbox)).
 :- use_module(library(http/html_write)).
 :- use_module(library(http/term_html)).
 :- html_meta send_html(html).
@@ -439,7 +440,6 @@ map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
 	sandbox:safe_primitive/1,	% Goal
 	sandbox:safe_meta/2.		% Goal, Called
 
-sandbox:safe_primitive(pengines_io:pengine_format(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_listing(_)).
 sandbox:safe_primitive(pengines_io:pengine_nl).
 sandbox:safe_primitive(pengines_io:pengine_print(_)).
@@ -452,6 +452,9 @@ sandbox:safe_primitive(pengines_io:pengine_portray_clause(_)).
 sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
 sandbox:safe_primitive(system:statistics(_,_)).
+
+sandbox:safe_meta(pengines_io:pengine_format(Format, Args), Calls) :-
+	sandbox:format_calls(Format, Args, Calls).
 
 
 		 /*******************************
