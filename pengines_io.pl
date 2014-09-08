@@ -448,6 +448,7 @@ sandbox:safe_primitive(pengines_io:pengine_write_canonical(_)).
 sandbox:safe_primitive(pengines_io:pengine_write_term(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_writeln(_)).
 sandbox:safe_primitive(pengines_io:pengine_writeq(_)).
+sandbox:safe_primitive(pengines_io:pengine_portray_clause(_)).
 sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
 sandbox:safe_primitive(system:statistics(_,_)).
