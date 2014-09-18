@@ -46,6 +46,7 @@
 	    pengine_application/1,              % +Application
 	    current_pengine_application/1,      % ?Application
             pengine_property/2,			% ?Pengine, ?Property
+	    pengine_user/1,			% -User
             pengine_event_loop/2,		% :Closure, +Options
             pengine_rpc/2,			% +Server, :Goal
             pengine_rpc/3			% +Server, :Goal, +Options
@@ -94,7 +95,8 @@ from Prolog or JavaScript.
 
 :- multifile
 	event_to_json/3,		% +Event, -JSON, +Format
-	prepare_module/3.		% +Module, +Application, +Options
+	prepare_module/3,		% +Module, +Application, +Options
+	authentication_hook/3.		% +Request, +Application, -User
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
@@ -544,11 +546,13 @@ pengine_destroy(ID, _) :-
 :- dynamic
 	current_pengine/6,		% Id, ParentId, Thread, URL, App, Destroy
 	pengine_queue/4,		% Pengine, Queue, TimeOut, Time
-	output_queue/3.			% Id, Queue, Time
+	output_queue/3,			% Id, Queue, Time
+	pengine_user/2.			% Id, User
 :- volatile
 	current_pengine/6,
 	pengine_queue/4,
-	output_queue/3.
+	output_queue/3,
+	pengine_user/2.
 
 :- thread_local
 	child/2.			% ?Name, ?Child
@@ -576,7 +580,8 @@ pengine_unregister(Id) :-
     ->	with_mutex(pengine, sync_delay_destroy_queue(Id, Queue))
     ;	true
     ),
-    retractall(current_pengine(Id, _, Me, _, _, _)).
+    retractall(current_pengine(Id, _, Me, _, _, _)),
+    retractall(pengine_user(Id, _)).
 
 pengine_unregister_remote(Id) :-
     retractall(current_pengine(Id, _Parent, 0, _, _, _)).
@@ -894,6 +899,7 @@ pengine_create_option(ask(_)).
 pengine_create_option(template(_)).
 pengine_create_option(chunk(_)).
 pengine_create_option(alias(_)).
+pengine_create_option(user(_)).
 
 
 %%	pengine_done is det.
@@ -925,6 +931,7 @@ pengine_main(Parent, Options, Application) :-
     fix_streams,
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
+    pengine_register_user(Options),
     catch(in_temporary_module(
 	      Self,
 	      pengine_prepare_source(Application, Options),
@@ -1622,7 +1629,9 @@ http_pengine_create(Request) :-
     valid_format(Format),
     (	current_application(Application)
     ->  allowed(Request, Application),
-	dict_to_options(Dict, Application, CreateOptions),
+	authenticate(Request, Application, UserOptions),
+	dict_to_options(Dict, Application, CreateOptions0),
+	append(UserOptions, CreateOptions0, CreateOptions),
 	pengine_uuid(Pengine),
 	message_queue_create(Queue, [max_size(25)]),
 	setting(Application:time_limit, TimeLimit),
@@ -1667,7 +1676,7 @@ pairs_create_options([ask-String|T0], App,
     pairs_create_options(T0, App, T).
 pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     Opt =.. [N,V],
-    pengine_create_option(Opt), !,
+    pengine_create_option(Opt), N \== user, !,
     (   create_option_type(Opt, Type)
     ->  (   Type == term
 	->  atom_to_term(V0, V, _)
@@ -2054,6 +2063,57 @@ ip_pattern([*], _) :- !.
 ip_pattern([S|T0], [N|T]) :-
 	number_string(N, S),
 	ip_pattern(T0, T).
+
+
+%%  authenticate(+Request, +Application, -UserOptions:list) is det.
+%
+%   Call authentication_hook/3, returning either `[user(User)]`, `[]` or
+%   an exception.
+
+authenticate(Request, Application, UserOptions) :-
+	authentication_hook(Request, Application, User), !,
+	must_be(ground, User),
+	UserOptions = [user(User)].
+authenticate(_, _, []).
+
+%%  authentication_hook(+Request, +Application, -User) is semidet.
+%
+%   This hook is called  from  the   =/pengine/create=  HTTP  handler to
+%   discover whether the server is accessed   by  an authorized user. It
+%   can react in three ways:
+%
+%     - Succeed, binding User to a ground term.  The authentity of the
+%       user is available through pengine_user/1.
+%     - Fail.  The =/create= succeeds, but the pengine is not associated
+%       with a user.
+%     - Throw an exception to prevent creation of the pengine.  Two
+%       meaningful exceptions are:
+%         - throw(http_reply(authorise(basic(Realm))))
+%         Start a normal HTTP login challenge (reply 401)
+%         - throw(http_reply(forbidden(Path))))
+%         Reject the request using a 403 repply.
+%
+%   @see http_authenticate/3 can be used to implement this hook using
+%        default HTTP authentication data.
+
+pengine_register_user(Options) :-
+    option(user(User), Options), !,
+    pengine_self(Me),
+    asserta(pengine_user(Me, User)).
+pengine_register_user(_).
+
+
+%%  pengine_user(-User) is semidet.
+%
+%   True when the pengine was create by  an HTTP request that authorized
+%   User.
+%
+%   @see authentication_hook/3 can be used to extract authorization from
+%        the HTTP header.
+
+pengine_user(User) :-
+    pengine_self(Me),
+    pengine_user(Me, User).
 
 
 		 /*******************************
