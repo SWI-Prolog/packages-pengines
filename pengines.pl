@@ -2187,6 +2187,7 @@ sandbox:safe_primitive(pengines:pengine_output(_)).
 sandbox:safe_primitive(pengines:pengine_debug(_,_)).
 sandbox:safe_primitive(pengines:pengine_ask(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_pull_response(_,_)).
+sandbox:safe_primitive(pengines:pengine_user(_)).
 
 %%	sandbox:safe_meta(+Goal, -Called) is semidet.
 %
