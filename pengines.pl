@@ -96,7 +96,8 @@ from Prolog or JavaScript.
 :- multifile
 	event_to_json/3,		% +Event, -JSON, +Format
 	prepare_module/3,		% +Module, +Application, +Options
-	authentication_hook/3.		% +Request, +Application, -User
+	authentication_hook/3,		% +Request, +Application, -User
+	not_sandboxed/2.		% +User, +App
 
 :- predicate_options(pengine_create/1, 1,
 		     [ id(-atom),
@@ -1134,7 +1135,9 @@ more_solutions(Event, ID, Choice) :-
 ask(ID, Goal, Options) :-
     get_pengine_module(ID, Module),
     expand_goal(Module:Goal, Goal1),
-    catch(safe_goal(Goal1), Error, true),
+    catch(( pengine_not_sandboxed(ID) ;
+	    safe_goal(Goal1)
+	  ), Error, true), !,
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
@@ -1149,6 +1152,31 @@ ask(ID, Goal, Options) :-
 findnsols_no_empty(N, Template, Goal, List) :-
 	findnsols(N, Template, Goal, List),
 	List \== [].
+
+%%  pengine_not_sandboxed(+Pengine) is semidet.
+%
+%   True when pengine does not operate in sandboxed mode. This implies a
+%   user must be  registered  by   authentication_hook/3  and  the  hook
+%   pengines:not_sandboxed(User, Application) must succeed.
+
+pengine_not_sandboxed(ID) :-
+	pengine_user(ID, User),
+	pengine_property(ID, application(App)),
+	not_sandboxed(User, App), !.
+
+%%  not_sandboxed(+User, +Application) is semidet.
+%
+%   This hook is called to see whether the Pengine must be executed in a
+%   protected environment. It is only called after authentication_hook/3
+%   has confirmed the authentity  of  the   current  user.  If this hook
+%   succeeds, both loading the code and  executing the query is executed
+%   without enforcing sandbox security.  Typically, one should:
+%
+%     1. Provide a safe user authentication hook.
+%     2. Enable HTTPS in the server or put it behind an HTTPS proxy and
+%	 ensure that the network between the proxy and the pengine
+%	 server can be trusted.
+
 
 /** pengine_pull_response(+Pengine, +Options) is det
 
@@ -2130,13 +2158,14 @@ pengine_create/1.
 pengine_src_text(Src, Module) :-
     pengine_self(Self),
     format(atom(ID), 'pengine://~w/src', [Self]),
+    extra_load_options(Self, Options),
     setup_call_cleanup(
 	open_chars_stream(Src, Stream),
 	load_files(Module:ID,
 		   [ stream(Stream),
 		     module(Module),
-		     sandboxed(true),
 		     silent(true)
+		   | Options
 		   ]),
 	close(Stream)).
 
@@ -2151,15 +2180,21 @@ pengine_src_url(URL, Module) :-
     pengine_self(Self),
     uri_encoded(path, URL, Path),
     format(atom(ID), 'pengine://~w/url/~w', [Self, Path]),
+    extra_load_options(Self, Options),
     setup_call_cleanup(
 	http_open(URL, Stream, []),
 	load_files(Module:ID,
 		   [ stream(Stream),
 		     module(Module),
-		     sandboxed(true),
-		     silent(true)
+		     sandboxed(true)
+		   | Options
 		   ]),
 	close(Stream)).
+
+extra_load_options(Pengine, Options) :-
+	pengine_not_sandboxed(Pengine), !,
+	Options = [].
+extra_load_options(_, [sandboxed(true)]).
 
 
 		 /*******************************
