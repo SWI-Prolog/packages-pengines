@@ -139,8 +139,11 @@ function Pengine(options) {
         ask: function(query, options) {
 	    send('ask((' + query + '), ' + options_to_list(options) + ')');
 	},
-	next: function() {
-	    send('next');
+	next: function(n) {
+	    if ( n === undefined )
+	      send('next');
+	    else
+	      send('next('+n+')');
 	},
         stop: function() {
 	    send('stop');
