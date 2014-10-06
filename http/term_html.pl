@@ -90,9 +90,13 @@ any(Term, Options) -->
 
 compound('$VAR'(Var), Options) -->
 	{ Options.get(numbervars) == true, !,
-	  format(string(S), '~W', ['$VAR'(Var), [numbervars(true)]])
+	  format(string(S), '~W', ['$VAR'(Var), [numbervars(true)]]),
+	  (   S == "_"
+	  ->  Class = 'pl-anon'
+	  ;   Class = 'pl-var'
+	  )
 	},
-	html(span(class('pl-var'), S)).
+	html(span(class(Class), S)).
 compound(List, Options) -->
 	{ (   List == []
 	  ;   List = [_|_]				% May have unbound tail
@@ -464,7 +468,7 @@ is_solo('!').
 %	True if Term is a primitive term, rendered using the CSS
 %	class Class.
 
-primitive(Term, Type) :- var(Term),     !, Type = 'pl-var'.
+primitive(Term, Type) :- var(Term),     !, Type = 'pl-avar'.
 primitive(Term, Type) :- atom(Term),    !, Type = 'pl-atom'.
 primitive(Term, Type) :- string(Term),  !, Type = 'pl-string'.
 primitive(Term, Type) :- integer(Term), !, Type = 'pl-int'.
