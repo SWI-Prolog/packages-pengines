@@ -72,6 +72,14 @@ test(chunk, Results = [a,b,c]) :-
 	]),
     collect(X, p(X), Results, [chunk(2)]),
     assertion(no_more_pengines).
+test(chunk2, Results = [a,b,c]) :-
+    pengine_create(
+	[ src_text("p(a). p(b). p(c).")
+	]),
+    collect_state(X, p(X), State, [chunk(2), next(2)]),
+    Results = State.results,
+    assertion(State.replies = 2),
+    assertion(no_more_pengines).
 test(stop, Results = [a,b]) :-
     pengine_create(
 	[ src_text("p(a). p(b). p(c).")
@@ -293,30 +301,46 @@ papp:p1(c).
 %
 %	  * stop_after(N)
 %	  Stop collecting results after N answers
+%	  * next(N)
+%	  Passed to pengine_next/2
+%
+%	Other options are passed to pengine_ask/3.
 
 collect(Results, Options) :-
     collect(-, -, Results, Options).
 
 collect(Template, Goal, Results, Options) :-
-    (	select_option(stop_after(StopAfter), Options, Options1)
-    ->	State = _{results:[], stop_after:StopAfter, options:Options1}
-    ;	State = _{results:[], options:Options}
-    ),
-    pengine_event_loop(collect_handler(Template, Goal, State), []),
+    collect_state(Template, Goal, State, Options),
     Results = State.results.
+
+collect_state(Template, Goal, State, Options) :-
+    partition(next_option, Options, NextOptions, Options1),
+    partition(state_option, Options1, StateOptions, AskOptions),
+    dict_create(State, state,
+		[ results([]),
+		  replies(0),
+		  options(_{ask:AskOptions, next:NextOptions})
+		| StateOptions
+		]),
+    pengine_event_loop(collect_handler(Template, Goal, State), []).
+
+state_option(stop_after(_)).
+next_option(next(_)).
 
 collect_handler(Template, Goal, State, create(Id, _)) :-
     Goal \== (-),
-    pengine_ask(Id, Goal, [template(Template)|State.options]).
+    pengine_ask(Id, Goal, [template(Template)|State.options.ask]).
 collect_handler(_, _, State, success(Id, Values, More)) :-
     append(State.results, Values, R1),
     b_set_dict(results, State, R1),
+    Replies1 is State.replies+1,
+    b_set_dict(replies, State, Replies1),
     (	StopAfter = State.get(stop_after),
 	length(R1, Collected),
 	Collected >= StopAfter
     ->	pengine_destroy(Id)
     ;	More == true
-    ->	pengine_next(Id, [])
+    ->	pengine_next(Id, State.options.next)
     ;	true
     ).
 

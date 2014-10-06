@@ -156,7 +156,7 @@ do_random_delay :-
     sleep(Delay).
 
 :- meta_predicate			% internal meta predicates
-	solve(?, 0, +),
+	solve(+, ?, 0, +),
 	findnsols_no_empty(+, ?, 0, -),
 	pengine_event_loop(+, 1, +).
 
@@ -426,10 +426,16 @@ pengine_ask_option(chunk(_)).
 
 /** pengine_next(+NameOrID, +Options) is det
 
-Asks pengine NameOrID for the next solution to a query started by
-pengine_ask/3. Options are passed to pengine_send/3.
+Asks pengine NameOrID for the  next  solution   to  a  query  started by
+pengine_ask/3. Defined options are:
 
-Here too, results will be returned in the form of _event terms_.
+    * chunk(+Count)
+    Modify the chunk-size to Count before asking the next set of
+    solutions.
+
+Remaining  options  are  passed  to    pengine_send/3.   The  result  of
+re-executing the current goal is returned  to the caller's message queue
+in the form of _event terms_.
 
     * success(ID, Terms, More)
       ID is the id of the pengine that succeeded in finding yet another
@@ -463,7 +469,11 @@ pengine_next(ID, Options) :-
 
 */
 
-pengine_next(ID, Options) :- pengine_send(ID, next, Options).
+pengine_next(ID, Options) :-
+	select_option(chunk(Count), Options, Options1), !,
+	pengine_send(ID, next(Count), Options1).
+pengine_next(ID, Options) :-
+	pengine_send(ID, next, Options).
 
 
 /** pengine_stop(+NameOrID, +Options) is det
@@ -1049,7 +1059,7 @@ pengine_terminate(ID) :-
     thread_detach(Me).
 
 
-%%	solve(+Template, :Goal, +ID) is det.
+%%	solve(+Chunk, +Template, :Goal, +ID) is det.
 %
 %	Solve Goal. Note that because we can ask for a new goal in state
 %	`6', we must provide for an ancesteral cut (prolog_cut_to/1). We
@@ -1057,15 +1067,17 @@ pengine_terminate(ID) :-
 %	prolog_current_choice/1. This is the reason   why this predicate
 %	has two clauses.
 
-solve(Template, Goal, ID) :-
+solve(Chunk, Template, Goal, ID) :-
     prolog_current_choice(Choice),
-    (   call_cleanup(catch(Goal, Error, true), Det=true),
+    (   State = count(Chunk),
+	call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
+			   Error, true), Det=true),
         (   var(Error)
         ->  (   var(Det)
-            ->  pengine_reply(success(ID, Template, true)),
-                more_solutions(ID, Choice)
+            ->  pengine_reply(success(ID, Result, true)),
+                more_solutions(ID, Choice, State)
             ;   !,			% commit
-		destroy_or_continue(success(ID, Template, false))
+		destroy_or_continue(success(ID, Result, false))
             )
         ;   !,				% commit
 	    (	Error == abort_query
@@ -1076,8 +1088,11 @@ solve(Template, Goal, ID) :-
     ;   !,				% commit
 	destroy_or_continue(failure(ID))
     ).
-solve(_, _, _).				% leave a choice point
+solve(_, _, _, _).				% leave a choice point
 
+findnsols_no_empty(N, Template, Goal, List) :-
+	findnsols(N, Template, Goal, List),
+	List \== [].
 
 destroy_or_continue(Event) :-
     arg(1, Event, ID),
@@ -1091,7 +1106,7 @@ destroy_or_continue(Event) :-
 	guarded_main_loop(ID)
     ).
 
-%%	more_solutions(+Pengine, +Choice)
+%%	more_solutions(+Pengine, +Choice, +State)
 %
 %	Called after a solution was found while  there can be more. This
 %	is state `6' of the state machine. It processes these events:
@@ -1099,32 +1114,40 @@ destroy_or_continue(Event) :-
 %	  * stop
 %	  Go back via state `7' to state `2' (guarded_main_loop/1)
 %	  * next
-%	  Fail.  This causes solve/3 to backtrack on the goal asked.
+%	  Fail.  This causes solve/3 to backtrack on the goal asked,
+%	  providing at most the current `chunk` solutions.
+%	  * next(Count)
+%	  As `next`, but sets the new chunk-size to Count.
 %	  * ask(Goal, Options)
 %	  Ask another goal.  Note that we must commit the choice point
 %	  of the previous goal asked for.
 
-more_solutions(ID, Choice) :-
+more_solutions(ID, Choice, State) :-
     pengine_request(Event),
-    more_solutions(Event, ID, Choice).
+    more_solutions(Event, ID, Choice, State).
 
-more_solutions(stop, ID, _Choice) :- !,
+more_solutions(stop, ID, _Choice, _State) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
     destroy_or_continue(stop(ID)).
-more_solutions(next, ID, _Choice) :- !,
+more_solutions(next, ID, _Choice, _State) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
     fail.
-more_solutions(ask(Goal, Options), ID, Choice) :- !,
+more_solutions(next(Count), ID, _Choice, State) :-
+    Count > 0, !,
+    debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next(Count)]),
+    nb_setarg(1, State, Count),
+    fail.
+more_solutions(ask(Goal, Options), ID, Choice, _State) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, ask(Goal)]),
     prolog_cut_to(Choice),
     ask(ID, Goal, Options).
-more_solutions(destroy, ID, _Choice) :- !,
+more_solutions(destroy, ID, _Choice, _State) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
     pengine_terminate(ID).
-more_solutions(Event, ID, Choice) :-
+more_solutions(Event, ID, Choice, State) :-
     debug(pengine(transition), '~q: 6 = ~q => 6', [ID, protocol_error(Event)]),
     pengine_reply(error(ID, error(protocol_error, _))),
-    more_solutions(ID, Choice).
+    more_solutions(ID, Choice, State).
 
 %%	ask(+Pengine, :Goal, +Options)
 %
@@ -1141,17 +1164,10 @@ ask(ID, Goal, Options) :-
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
-        (   N == 1
-        ->  solve([Template], Goal1, ID)
-        ;   solve(Res, findnsols_no_empty(N, Template, Goal1, Res), ID)
-        )
+	solve(N, Template, Goal1, ID)
     ;   pengine_reply(error(ID, Error)),
 	guarded_main_loop(ID)
     ).
-
-findnsols_no_empty(N, Template, Goal, List) :-
-	findnsols(N, Template, Goal, List),
-	List \== [].
 
 %%  pengine_not_sandboxed(+Pengine) is semidet.
 %
