@@ -159,7 +159,7 @@ pengine_write(Term) :-
 pengine_writeq(Term) :-
 	pengine_write_term(Term, [quoted(true), numbervars(true)]).
 pengine_display(Term) :-
-	pengine_write_term(Term, [quoted(true)]).
+	pengine_write_term(Term, [quoted(true), ignore_ops(true)]).
 pengine_print(Term) :-
 	current_prolog_flag(print_write_options, Options),
 	pengine_write_term(Term, Options).
