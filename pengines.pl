@@ -1069,15 +1069,20 @@ pengine_terminate(ID) :-
 
 solve(Chunk, Template, Goal, ID) :-
     prolog_current_choice(Choice),
-    (   State = count(Chunk),
-	call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
+    State = count(Chunk),
+    statistics(cputime, Epoch),
+    Time = time(Epoch),
+    (   call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
 			   Error, true), Det=true),
+	arg(1, Time, T0),
+	statistics(cputime, T1),
+	CPUTime is T1-T0,
         (   var(Error)
         ->  (   var(Det)
-            ->  pengine_reply(success(ID, Result, true)),
-                more_solutions(ID, Choice, State)
+            ->  pengine_reply(success(ID, Result, CPUTime, true)),
+                more_solutions(ID, Choice, State, Time)
             ;   !,			% commit
-		destroy_or_continue(success(ID, Result, false))
+		destroy_or_continue(success(ID, Result, CPUTime, false))
             )
         ;   !,				% commit
 	    (	Error == abort_query
@@ -1086,7 +1091,10 @@ solve(Chunk, Template, Goal, ID) :-
 	    )
         )
     ;   !,				% commit
-	destroy_or_continue(failure(ID))
+	arg(1, Time, T0),
+	statistics(cputime, T1),
+	CPUTime is T1-T0,
+	destroy_or_continue(failure(ID, CPUTime))
     ).
 solve(_, _, _, _).				% leave a choice point
 
@@ -1106,7 +1114,7 @@ destroy_or_continue(Event) :-
 	guarded_main_loop(ID)
     ).
 
-%%	more_solutions(+Pengine, +Choice, +State)
+%%	more_solutions(+Pengine, +Choice, +State, +Time)
 %
 %	Called after a solution was found while  there can be more. This
 %	is state `6' of the state machine. It processes these events:
@@ -1122,32 +1130,36 @@ destroy_or_continue(Event) :-
 %	  Ask another goal.  Note that we must commit the choice point
 %	  of the previous goal asked for.
 
-more_solutions(ID, Choice, State) :-
+more_solutions(ID, Choice, State, Time) :-
     pengine_request(Event),
-    more_solutions(Event, ID, Choice, State).
+    more_solutions(Event, ID, Choice, State, Time).
 
-more_solutions(stop, ID, _Choice, _State) :- !,
+more_solutions(stop, ID, _Choice, _State, _Time) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
     destroy_or_continue(stop(ID)).
-more_solutions(next, ID, _Choice, _State) :- !,
+more_solutions(next, ID, _Choice, _State, Time) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
+    statistics(cputime, T0),
+    nb_setarg(1, Time, T0),
     fail.
-more_solutions(next(Count), ID, _Choice, State) :-
+more_solutions(next(Count), ID, _Choice, State, Time) :-
     Count > 0, !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next(Count)]),
     nb_setarg(1, State, Count),
+    statistics(cputime, T0),
+    nb_setarg(1, Time, T0),
     fail.
-more_solutions(ask(Goal, Options), ID, Choice, _State) :- !,
+more_solutions(ask(Goal, Options), ID, Choice, _State, _Time) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, ask(Goal)]),
     prolog_cut_to(Choice),
     ask(ID, Goal, Options).
-more_solutions(destroy, ID, _Choice, _State) :- !,
+more_solutions(destroy, ID, _Choice, _State, _Time) :- !,
     debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
     pengine_terminate(ID).
-more_solutions(Event, ID, Choice, State) :-
+more_solutions(Event, ID, Choice, State, Time) :-
     debug(pengine(transition), '~q: 6 = ~q => 6', [ID, protocol_error(Event)]),
     pengine_reply(error(ID, error(protocol_error, _))),
-    more_solutions(ID, Choice, State).
+    more_solutions(ID, Choice, State, Time).
 
 %%	ask(+Pengine, :Goal, +Options)
 %
@@ -1493,10 +1505,10 @@ pengine_process_event(debug(ID, Msg), Closure, true, _Options) :-
 pengine_process_event(prompt(ID, Term), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))).
-pengine_process_event(success(ID, Sol, More), Closure, true, _Options) :-
+pengine_process_event(success(ID, Sol, _Time, More), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
     ignore(call(Closure, success(ID, Sol, More))).
-pengine_process_event(failure(ID), Closure, true, _Options) :-
+pengine_process_event(failure(ID, _Time), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
     ignore(call(Closure, failure(ID))).
 pengine_process_event(error(ID, Error), Closure, Continue, _Options) :-
@@ -1578,7 +1590,7 @@ process_event(create(_ID, Features), Template, State, Options) :-
     process_event(First, Template, State, Options).
 process_event(error(_ID, Error), _Template, _, _Options) :-
     throw(Error).
-process_event(failure(_ID), _Template, _, _Options) :-
+process_event(failure(_ID, _Time), _Template, _, _Options) :-
     fail.
 process_event(prompt(ID, Prompt), Template, State, Options) :-
     pengine_rpc_prompt(ID, Prompt, Reply),
@@ -1592,9 +1604,9 @@ process_event(debug(ID, Message), Template, State, Options) :-
     debug(pengine(debug), '~w', [Message]),
     pengine_pull_response(ID, Options),
     wait_event(Template, State, Options).
-process_event(success(_ID, Solutions, false), Template, _, _Options) :- !,
+process_event(success(_ID, Solutions, _Time, false), Template, _, _Options) :- !,
     member(Template, Solutions).
-process_event(success(ID, Solutions, true), Template, State, Options) :-
+process_event(success(ID, Solutions, _Time, true), Template, State, Options) :-
     (	member(Template, Solutions)
     ;   pengine_next(ID, Options),
 	wait_event(Template, State, Options)
@@ -1987,8 +1999,9 @@ disable_client_cache :-
 
 event_term_to_json_data(Event, JSON, Lang) :-
     event_to_json(Event, JSON, Lang), !.
-event_term_to_json_data(success(ID, Bindings0, More),
-			json{event:success, id:ID, data:Bindings, more:More},
+event_term_to_json_data(success(ID, Bindings0, Time, More),
+			json{event:success, id:ID, time:Time,
+			     data:Bindings, more:More},
 			json) :- !,
     term_to_json(Bindings0, Bindings).
 event_term_to_json_data(create(ID, Features0), JSON, Style) :- !,
@@ -2005,6 +2018,8 @@ event_term_to_json_data(error(ID, ErrorTerm), Error, _Style) :- !,
     Error0 = json{event:error, id:ID, data:Message},
     add_error_details(ErrorTerm, Error0, Error),
     message_to_string(ErrorTerm, Message).
+event_term_to_json_data(failure(ID, Time),
+			json{event:failure, id:ID, time:Time}, _).
 event_term_to_json_data(EventTerm, json{event:F, id:ID}, _) :-
     functor(EventTerm, F, 1), !,
     arg(1, EventTerm, ID).

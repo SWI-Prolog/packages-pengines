@@ -338,8 +338,9 @@ pengine_module(user).
 %	    If the message is related to a source location, indicate the
 %	    file and line and, if available, the character location.
 
-pengines:event_to_json(success(ID, Answers0, More),
-		       json{event:success, id:ID, data:Answers, more:More},
+pengines:event_to_json(success(ID, Answers0, Time, More),
+		       json{event:success, id:ID, time:Time,
+			    data:Answers, more:More},
 		       'json-s') :- !,
 	maplist(answer_to_json_strings(ID), Answers0, Answers).
 pengines:event_to_json(output(ID, Term), JSON, 'json-s') :- !,
@@ -364,8 +365,9 @@ term_string_value(Pengine, N-V, N-A) :-
 
 /* JSON-HTML */
 
-pengines:event_to_json(success(ID, Answers0, More),
-		       json{event:success, id:ID, data:Answers, more:More},
+pengines:event_to_json(success(ID, Answers0, Time, More),
+		       json{event:success, id:ID, time:Time,
+			    data:Answers, more:More},
 		       'json-html') :- !,
 	maplist(map_answer(ID), Answers0, Answers).
 pengines:event_to_json(output(ID, Term), JSON, 'json-html') :- !,
