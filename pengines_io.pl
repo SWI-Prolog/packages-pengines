@@ -379,9 +379,14 @@ map_answer(ID, Bindings0, Answer) :-
 	maplist(binding_to_html(ID), Bindings2, VarBindings),
 	(   Residuals == []
 	->  Answer = json{variables:VarBindings}
-	;   maplist(term_html_string(ID), Residuals, ResHTML),
+	;   residuals_html(Residuals, ID, ResHTML),
 	    Answer = json{variables:VarBindings, residuals:ResHTML}
 	).
+
+residuals_html([], _, []).
+residuals_html([H0|T0], Module, [H|T]) :-
+	term_html_string(H0, [], Module, H),
+	residuals_html(T0, Module, T).
 
 dict_bindings(Dict, Bindings) :-
 	dict_pairs(Dict, _Tag, Pairs),
@@ -389,27 +394,60 @@ dict_bindings(Dict, Bindings) :-
 
 pair_eq(N-V, N=V).
 
+%%	binding_to_html(+Pengine, +Binding, -Dict) is det.
+%
+%	Convert a variable binding into a JSON Dict. Note that this code
+%	assumes that the module associated  with   Pengine  has the same
+%	name as the Pengine.  The module is needed to
+%
+%	@arg Binding is a term binding(Vars,Term,Substitutions)
+
 binding_to_html(ID, binding(Vars,Term,Substitutions), JSON) :-
 	JSON0 = json{variables:Vars, value:HTMLString},
-	term_html_string(ID, Term, HTMLString),
+	term_html_string(Term, Vars, ID, HTMLString),
 	(   Substitutions == []
 	->  JSON = JSON0
 	;   maplist(subst_to_html(ID), Substitutions, HTMLSubst),
 	    JSON = JSON0.put(substitutions, HTMLSubst)
 	).
 
-term_html_string(Pengine, Term, HTMLString) :-
+%%	term_html_string(+Term, +VarNames, +Module, -HTMLString) is det.
+%
+%	Translate  Term  into  an  HTML    string   using  the  operator
+%	declarations from Module. VarNames is a   list of variable names
+%	that have this value.
+
+term_html_string(Term, Vars, Module, HTMLString) :-
 	setting(write_options, Options),
-%	pengine_property(Pengine, module(Module)),
-	phrase(term(Term, [ quoted(true),
-			    numbervars(true),
-			    module(Pengine)
-			  | Options
-			  ]), Tokens),
+	merge_options(Options,
+		      [ quoted(true),
+			numbervars(true),
+			module(Module)
+		      ], WriteOptions),
+	phrase(term_html(Term, Vars, WriteOptions), Tokens),
 	with_output_to(string(HTMLString), print_html(Tokens)).
 
+%%	binding_term(+Term, +Vars, +WriteOptions)// is semidet.
+%
+%	Hook to render a Prolog result term as HTML. This hook is called
+%	for each non-variable binding,  passing   the  binding  value as
+%	Term, the names of the variables as   Vars and a list of options
+%	for write_term/3.  If the hook fails, term//2 is called.
+%
+%	@arg	Vars is a list of variable names or `[]` if Term is a
+%		_residual goal_.
+
+:- multifile binding_term//3.
+
+term_html(Term, Vars, WriteOptions) -->
+	{ nonvar(Term) },
+	binding_term(Term, Vars, WriteOptions), !.
+term_html(Term, _Vars, WriteOptions) -->
+	term(Term, WriteOptions).
+
+
 subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
-	term_html_string(ID, Value, HTMLString).
+	term_html_string(Value, [Name], ID, HTMLString).
 subst_to_html(_, Term, _) :-
 	assertion(Term = '$VAR'(_)).
 
