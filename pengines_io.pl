@@ -445,6 +445,10 @@ term_html(Term, Vars, WriteOptions) -->
 term_html(Term, _Vars, WriteOptions) -->
 	term(Term, WriteOptions).
 
+%%	subst_to_html(+Module, +Binding, -JSON) is det.
+%
+%	Render   a   variable   substitution     resulting   from   term
+%	factorization, in this case breaking a cycle.
 
 subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
 	term_html_string(Value, [Name], ID, HTMLString).
