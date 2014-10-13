@@ -293,7 +293,7 @@ pengine_module(user).
 		 *	  OUTPUT FORMAT		*
 		 *******************************/
 
-%%	pengines:event_to_json(+Event, -JSON, +Format) is semidet.
+%%	pengines:event_to_json(+Event, -JSON, +Format, +VarNames) is semidet.
 %
 %	Provide additional translations for  Prolog   terms  to  output.
 %	Defines formats are:
@@ -321,9 +321,9 @@ pengine_module(user).
 %	        Array of strings representing HTML-ified residual goals.
 
 :- multifile
-	pengines:event_to_json/3.
+	pengines:event_to_json/4.
 
-%%	pengines:event_to_json(+PrologEvent, -JSONEvent, +Format)
+%%	pengines:event_to_json(+PrologEvent, -JSONEvent, +Format, +VarNames)
 %
 %	If Format equals `'json-s'` or  `'json-html'`, emit a simplified
 %	JSON representation of the  data,   suitable  for notably SWISH.
@@ -338,13 +338,17 @@ pengine_module(user).
 %	    If the message is related to a source location, indicate the
 %	    file and line and, if available, the character location.
 
-pengines:event_to_json(success(ID, Answers0, Time, More),
-		       json{event:success, id:ID, time:Time,
-			    data:Answers, more:More},
-		       'json-s') :- !,
-	maplist(answer_to_json_strings(ID), Answers0, Answers).
-pengines:event_to_json(output(ID, Term), JSON, 'json-s') :- !,
+pengines:event_to_json(success(ID, Answers0, Time, More), JSON,
+		       'json-s', VarNames) :- !,
+	JSON0 = json{event:success, id:ID, time:Time, data:Answers, more:More},
+	maplist(answer_to_json_strings(ID), Answers0, Answers),
+	add_projection(VarNames, JSON0, JSON).
+pengines:event_to_json(output(ID, Term), JSON, 'json-s', _) :- !,
 	map_output(ID, Term, JSON).
+
+add_projection(-, JSON, JSON) :- !.
+add_projection(VarNames, JSON0, JSON0.put(projection, VarNames)).
+
 
 %%	answer_to_json_strings(+Pengine, +AnswerDictIn, -AnswerDict).
 %
@@ -366,11 +370,11 @@ term_string_value(Pengine, N-V, N-A) :-
 /* JSON-HTML */
 
 pengines:event_to_json(success(ID, Answers0, Time, More),
-		       json{event:success, id:ID, time:Time,
-			    data:Answers, more:More},
-		       'json-html') :- !,
-	maplist(map_answer(ID), Answers0, Answers).
-pengines:event_to_json(output(ID, Term), JSON, 'json-html') :- !,
+		       JSON, 'json-html', VarNames) :- !,
+	JSON0 = json{event:success, id:ID, time:Time, data:Answers, more:More},
+	maplist(map_answer(ID), Answers0, Answers),
+	add_projection(VarNames, JSON0, JSON).
+pengines:event_to_json(output(ID, Term), JSON, 'json-html', _) :- !,
 	map_output(ID, Term, JSON).
 
 map_answer(ID, Bindings0, Answer) :-

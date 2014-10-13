@@ -94,7 +94,7 @@ from Prolog or JavaScript.
 	pengine_event_loop(1, +).
 
 :- multifile
-	event_to_json/3,		% +Event, -JSON, +Format
+	event_to_json/4,		% +Event, -JSON, +Format, +VarNames
 	prepare_module/3,		% +Module, +Application, +Options
 	authentication_hook/3,		% +Request, +Application, -User
 	not_sandboxed/2.		% +User, +App
@@ -1747,7 +1747,10 @@ pairs_create_options([_|T0], App, T) :-
     pairs_create_options(T0, App, T).
 
 
-%%	wait_and_output_result(+Pengine, +Queue, +Format, +TimeLimit)
+%%	wait_and_output_result(+Pengine, +Queue,
+%%			       +Format, +TimeLimit) is det.
+%%	wait_and_output_result(+Pengine, +Queue,
+%%			       +Format, +TimeLimit, +VarNames) is det.
 %
 %	Wait for the Pengine's Queue and if  there is a message, send it
 %	to the requester using  output_result/1.   If  Pengine  does not
@@ -1756,6 +1759,9 @@ pairs_create_options([_|T0], App, T) :-
 %	_).
 
 wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
+	wait_and_output_result(Pengine, Queue, Format, TimeLimit, -).
+
+wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
     (   catch(thread_get_message(Queue, pengine_event(_, Event),
 				 [ timeout(TimeLimit)
 				 ]),
@@ -1763,7 +1769,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
     ->  (   var(Error)
 	->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
 	    destroy_queue(Pengine, Event, Queue),
-	    output_result(Format, Event)
+	    output_result(Format, Event, VarNames)
 	;   output_result(Format, died(Pengine))
 	)
     ;   output_result(Format, error(Pengine,
@@ -1856,7 +1862,7 @@ http_pengine_send(Request) :-
 			[ variable_names(Bindings),
 			  module(Module)
 			]),
-	    fix_bindings(Format, Event0, ID, Bindings, Event1)
+	    fix_bindings(Format, Event0, Bindings, VarNames, Event1)
 	  ),
 	  Error,
 	  true),
@@ -1866,7 +1872,7 @@ http_pengine_send(Request) :-
 	->  pengine_queue(ID, Queue, TimeLimit, _),
 	    random_delay,
 	    thread_send_message(Thread, pengine_request(Event1)),
-	    wait_and_output_result(ID, Queue, Format, TimeLimit)
+	    wait_and_output_result(ID, Queue, Format, TimeLimit, VarNames)
 	;   atom(ID)
 	->  output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
 	;   http_404([], Request)
@@ -1875,31 +1881,35 @@ http_pengine_send(Request) :-
     ).
 
 
-%%	fix_bindings(+Format, +EventIn, -Event) is det.
+%%	fix_bindings(+Format, +EventIn, +Bindings, -VarNames, -Event) is det.
 %
 %	Generate the template for json(-s) Format  from the variables in
 %	the asked Goal. Variables starting  with an underscore, followed
 %	by an capital letter are ignored from the template.
 
 fix_bindings(Format,
-	     ask(Goal, Options), _ID, Bindings,
+	     ask(Goal, Options), Bindings, VarNames,
 	     ask(Goal, NewOptions)) :-
     json_lang(Format), !,
-    template(Bindings, Template, Options),
+    template(Bindings, VarNames, Template, Options),
     option(chunk(Paging), Options, 1),
     NewOptions = [template(Template), chunk(Paging)].
-fix_bindings(_, Command, _, _, Command).
+fix_bindings(_, Command, _, -, Command).
 
-template(_, Template, Options) :-
+template(_, -, Template, Options) :-
     option(template(Template), Options), !.
-template(Bindings, Template, _Options) :-
+template(Bindings, VarNames, Template, _Options) :-
     exclude(anon, Bindings, Bindings1),
+    maplist(var_name, Bindings1, VarNames),
     dict_create(Template, json, Bindings1).
 
 anon(Name=_) :-
     sub_atom(Name, 0, _, _, '_'),
     sub_atom(Name, 1, 1, _, Next),
     char_type(Next, prolog_var_start).
+
+var_name(Name=_, Name).
+
 
 %%	json_lang(+Format) is semidet.
 %
@@ -1963,11 +1973,15 @@ http_pengine_destroy_all(Request) :-
     reply_json("ok").
 
 %%	output_result(+Format, +EventTerm) is det.
+%%	output_result(+Format, +EventTerm, +VarNames) is det.
 %
 %	Formulate an HTTP response from a pengine event term. Format is
 %	one of =prolog=, =json= or =json-s=.
 
-output_result(prolog, Event) :- !,
+output_result(Format, Event) :-
+    output_result(Format, Event, -).
+
+output_result(prolog, Event, _) :- !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
     write_term(Event,
 	       [ quoted(true),
@@ -1975,15 +1989,16 @@ output_result(prolog, Event) :- !,
 		 fullstop(true),
 		 nl(true)
 	       ]).
-output_result(Lang, Event) :-
+output_result(Lang, Event, VarNames) :-
     json_lang(Lang), !,
-    (	event_term_to_json_data(Event, JSON, Lang)
+    (	event_term_to_json_data(Event, JSON, Lang, VarNames)
     ->	cors_enable,
 	disable_client_cache,
 	reply_json(JSON)
-    ;	assertion(event_term_to_json_data(Event, _, Lang))
+    ;	gtrace,
+assertion(event_term_to_json_data(Event, _, Lang))
     ).
-output_result(Lang, _Event) :-			% FIXME: allow for non-JSON format
+output_result(Lang, _Event, _) :-	% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
 
 %%	disable_client_cache
@@ -1997,8 +2012,22 @@ disable_client_cache :-
             Pragma: no-cache\r\n\c
 	    Expires: 0\r\n').
 
-event_term_to_json_data(Event, JSON, Lang) :-
-    event_to_json(Event, JSON, Lang), !.
+event_term_to_json_data(Event, JSON, Lang, VarNames) :-
+    event_to_json(Event, JSON, Lang, VarNames), !.
+event_term_to_json_data(Event, JSON, Lang, -) :- !,
+    event_term_to_json_data(Event, JSON, Lang).
+event_term_to_json_data(success(ID, Bindings0, Time, More),
+			json{event:success, id:ID, time:Time,
+			     data:Bindings, more:More, projection:VarNames},
+			json, VarNames) :- !,
+    term_to_json(Bindings0, Bindings).
+event_term_to_json_data(destroy(ID, Event),
+			json{event:destroy, id:ID, data:JSON},
+			Style, VarNames) :- !,
+    event_term_to_json_data(Event, JSON, Style, VarNames).
+event_term_to_json_data(Event, JSON, Lang, _) :-
+    event_term_to_json_data(Event, JSON, Lang).
+
 event_term_to_json_data(success(ID, Bindings0, Time, More),
 			json{event:success, id:ID, time:Time,
 			     data:Bindings, more:More},
@@ -2013,7 +2042,7 @@ event_term_to_json_data(create(ID, Features0), JSON, Style) :- !,
     dict_create(JSON, json, [event(create), id(ID)|Features]).
 event_term_to_json_data(destroy(ID, Event),
 			json{event:destroy, id:ID, data:JSON}, Style) :- !,
-    event_term_to_json_data(Event, JSON, Style).
+    event_term_to_json_data(Event, JSON, Style, -).
 event_term_to_json_data(error(ID, ErrorTerm), Error, _Style) :- !,
     Error0 = json{event:error, id:ID, data:Message},
     add_error_details(ErrorTerm, Error0, Error),
