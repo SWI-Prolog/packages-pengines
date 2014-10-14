@@ -2072,13 +2072,29 @@ add_error_details(Error, JSON0, JSON) :-
 %
 %   Add a =code= field to JSON0 of Error is an ISO error term. The error
 %   code is the functor name of  the   formal  part  of the error, e.g.,
-%   =syntax_error=, =type_error=, etc.
+%   =syntax_error=,  =type_error=,  etc.   Some    errors   carry   more
+%   information:
+%
+%     - existence_error(Type, Obj)
+%     {arg1:Type, arg2:Obj}, where Obj is stringified of it is not
+%     atomic.
 
+add_error_code(error(existence_error(Type, Obj), _), Error0, Error) :-
+    atom(Type), !,
+    to_atomic(Obj, Value),
+    Error = Error0.put(_{code:existence_error, arg1:Type, arg2:Value}).
 add_error_code(error(Formal, _), Error0, Error) :-
     callable(Formal), !,
     functor(Formal, Code, _),
     Error = Error0.put(code, Code).
 add_error_code(_, Error, Error).
+
+to_atomic(Obj, Atomic) :-
+    (   atomic(Obj)
+    ->	Atomic = Obj
+    ;	term_string(Obj, Atomic)
+    ).
+
 
 %%  add_error_location(+Error, +JSON0, -JSON) is det.
 %

@@ -83,6 +83,10 @@ function Pengine(options) {
         } else if (obj.event === 'failure') {
             if (options.onfailure) options.onfailure.call(obj);
         } else if (obj.event === 'error') {
+	    if ( obj.code == "existence_error" &&
+		 obj.arg1 == "pengine" &&
+		 obj.arg2 == that.id )
+	      unregisterPengine(that.id);
             if (options.onerror)
 	        options.onerror.call(obj);
 	    else if (typeof(console) !== 'undefined')
@@ -102,12 +106,11 @@ function Pengine(options) {
 	    that.aborted = true;
             if (options.onabort) options.onabort.call(obj);
         } else if (obj.event === 'destroy') {
-	    var index = Pengine.ids.indexOf(that.id);
-
-	    if ( index > -1 ) Pengine.ids.splice(index, 1);
+	    unregisterPengine(that.id);
 	    if (obj.data) process_response(obj.data);
             if (options.ondestroy) options.ondestroy.call(obj);
         } else if (obj.event === 'died') {
+	    unregisterPengine(that.id);
 	    if ( !that.aborted ) {
 	        obj.data = "Pengine has died";
 		obj.code = "died";
@@ -128,11 +131,18 @@ function Pengine(options) {
 	if ( obj.event !== 'died')
 	    process_response(obj);
     }
+
     function send(event) {
         var event = encodeURIComponent(event);
         $.get(server + '/send?id=' + that.id +
 	      '&event=' + event + '&format=' + format, process_response);
     }
+
+    function unregisterPengine(id) {
+      var index = Pengine.ids.indexOf(id);
+      if ( index > -1 ) Pengine.ids.splice(index, 1);
+    }
+
 
     // Public methods
     Pengine.prototype = {
