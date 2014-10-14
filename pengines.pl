@@ -1995,8 +1995,7 @@ output_result(Lang, Event, VarNames) :-
     ->	cors_enable,
 	disable_client_cache,
 	reply_json(JSON)
-    ;	gtrace,
-assertion(event_term_to_json_data(Event, _, Lang))
+    ;	assertion(event_term_to_json_data(Event, _, Lang))
     ).
 output_result(Lang, _Event, _) :-	% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
