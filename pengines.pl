@@ -675,6 +675,8 @@ current_pengine_application(Application) :-
 	   'Maximum time to wait for output').
 :- setting(idle_limit, number, 300,
 	   'Pengine auto-destroys when idle for this time').
+:- setting(program_space, integer, 100_000_000,
+	   'Maximum memory used by predicates').
 :- setting(allow_from, list(atom), [*],
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
@@ -710,6 +712,10 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 			    setting(pengines:idle_limit),
 			    'Pengine auto-destroys when idle for this time')),
 		IdleLimitSetting),
+    expand_term((:- setting(Application:program_space, integer,
+			    setting(pengines:program_space),
+			    'Maximum memory used by predicates')),
+		ProgramSpaceSetting),
     expand_term((:- setting(Application:allow_from, list(atom),
 			    setting(pengines:allow_from),
 			    'IP addresses from which remotes are allowed \c
@@ -726,6 +732,7 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 	      SlaveLimitSetting,
 	      TimeLimitSetting,
 	      IdleLimitSetting,
+	      ProgramSpaceSetting,
 	      AllowFromSetting,
 	      DenyFromSetting
 	    ], Expanded).
@@ -986,6 +993,8 @@ fix_stream(_).
 %		sources.
 
 pengine_prepare_source(Module:Application, Options) :-
+    setting(Application:program_space, SpaceLimit),
+    set_module(Module:program_space(SpaceLimit)),
     add_import_module(Module, Application, start),
     ignore(prepare_module(Module, Application, Options)),
     catch(maplist(process_create_option(Module), Options), Error, true),
