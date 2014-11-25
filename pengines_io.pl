@@ -108,7 +108,7 @@ for using this module with the following code:
 %	Emit Term as <div class=writeln>Term</div>.
 
 pengine_writeln(Line) :-
-	atomic(Line), !,
+	atomic(Line), \+ special_blob(Line), !,
 	send_html(div(class(writeln), Line)).
 pengine_writeln(Term) :-
 	pengine_module(Module),
@@ -118,6 +118,9 @@ pengine_writeln(Term) :-
 			      module(Module)
 			    ]))).
 
+special_blob(X) :-
+	blob(X, _Type),
+	\+ atom(X).
 
 %%	pengine_nl
 %
