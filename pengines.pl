@@ -995,6 +995,7 @@ fix_stream(_).
 pengine_prepare_source(Module:Application, Options) :-
     setting(Application:program_space, SpaceLimit),
     set_module(Module:program_space(SpaceLimit)),
+    delete_import_module(Module, user),
     add_import_module(Module, Application, start),
     ignore(prepare_module(Module, Application, Options)),
     catch(maplist(process_create_option(Module), Options), Error, true),
