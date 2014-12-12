@@ -1178,11 +1178,7 @@ more_solutions(Event, ID, Choice, State, Time) :-
 %	prove the goal. It takes care of the chunk(N) option.
 
 ask(ID, Goal, Options) :-
-    get_pengine_module(ID, Module),
-    expand_goal(Module:Goal, Goal1),
-    catch(( pengine_not_sandboxed(ID) ;
-	    safe_goal(Goal1)
-	  ), Error, true), !,
+    catch(prepare_goal(ID, Goal, Goal1), Error, true), !,
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
@@ -1190,6 +1186,14 @@ ask(ID, Goal, Options) :-
     ;   pengine_reply(error(ID, Error)),
 	guarded_main_loop(ID)
     ).
+
+prepare_goal(ID, Goal, Goal1) :-
+	get_pengine_module(ID, Module),
+	expand_goal(Module:Goal, Goal1),
+	(   pengine_not_sandboxed(ID)
+	->  true
+	;   safe_goal(Goal1)
+	).
 
 %%  pengine_not_sandboxed(+Pengine) is semidet.
 %
