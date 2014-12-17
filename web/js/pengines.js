@@ -202,6 +202,118 @@ function Pengine(options) {
 	     "success": process_response,
 	     "type": "POST"
 	   });
+
+    /**
+     * Serialize JavaScript data as a Prolog term.  The serialization
+     * is performed according to the rules below:
+     *
+     *   - A number is serialized trivially
+     *	 - A string is serialized into a Prolog string unless
+     *	   `option.string == "atom"`
+     *   - An array is serialized into a Prolog list
+     *   - An object is serialized into a Prolog dict.  Keys that are
+     *     integers are mapped to Prolog integers, other keys are mapped
+     *     to Prolog atoms.  Note that in JavaScript {1:42} and {"1":42}
+     *     are equavalent and both can be retrieved as either
+     *     obj[1] or obj["1"]
+     *
+     * @param  {any} data is the data to be serialized
+     * @param  {Object} [options]
+     * @param {String} [options.string] If `"atom"`, translate
+     * JavaScript strings into Prolog objects.
+     * @return {String|undefined} is the Prolog serialization of `data`
+     */
+
+    Pengine.stringify = function(data, options) {
+      var msg  = "";
+      var strq = options && options.string == "atom" ? "'" : '"';
+
+      function serialize(data) {
+	function stringEscape(s, q) {
+	  function dec2unicode(i)
+	  { var r;
+	    if      (i >= 0    && i <= 15)    { r = "\\u000" + i.toString(16); }
+	    else if (i >= 16   && i <= 255)   { r = "\\u00"  + i.toString(16); }
+	    else if (i >= 256  && i <= 4095)  { r = "\\u0"   + i.toString(16); }
+	    else if (i >= 4096 && i <= 65535) { r = "\\u"    + i.toString(16); }
+	    return r
+	  }
+
+	  var result = q;
+	  for(var i=0; i<s.length; i++) {
+	    var c = s.charAt(i);
+	    if ( c >= ' ' ) {
+	           if ( c == '\\' ) result += "\\\\";
+	      else if ( c ==   q  ) result += "\\"+q;
+	      else result += c;
+	    } else {
+	           if ( c == '\n' ) result += "\\n";
+	      else if ( c == '\r' ) result += "\\r";
+	      else if ( c == '\t' ) result += "\\t";
+	      else if ( c == '\b' ) result += "\\b";
+	      else if ( c == '\f' ) result += "\\f";
+	      else result += dec2unicode(c.charCodeAt(0));
+	    }
+	  }
+	  return result+q;
+	}
+
+	function serializeKey(k) {
+	  if ( k.match(/^\d+$/) ) {
+	    msg += k;
+	  } else {
+	    msg += stringEscape(k, "'");
+	  }
+
+	  return true;
+	}
+
+	switch ( typeof(data) ) {
+	  case "number":
+	    msg += data;
+	    break;
+	  case "string":
+	    msg += stringEscape(data, strq);
+	    break;
+	  case "object":
+	    if ( Array.isArray(data) ) {
+	      msg += "[";
+	      for(var i=0; i<data.length; i++) {
+		if ( !serialize(data[i]) )
+		  return false;
+		if ( i+1 < data.length )
+		  msg += ",";
+	      }
+	      msg += "]";
+	    } else {
+	      var first = true;
+	      msg += "js{";
+	      for(var p in data) {
+		if ( data.hasOwnProperty(p) ) {
+		  if ( !first )
+		    msg += ",";
+		  else
+		    first = false;
+		  if ( !serializeKey(p) )
+		    return false;
+		  msg += ":";
+		  if ( !serialize(data[p]) )
+		    return false;
+		}
+	      }
+	      msg += "}";
+	    }
+	    break;
+	  default:
+	    return false;
+	}
+
+	return true;
+      }
+
+      if ( serialize(data) )
+	return msg;
+    }
 }
 
 window.onunload = function() {
