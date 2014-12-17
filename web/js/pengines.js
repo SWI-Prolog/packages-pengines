@@ -67,55 +67,55 @@ function Pengine(options) {
 		           "The limit is: " + obj.slave_limit;
 		obj.code = "too_many_pengines";
 		if (options.onerror)
-		    options.onerror.call(obj);
+		    options.onerror.call(obj, obj);
 		else if (typeof(console) !== 'undefined')
 		    console.error(obj.data);
 		else
 		    alert(obj.data);
 	    } else {
-		if (options.oncreate) options.oncreate.call(obj);
+		if (options.oncreate) options.oncreate.call(obj, obj);
 		if (obj.answer) process_response(obj.answer);
 	    }
         } else if (obj.event === 'stop') {
-            if (options.onstop) options.onstop.call(obj);
+            if (options.onstop) options.onstop.call(obj, obj);
         } else if (obj.event === 'success') {
-            if (options.onsuccess) options.onsuccess.call(obj);
+            if (options.onsuccess) options.onsuccess.call(obj, obj);
         } else if (obj.event === 'failure') {
-            if (options.onfailure) options.onfailure.call(obj);
+            if (options.onfailure) options.onfailure.call(obj, obj);
         } else if (obj.event === 'error') {
 	    if ( obj.code == "existence_error" &&
 		 obj.arg1 == "pengine" &&
 		 obj.arg2 == that.id )
 	      unregisterPengine(that.id);
             if (options.onerror)
-	        options.onerror.call(obj);
+	        options.onerror.call(obj, obj);
 	    else if (typeof(console) !== 'undefined')
 	        console.error(obj.data);
         } else if (obj.event === 'output') {
-            if (options.onoutput) options.onoutput.call(obj);
+            if (options.onoutput) options.onoutput.call(obj, obj);
             that.pull_response(obj.id);
         } else if (obj.event === 'debug') {
             if (options.ondebug)
-	        options.ondebug.call(obj);
+	        options.ondebug.call(obj, obj);
 	    else if (typeof(console) !== 'undefined')
 		console.log(obj.data);
             that.pull_response(obj.id);
         } else if (obj.event === 'prompt') {
-            if (options.onprompt) options.onprompt.call(obj);
+            if (options.onprompt) options.onprompt.call(obj, obj);
         } else if (obj.event === 'abort') {
 	    that.aborted = true;
-            if (options.onabort) options.onabort.call(obj);
+            if (options.onabort) options.onabort.call(obj, obj);
         } else if (obj.event === 'destroy') {
 	    unregisterPengine(that.id);
 	    if (obj.data) process_response(obj.data);
-            if (options.ondestroy) options.ondestroy.call(obj);
+            if (options.ondestroy) options.ondestroy.call(obj, obj);
         } else if (obj.event === 'died') {
 	    unregisterPengine(that.id);
 	    if ( !that.aborted ) {
 	        obj.data = "Pengine has died";
 		obj.code = "died";
 	        if (options.onerror)
-		    options.onerror.call(obj);
+		    options.onerror.call(obj, obj);
 		else if (typeof(console) !== 'undefined')
 		    console.error(obj.data);
 	    }
