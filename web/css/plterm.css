@@ -18,6 +18,13 @@ span.pl-dict		{}
 span.pl-key		{font-weight:bold;}
 span.pl-constraint	{color:#008b8b;}
 span.pl-comment		{color: #060; font-style: italic;}
+span.pl-blob { 
+   border-radius: 1em;
+   background-color: #444; 
+   margin: 0.1ex;
+   padding: 0ex .5ex 0.2ex 0.5ex;
+   color:#fff 
+}
 
 /* pengines_io elements */
 
