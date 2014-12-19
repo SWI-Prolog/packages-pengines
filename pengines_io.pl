@@ -446,6 +446,17 @@ term_html_string(Term, Vars, Module, HTMLString) :-
 
 :- multifile binding_term//3.
 
+%% blob_rendering(+BlobType, +Blob, +WriteOptions)// is semidet.
+%
+%  Hook to render blob atoms as HTML. This hook is called whenever
+%  a blob atom is encountered while rendering a compound term as HTML.
+%  The blob type is provided to allow efficient indexing without
+%  having to examine the blob. If this predicate fails, the blob
+%  is rendered as an HTML SPAN with class 'pl-blob' containing  
+%  BlobType as text.
+
+:- multifile blob_rendering//3.
+
 term_html(Term, Vars, WriteOptions) -->
 	{ nonvar(Term) },
 	binding_term(Term, Vars, WriteOptions), !.

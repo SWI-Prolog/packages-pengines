@@ -70,6 +70,11 @@ any(_, Options) -->
 	{ Options.depth >= Options.max_depth }, !,
 	html(span(class('pl-ellipsis'), ...)).
 any(Term, Options) -->
+   { blob(Term,Type) }, !, 
+   (  pengines_io:blob_rendering(Type,Term,Options) -> []
+   ;  html(span(class('pl-blob'),Type))
+   ).
+any(Term, Options) -->
 	{ primitive(Term, Class0), !,
 	  quote_atomic(Term, S, Options),
 	  primitive_class(Class0, Term, S, Class)
