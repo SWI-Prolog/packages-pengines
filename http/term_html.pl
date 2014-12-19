@@ -35,6 +35,8 @@
 :- use_module(library(error)).
 :- use_module(library(debug)).
 
+:- multifile
+	blob_rendering//3.		% +Type, +Blob, +Options
 
 /** <module> Represent Prolog terms as HTML
 
@@ -75,6 +77,12 @@ any(Term, Options) -->
 	  primitive_class(Class0, Term, S, Class)
 	},
 	html(span(class(Class), S)).
+any(Term, Options) -->
+	{ blob(Term,Type) }, !,
+	(   blob_rendering(Type,Term,Options)
+	->  []
+	;   html(span(class('pl-blob'),['<',Type,'>']))
+	).
 any(Term, Options) -->
 	{ is_dict(Term), !
 	},
@@ -483,3 +491,20 @@ primitive_class('pl-atom', Atom, String, Class) :-
 	\+ atom_string(Atom, String), !,
 	Class = 'pl-quoted-atom'.
 primitive_class(Class, _, _, Class).
+
+
+		 /*******************************
+		 *	       HOOKS		*
+		 *******************************/
+
+%%	blob_rendering(+BlobType, +Blob, +WriteOptions)// is semidet.
+%
+%	Hook to render blob atoms as HTML.  This hook is called whenever
+%	a blob atom is encountered while   rendering  a compound term as
+%	HTML. The blob type is  provided   to  allow  efficient indexing
+%	without having to examine the blob. If this predicate fails, the
+%	blob is rendered as an HTML SPAN with class 'pl-blob' containing
+%	BlobType as text.
+
+:- multifile blob_rendering//3.
+
