@@ -78,7 +78,7 @@ any(Term, Options) -->
 	},
 	html(span(class(Class), S)).
 any(Term, Options) -->
-	{ blob(Term,Type) }, !,
+	{ blob(Term,Type), Term \== [] }, !,
 	(   blob_rendering(Type,Term,Options)
 	->  []
 	;   html(span(class('pl-blob'),['<',Type,'>']))
