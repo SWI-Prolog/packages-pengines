@@ -27,7 +27,7 @@
 */
 
 function Pengine(options) {
-    if ( typeof Pengine.ids == 'undefined' ) {
+    if ( Pengine.ids === undefined ) {
         Pengine.ids = [];
     }
     var src = options.src ? [options.src] : [];
@@ -68,7 +68,7 @@ function Pengine(options) {
 		obj.code = "too_many_pengines";
 		if (options.onerror)
 		    options.onerror.call(obj, obj);
-		else if (typeof(console) !== 'undefined')
+		else if ( console !== undefined )
 		    console.error(obj.data);
 		else
 		    alert(obj.data);
@@ -89,7 +89,7 @@ function Pengine(options) {
 	      unregisterPengine(that.id);
             if (options.onerror)
 	        options.onerror.call(obj, obj);
-	    else if (typeof(console) !== 'undefined')
+	    else if ( console !== undefined )
 	        console.error(obj.data);
         } else if (obj.event === 'output') {
             if (options.onoutput) options.onoutput.call(obj, obj);
@@ -97,7 +97,7 @@ function Pengine(options) {
         } else if (obj.event === 'debug') {
             if (options.ondebug)
 	        options.ondebug.call(obj, obj);
-	    else if (typeof(console) !== 'undefined')
+	    else if ( console !== undefined )
 		console.log(obj.data);
             that.pull_response(obj.id);
         } else if (obj.event === 'prompt') {
@@ -116,7 +116,7 @@ function Pengine(options) {
 		obj.code = "died";
 	        if (options.onerror)
 		    options.onerror.call(obj, obj);
-		else if (typeof(console) !== 'undefined')
+		else if ( console !== undefined )
 		    console.error(obj.data);
 	    }
 	}
@@ -162,7 +162,7 @@ function Pengine(options) {
 	    send('input((' + input + '))');
 	},
         pull_response: function(id) {
-	    if ( typeof id === 'undefined' ) id = that.id;
+	    if ( id === undefined ) id = that.id;
 	    $.get(server + '/pull_response?id=' + id +
 		  '&format=' + format, process_pull_response);
 	},
@@ -180,7 +180,7 @@ function Pengine(options) {
     Pengine.destroy_all = function(async) {
         if ( Pengine.ids.length > 0 ) {
 	    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
-	             async: async === 'undefined' ? true : false
+	             async: async === undefined ? true : false
 		   });
 	    Pengine.ids = [];
 	}
