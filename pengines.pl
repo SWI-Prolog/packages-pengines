@@ -342,7 +342,7 @@ pengine_request(Request) :-
 
 
 pengine_reply(Event) :-
-    nb_getval(pengine_parent, Queue),
+    pengine_parent(Queue),
     pengine_reply(Queue, Event).
 
 pengine_reply(Queue, Event0) :-
@@ -603,10 +603,6 @@ pengine_self(Id) :-
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
-
-http_pengine_parent(Pengine, Parent) :-
-    current_pengine(Pengine, Parent, Thread, _URL, _Application, _Destroy),
-    Thread \== 0, !.
 
 pengine_thread(Pengine, Thread) :-
     current_pengine(Pengine, _Parent, Thread, _URL, _Application, _Destroy),
@@ -1240,7 +1236,7 @@ any term, compound as well as atomic.
 
 pengine_input(Prompt, Term) :-
     pengine_self(Self),
-    nb_getval(pengine_parent, Parent),
+    pengine_parent(Parent),
     pengine_reply(Parent, prompt(Self, Prompt)),
     pengine_request(input(Term)).
 
