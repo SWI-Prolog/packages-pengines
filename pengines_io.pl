@@ -62,6 +62,9 @@
 :- use_module(library(http/term_html)).
 :- html_meta send_html(html).
 
+:- meta_predicate
+	pengine_format(+,:).
+
 /** <module> Provide Prolog I/O for HTML clients
 
 This module redefines some of  the   standard  Prolog  I/O predicates to
