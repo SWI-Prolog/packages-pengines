@@ -1183,12 +1183,27 @@ ask(ID, Goal, Options) :-
 	guarded_main_loop(ID)
     ).
 
-prepare_goal(ID, Goal, Goal1) :-
+%%	prepare_goal(+Pengine, +GoalIn, -GoalOut) is det.
+%
+%	Prepare GoalIn for execution in Pengine.   This  implies we must
+%	perform goal expansion and, if the   system  is sandboxed, check
+%	the sandbox.
+%
+%	Note that expand_goal(Module:GoalIn, GoalOut) is  what we'd like
+%	to write, but this does not work correctly if the user wishes to
+%	expand `X:Y` while interpreting `X` not   as the module in which
+%	to run `Y`. This happens in the  CQL package. Possibly we should
+%	disallow this reinterpretation?
+
+prepare_goal(ID, Goal, Module:Goal1) :-
 	get_pengine_module(ID, Module),
-	expand_goal(Module:Goal, Goal1),
+	setup_call_cleanup(
+	    '$set_source_module'(Old, Module),
+	    expand_goal(Goal, Goal1),
+	    '$set_source_module'(_, Old)),
 	(   pengine_not_sandboxed(ID)
 	->  true
-	;   safe_goal(Goal1)
+	;   safe_goal(Module:Goal1)
 	).
 
 %%  pengine_not_sandboxed(+Pengine) is semidet.
