@@ -196,11 +196,23 @@ function Pengine(options) {
     if (typeof options.destroy == "boolean" )
       createOptions["destroy"] = options.destroy;
     $.ajax(server + '/create',
-	   { "contentType": "application/json; charset=utf-8",
-	     "dataType": "json",
-	     "data": JSON.stringify(createOptions),
-	     "success": process_response,
-	     "type": "POST"
+	   { contentType: "application/json; charset=utf-8",
+	     dataType: "json",
+	     data: JSON.stringify(createOptions),
+	     type: "POST",
+	     success: process_response,
+	     error: function(jqXHR) {
+	       var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
+					   .replace(/<\/body>/, "");
+	       var plain = $("<div></div>").html(msg).text();
+
+	       if ( options.onerror ) {
+		 obj = {pengine:that, data: plain, dataHTML: msg};
+		 options.onerror.call(obj, obj);
+	       } else {
+		 alert(plain);
+	       }
+	     }
 	   });
 }/*end of Pengine()*/
 
