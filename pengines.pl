@@ -3,8 +3,8 @@
 
     Author:        Torbjörn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, Torbjörn Lager,
-			 VU University Amsterdam
+    Copyright (C): 2014-2015, Torbjörn Lager,
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -94,6 +94,7 @@ from Prolog or JavaScript.
 	pengine_event_loop(1, +).
 
 :- multifile
+	write_result/3,			% +Format, +Event, +VarNames
 	event_to_json/4,		% +Event, -JSON, +Format, +VarNames
 	prepare_module/3,		% +Module, +Application, +Options
 	authentication_hook/3,		% +Request, +Application, -User
@@ -1707,7 +1708,6 @@ http_pengine_create(Request) :-
     http_read_json_dict(Request, Dict),
     dict_atom_option(format, Dict, Format, prolog),
     dict_atom_option(application, Dict, Application, pengine_sandbox),
-    valid_format(Format),
     (	current_application(Application)
     ->  allowed(Request, Application),
 	authenticate(Request, Application, UserOptions),
@@ -1944,12 +1944,6 @@ json_lang(json) :- !.
 json_lang(Format) :-
     sub_atom(Format, 0, _, _, 'json-').
 
-valid_format(prolog) :- !.
-valid_format(Format) :-
-	json_lang(Format), !.
-valid_format(Format) :-
-	domain_error(pengine_format, Format).
-
 %%	http_pengine_pull_response(+Request)
 %
 %	HTTP handler for /pengine/pull_response.  Pulls possible pending
@@ -2015,6 +2009,8 @@ output_result(prolog, Event, _) :- !,
 		 nl(true)
 	       ]).
 output_result(Lang, Event, VarNames) :-
+    write_result(Lang, Event, VarNames), !.
+output_result(Lang, Event, VarNames) :-
     json_lang(Lang), !,
     (	event_term_to_json_data(Event, JSON, Lang, VarNames)
     ->	cors_enable,
@@ -2024,6 +2020,14 @@ output_result(Lang, Event, VarNames) :-
     ).
 output_result(Lang, _Event, _) :-	% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
+
+%%	write_result(+Lang, +Event, +VarNames) is semidet.
+%
+%	Hook that allows for different output formats. The core Pengines
+%	library supports `prolog` and various   JSON  dialects. The hook
+%	event_to_json/4 can be used to refine   the  JSON dialects. This
+%	hook must be used if  a   completely  different output format is
+%	desired.
 
 %%	disable_client_cache
 %
