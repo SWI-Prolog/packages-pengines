@@ -1278,8 +1278,18 @@ pengine_respond(Pengine, Input, Options) :-
 %%	send_error(+Error) is det.
 %
 %	Send an error to my parent.   Remove non-readable blobs from the
-%	error term first using replace_blobs/2.
+%	error term first using replace_blobs/2. If  the error contains a
+%	stack-trace, this is resolved to a string before sending.
 
+send_error(error(Formal, context(prolog_stack(Frames), Message))) :-
+    is_list(Frames), !,
+    with_output_to(string(Stack),
+		   print_prolog_backtrace(current_output, Frames)),
+    pengine_self(Self),
+    replace_blobs(Formal, Formal1),
+    replace_blobs(Message, Message1),
+    pengine_reply(error(Self, error(Formal1,
+				    context(prolog_stack(Stack), Message1)))).
 send_error(Error) :-
     pengine_self(Self),
     replace_blobs(Error, Error1),
