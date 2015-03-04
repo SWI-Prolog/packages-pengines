@@ -1714,10 +1714,57 @@ pengine_rpc_output(_ID, Term) :-
 		http_reply_file(library('http/web/css/plterm.css'), []), []).
 
 
+%%  http_pengine_create(+Request)
+%
+%   HTTP POST handler  for  =/pengine/create=.   This  API  accepts  the
+%   pengine  creation  parameters  both  as  =application/json=  and  as
+%   =www-form-encoded=.
+
 http_pengine_create(Request) :-
+    memberchk(content_type(CT), Request),
+    sub_atom(CT, 0, _, _, 'application/json'), !,
     http_read_json_dict(Request, Dict),
     dict_atom_option(format, Dict, Format, prolog),
     dict_atom_option(application, Dict, Application, pengine_sandbox),
+    http_pengine_create(Request, Application, Format, Dict).
+http_pengine_create(Request) :-
+    Optional = optional(true),
+    Form = [ format(Format, [default(prolog)]),
+	     application(Application, [default(pengine_sandbox)]),
+	     chunk(_, [integer, default(1)]),
+	     ask(_, [string, Optional]),
+	     template(_, [string, Optional]),
+	     src_text(_, [string, Optional]),
+	     src_url(_, [Optional])
+	   ],
+    http_parameters(Request, Form),
+    form_dict(Form, Dict),
+    http_pengine_create(Request, Application, Format, Dict).
+
+dict_atom_option(Key, Dict, Atom, Default) :-
+	(   get_dict(Key, Dict, String)
+	->  atom_string(Atom, String)
+	;   Atom = Default
+	).
+
+form_dict(Form, Dict) :-
+    form_values(Form, Pairs),
+    dict_pairs(Dict, _, Pairs).
+
+form_values([], []).
+form_values([H|T], Pairs) :-
+	arg(1, H, Value),
+	nonvar(Value), !,
+	functor(H, Name, _),
+	Pairs = [Name-Value|PairsT],
+	form_values(T, PairsT).
+form_values([_|T], Pairs) :-
+	form_values(T, Pairs).
+
+%%	http_pengine_create(+Request, +Application, +Format, +OptionsDict)
+
+
+http_pengine_create(Request, Application, Format, Dict) :-
     (	current_application(Application)
     ->  allowed(Request, Application),
 	authenticate(Request, Application, UserOptions),
@@ -1734,12 +1781,6 @@ http_pengine_create(Request) :-
 	pengine_uuid(ID),
         output_result(Format, error(ID, error(Error, _)))
     ).
-
-dict_atom_option(Key, Dict, Atom, Default) :-
-	(   get_dict(Key, Dict, String)
-	->  atom_string(Atom, String)
-	;   Atom = Default
-	).
 
 dict_to_options(Dict, Application, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),
