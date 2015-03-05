@@ -2340,8 +2340,7 @@ pengine_src_url(URL, Module) :-
 	http_open(URL, Stream, []),
 	load_files(Module:ID,
 		   [ stream(Stream),
-		     module(Module),
-		     sandboxed(true)
+		     module(Module)
 		   | Options
 		   ]),
 	close(Stream)).
