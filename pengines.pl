@@ -1768,7 +1768,7 @@ http_pengine_create(Request, Application, Format, Dict) :-
     (	current_application(Application)
     ->  allowed(Request, Application),
 	authenticate(Request, Application, UserOptions),
-	dict_to_options(Dict, Application, CreateOptions0),
+	dict_to_options(Dict, Application, CreateOptions0, VarNames),
 	append(UserOptions, CreateOptions0, CreateOptions),
 	pengine_uuid(Pengine),
 	message_queue_create(Queue, [max_size(25)]),
@@ -1776,37 +1776,40 @@ http_pengine_create(Request, Application, Format, Dict) :-
 	get_time(Now),
 	asserta(pengine_queue(Pengine, Queue, TimeLimit, Now)),
 	create(Queue, Pengine, CreateOptions, http, Application),
-	wait_and_output_result(Pengine, Queue, Format, TimeLimit)
+	wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames)
     ;	Error = existence_error(pengine_application, Application),
 	pengine_uuid(ID),
         output_result(Format, error(ID, error(Error, _)))
     ).
 
-dict_to_options(Dict, Application, CreateOptions) :-
+dict_to_options(Dict, Application, CreateOptions, VarNames) :-
     dict_pairs(Dict, _, Pairs),
-    pairs_create_options(Pairs, Application, CreateOptions).
+    pairs_create_options(Pairs, Application, CreateOptions, VarNames).
 
-pairs_create_options([], _, []) :- !.
-pairs_create_options(T0, App, [AskOpt, TemplateOpt|T]) :-
+pairs_create_options([], _, [], _) :- !.
+pairs_create_options(T0, App, [AskOpt, TemplateOpt|T], VarNames) :-
     selectchk(ask-Ask, T0, T1),
     selectchk(template-Template, T1, T2), !,
     format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
     term_string(t(Ask1,Template1), AskTemplate,
-		[ module(App)
+		[ variable_names(Bindings),
+		  module(App)
 		]),
+    template_varnames(Template1, Bindings, VarNames),
     AskOpt = ask(Ask1),
     TemplateOpt = template(Template1),
-    pairs_create_options(T2, App, T).
+    pairs_create_options(T2, App, T, VarNames).
 pairs_create_options([ask-String|T0], App,
-		     [ask(Ask),template(Template)|T]) :- !,
+		     [ask(Ask),template(Template)|T], VarNames) :- !,
     term_string(Ask, String,
 		[ variable_names(Bindings),
 		  module(App)
 		]),
     exclude(anon, Bindings, Bindings1),
+    maplist(var_name, Bindings1, VarNames),
     dict_create(Template, json, Bindings1),
-    pairs_create_options(T0, App, T).
-pairs_create_options([N-V0|T0], App, [Opt|T]) :-
+    pairs_create_options(T0, App, T, VarNames).
+pairs_create_options([N-V0|T0], App, [Opt|T], VarNames) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), N \== user, !,
     (   create_option_type(Opt, Type)
@@ -1818,9 +1821,24 @@ pairs_create_options([N-V0|T0], App, [Opt|T]) :-
 	)
     ;   V = V0
     ),
-    pairs_create_options(T0, App, T).
-pairs_create_options([_|T0], App, T) :-
-    pairs_create_options(T0, App, T).
+    pairs_create_options(T0, App, T, VarNames).
+pairs_create_options([_|T0], App, T, VarNames) :-
+    pairs_create_options(T0, App, T, VarNames).
+
+
+%%	template_varnames(+Template, +Bindings, -VarNames)
+%
+%	Compute the variable names for the template.
+
+template_varnames(Template1, Bindings, VarNames) :-
+    term_variables(Template1, TemplateVars),
+    filter_template_varnames(TemplateVars, Bindings, VarNames).
+
+filter_template_varnames([], _, []).
+filter_template_varnames([H|T0], Bindings, [Name|T]) :-
+	member(Name=Var, Bindings),
+	Var == H, !,
+	filter_template_varnames(T0, Bindings, T).
 
 
 %%	wait_and_output_result(+Pengine, +Queue,
