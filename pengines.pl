@@ -255,7 +255,7 @@ translate_local_sources([H|T0], S, [H|T], M) :-
 translate_local_source(src_predicates(PIs), Source, M) :-
     must_be(list, PIs),
     with_output_to(string(Source),
-		   maplist(M:listing, PIs)).
+		   maplist(listing(M), PIs)).
 translate_local_source(src_list(Terms), Source, _) :-
     must_be(list, Terms),
     with_output_to(string(Source),
@@ -263,6 +263,8 @@ translate_local_source(src_list(Terms), Source, _) :-
 			  format('~k .~n', [Term]))).
 translate_local_source(src_text(Source), Source, _).
 
+listing(M, PI) :-
+	listing(M:PI).
 
 /**  pengine_send(+NameOrID, +Term) is det
 
