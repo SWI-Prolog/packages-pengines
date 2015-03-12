@@ -1723,6 +1723,8 @@ pengine_rpc_output(_ID, Term) :-
 %   =www-form-encoded=.
 
 http_pengine_create(Request) :-
+    reply_options(Request, [post]), !.
+http_pengine_create(Request) :-
     memberchk(content_type(CT), Request),
     sub_atom(CT, 0, _, _, 'application/json'), !,
     http_read_json_dict(Request, Dict),
@@ -1948,6 +1950,8 @@ sync_delay_destroy_queue(ID, Queue) :-
 
 
 http_pengine_send(Request) :-
+    reply_options(Request, [get]), !.
+http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
 		      event(EventString, []),
@@ -2021,6 +2025,8 @@ json_lang(Format) :-
 %	messages from the pengine.
 
 http_pengine_pull_response(Request) :-
+    reply_options(Request, [get]), !.
+http_pengine_pull_response(Request) :-
     http_parameters(Request,
             [   id(ID, []),
                 format(Format, [default(prolog)])
@@ -2042,6 +2048,8 @@ http_pengine_pull_response(Request) :-
 %	wait_and_output_result/4.
 
 http_pengine_abort(Request) :-
+    reply_options(Request, [get]), !.
+http_pengine_abort(Request) :-
     http_parameters(Request,
             [   id(ID, []),
                 format(Format, [default(prolog)])
@@ -2053,6 +2061,8 @@ http_pengine_abort(Request) :-
     ;	http_404([], Request)
     ).
 
+http_pengine_destroy_all(Request) :-
+    reply_options(Request, [get]), !.
 http_pengine_destroy_all(Request) :-
     http_parameters(Request,
 		    [ ids(IDsAtom, [])
@@ -2317,6 +2327,17 @@ pengine_register_user(_).
 pengine_user(User) :-
     pengine_self(Me),
     pengine_user(Me, User).
+
+%%	reply_options(+Request, +Methods) is semidet.
+%
+%	Reply the HTTP OPTIONS request
+
+reply_options(Request, Allowed) :-
+	option(method(options), Request), !,
+	cors_enable(Request,
+		    [ methods(Allowed)
+		    ]),
+	format('~n').			% empty body
 
 
 		 /*******************************
