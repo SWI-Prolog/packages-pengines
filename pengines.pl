@@ -69,6 +69,7 @@ from Prolog or JavaScript.
 :- use_module(library(http/http_wrapper)).
 :- use_module(library(http/http_cors)).
 :- use_module(library(thread_pool)).
+:- use_module(library(broadcast)).
 :- use_module(library(uri)).
 :- use_module(library(filesex)).
 :- use_module(library(time)).
@@ -1779,6 +1780,7 @@ http_pengine_create(Request, Application, Format, Dict) :-
 	setting(Application:time_limit, TimeLimit),
 	get_time(Now),
 	asserta(pengine_queue(Pengine, Queue, TimeLimit, Now)),
+	broadcast(pengine(create(Pengine, Application, CreateOptions))),
 	create(Queue, Pengine, CreateOptions, http, Application),
 	wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames)
     ;	Error = existence_error(pengine_application, Application),
@@ -1971,6 +1973,7 @@ http_pengine_send(Request) :-
 	(   pengine_thread(ID, Thread)
 	->  pengine_queue(ID, Queue, TimeLimit, _),
 	    random_delay,
+	    broadcast(pengine(send(ID, Event1))),
 	    thread_send_message(Thread, pengine_request(Event1)),
 	    wait_and_output_result(ID, Queue, Format, TimeLimit, VarNames)
 	;   atom(ID)
@@ -2056,7 +2059,8 @@ http_pengine_abort(Request) :-
             ]),
     (	pengine_thread(ID, _Thread),
 	pengine_queue(ID, Queue, TimeLimit, _)
-    ->	pengine_abort(ID),
+    ->	broadcast(pengine(abort(ID))),
+	pengine_abort(ID),
 	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
     ).
