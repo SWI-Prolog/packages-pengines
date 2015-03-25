@@ -353,12 +353,12 @@ pengine_reply(Queue, Event0) :-
     arg(1, Event0, ID),
     wrap_first_answer(ID, Event0, Event),
     random_delay,
-	debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
+    debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
     thread_send_message(Queue, pengine_event(ID, Event)).
 
 wrap_first_answer(ID, Event0, CreateEvent) :-
-	wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)]),
-	arg(1, CreateEvent, ID), !,
+    wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)]),
+    arg(1, CreateEvent, ID), !,
     retract(wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)])).
 wrap_first_answer(_ID, Event, Event).
 
