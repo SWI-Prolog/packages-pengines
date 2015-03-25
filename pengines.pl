@@ -826,7 +826,7 @@ pengine_debug(Format, Args) :-
     ->	format(atom(Message), Format, Args)
     ;	message_to_string(E, Message)
     ),
-    thread_send_message(Queue, debug(Self, Message)).
+    pengine_reply(Queue, debug(Self, Message)).
 
 
 /*================= Local pengine =======================
