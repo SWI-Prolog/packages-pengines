@@ -158,7 +158,7 @@ pengine_output/1 instead of write/1.
 <html lang="en">
     <head>
         <script src="/vendor/jquery/jquery-2.0.3.min.js"></script>
-        <script src="/assets/js/pengine.js"></script>
+        <script src="/pengine/pengines.js"></script>
         <script type="text/x-prolog">
 
             main :-
