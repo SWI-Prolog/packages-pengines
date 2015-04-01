@@ -86,7 +86,7 @@ function Pengine(options) {
 	    if ( obj.code == "existence_error" &&
 		 obj.arg1 == "pengine" &&
 		 obj.arg2 == that.id )
-	      unregisterPengine(that.id);
+	      unregisterPengine(that);
             if (options.onerror)
 	        options.onerror.call(obj, obj);
 	    else if ( console !== undefined )
@@ -106,11 +106,11 @@ function Pengine(options) {
 	    that.aborted = true;
             if (options.onabort) options.onabort.call(obj, obj);
         } else if (obj.event === 'destroy') {
-	    unregisterPengine(that.id);
+	    unregisterPengine(that);
 	    if (obj.data) process_response(obj.data);
             if (options.ondestroy) options.ondestroy.call(obj, obj);
         } else if (obj.event === 'died') {
-	    unregisterPengine(that.id);
+	    unregisterPengine(that);
 	    if ( !that.aborted ) {
 	        obj.data = "Pengine has died";
 		obj.code = "died";
@@ -138,11 +138,11 @@ function Pengine(options) {
 	      '&event=' + event + '&format=' + format, process_response);
     }
 
-    function unregisterPengine(id) {
-      var index = Pengine.ids.indexOf(id);
+    function unregisterPengine(obj) {
+      var index = Pengine.ids.indexOf(obj.id);
       if ( index > -1 ) Pengine.ids.splice(index, 1);
+      obj.died = true;
     }
-
 
     // Public methods
     Pengine.prototype = {
@@ -171,7 +171,8 @@ function Pengine(options) {
 		  '&format=' + format, process_response);
 	},
         destroy: function() {
-	    send('destroy');
+	    if ( !this.died )
+	      send('destroy');
 	}
     };
     // JW: Why is this needed!?
