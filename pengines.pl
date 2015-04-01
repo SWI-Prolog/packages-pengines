@@ -929,6 +929,13 @@ pengine_create_option(user(_)).
 	pengine_done/0.
 
 pengine_done :-
+    thread_self(Me),
+    (	thread_property(Me, status(exception('$aborted')))
+    ->	pengine_self(Pengine),
+        pengine_reply(destroy(Pengine, abort(Pengine))),
+	thread_detach(Me)
+    ;	true
+    ),
     forall(child(_Name, Child),
 	   pengine_destroy(Child)),
     pengine_self(Id),
