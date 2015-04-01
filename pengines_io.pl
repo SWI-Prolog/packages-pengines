@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, VU University Amsterdam
+    Copyright (C): 2014-2015, VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -47,6 +47,7 @@
 
 	    pengine_read/1,		% -Term
 
+	    pengine_io_predicate/1,	% ?Head
 	    pengine_bind_io_to_html/1,	% +Module
 	    pengine_io_goal_expansion/2	% +Goal, -Expanded
 	  ]).
@@ -515,28 +516,33 @@ sandbox:safe_meta(pengines_io:pengine_format(Format, Args), Calls) :-
 		 *	   REDEFINITION		*
 		 *******************************/
 
-io_predicate(writeln(_)).
-io_predicate(nl).
-io_predicate(flush_output).
-io_predicate(format(_)).
-io_predicate(format(_,_)).
-io_predicate(read(_)).
-io_predicate(write_term(_,_)).
-io_predicate(write(_)).
-io_predicate(writeq(_)).
-io_predicate(display(_)).
-io_predicate(print(_)).
-io_predicate(write_canonical(_)).
-io_predicate(listing).
-io_predicate(listing(_)).
-io_predicate(portray_clause(_)).
+%%	pengine_io_predicate(?Head)
+%
+%	True when Head describes the  head   of  a (system) IO predicate
+%	that is redefined by the HTML binding.
+
+pengine_io_predicate(writeln(_)).
+pengine_io_predicate(nl).
+pengine_io_predicate(flush_output).
+pengine_io_predicate(format(_)).
+pengine_io_predicate(format(_,_)).
+pengine_io_predicate(read(_)).
+pengine_io_predicate(write_term(_,_)).
+pengine_io_predicate(write(_)).
+pengine_io_predicate(writeq(_)).
+pengine_io_predicate(display(_)).
+pengine_io_predicate(print(_)).
+pengine_io_predicate(write_canonical(_)).
+pengine_io_predicate(listing).
+pengine_io_predicate(listing(_)).
+pengine_io_predicate(portray_clause(_)).
 
 term_expansion(pengine_io_goal_expansion(_,_),
 	       Clauses) :-
 	findall(Clause, io_mapping(Clause), Clauses).
 
 io_mapping(pengine_io_goal_expansion(Head, Mapped)) :-
-	io_predicate(Head),
+	pengine_io_predicate(Head),
 	Head =.. [Name|Args],
 	atom_concat(pengine_, Name, BodyName),
 	Mapped =.. [BodyName|Args].
@@ -549,7 +555,7 @@ pengine_io_goal_expansion(_, _).
 %	using pengine_output/1.
 
 pengine_bind_io_to_html(Module) :-
-	forall(io_predicate(Head),
+	forall(pengine_io_predicate(Head),
 	       bind_io(Head, Module)).
 
 bind_io(Head, Module) :-
