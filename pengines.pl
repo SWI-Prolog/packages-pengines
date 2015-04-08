@@ -1261,7 +1261,13 @@ pengine_input(Prompt, Term) :-
     pengine_self(Self),
     pengine_parent(Parent),
     pengine_reply(Parent, prompt(Self, Prompt)),
-    pengine_request(input(Term)).
+    pengine_request(Request),
+    (	Request = input(Input)
+    ->	Term = Input
+    ;	Request == destroy
+    ->	abort
+    ;	throw(error(protocol_error,_))
+    ).
 
 
 /** pengine_respond(+Pengine, +Input, +Options) is det
