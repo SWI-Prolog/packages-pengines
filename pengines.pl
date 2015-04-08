@@ -521,8 +521,6 @@ pengine_abort(Name) :-
 
 Destroys the pengine NameOrID.  With the option force(true), the pengine
 is killed using abort/0 and pengine_destroy/2 succeeds.
-
-@tbd	Should abort the pengine if it is running a query.
 */
 
 pengine_destroy(ID) :-
@@ -534,11 +532,10 @@ pengine_destroy(Name, Options) :-
     ;	ID = Name
     ),
     option(force(true), Options), !,
-    (	pengine_thread(ID, Thread),
-	catch(thread_signal(Thread, abort),
-	      error(existence_error(thread, _), _), fail)
-    ->	thread_join(Thread, _)			% cannot detach because that
-    ;	true					% will result in a warning
+    (	pengine_thread(ID, Thread)
+    ->	catch(thread_signal(Thread, abort),
+	      error(existence_error(thread, _), _), true)
+    ;	true
     ).
 pengine_destroy(ID, _) :-
     catch(pengine_send(ID, destroy),
