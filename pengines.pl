@@ -559,12 +559,14 @@ pengine_destroy(ID, _) :-
 	current_pengine/6,		% Id, ParentId, Thread, URL, App, Destroy
 	pengine_queue/4,		% Pengine, Queue, TimeOut, Time
 	output_queue/3,			% Id, Queue, Time
-	pengine_user/2.			% Id, User
+	pengine_user/2,			% Id, User
+	pengine_data/2.			% Id, Data
 :- volatile
 	current_pengine/6,
 	pengine_queue/4,
 	output_queue/3,
-	pengine_user/2.
+	pengine_user/2,
+	pengine_data/2.
 
 :- thread_local
 	child/2.			% ?Name, ?Child
@@ -593,7 +595,8 @@ pengine_unregister(Id) :-
     ;	true
     ),
     retractall(current_pengine(Id, _, Me, _, _, _)),
-    retractall(pengine_user(Id, _)).
+    retractall(pengine_user(Id, _)),
+    retractall(pengine_data(Id, _)).
 
 pengine_unregister_remote(Id) :-
     retractall(current_pengine(Id, _Parent, 0, _, _, _)).
@@ -678,6 +681,8 @@ current_pengine_application(Application) :-
 	   'IP addresses from which remotes are allowed to connect').
 :- setting(deny_from, list(atom), [],
 	   'IP addresses from which remotes are NOT allowed to connect').
+:- setting(debug_info, boolean, false,
+	   'Keep information to support source-level debugging').
 
 
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
@@ -723,6 +728,11 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 			    'IP addresses from which remotes are NOT \c
 			    allowed to connect')),
 		DenyFromSetting),
+    expand_term((:- setting(Application:debug_info, boolean,
+			    setting(pengines:debug_info),
+			    'Keep information to support source-level \c
+			    debugging')),
+		DebugInfoSetting),
     flatten([ pengines:current_application(Application),
 	      ThreadPoolSizeSetting,
 	      ThreadPoolStacksSetting,
@@ -731,7 +741,8 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 	      IdleLimitSetting,
 	      ProgramSpaceSetting,
 	      AllowFromSetting,
-	      DenyFromSetting
+	      DenyFromSetting,
+	      DebugInfoSetting
 	    ], Expanded).
 
 % Register default application
@@ -765,6 +776,9 @@ properties are:
     after completing the query.
   * parent(Queue)
     Message queue to which the (local) pengine reports.
+  * source(?SourceID, ?Source)
+    Source is the source code with the given SourceID. May be present if
+    the setting `debug_info` is present.
 */
 
 
@@ -792,6 +806,8 @@ pengine_property2(Id, destroy(Destroy)) :-
     current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
 pengine_property2(Id, parent(Parent)) :-
     current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
+pengine_property2(Id, source(SourceID, Source)) :-
+    pengine_data(Id, source(SourceID, Source)).
 
 /** pengine_output(+Term) is det
 
@@ -2377,33 +2393,70 @@ pengine_src_text(Src, Module) :-
 		     silent(true)
 		   | Options
 		   ]),
-	close(Stream)).
+	close(Stream)),
+    keep_source(Self, ID, Src).
 
-/** pengine_src_url(+URL, +Module) is det
-
-Asserts the clauses defined in  URL  in   the  private  database  of the
-current Pengine. This  predicate  processes   the  `src_url'  option  of
-pengine_create/1.
-*/
+%%   pengine_src_url(+URL, +Module) is det
+%
+%    Asserts the clauses defined in URL in   the private database of the
+%    current Pengine. This predicate processes   the `src_url' option of
+%    pengine_create/1.
+%
+%    @tbd: make a sensible guess at the encoding.
 
 pengine_src_url(URL, Module) :-
     pengine_self(Self),
     uri_encoded(path, URL, Path),
     format(atom(ID), 'pengine://~w/url/~w', [Self, Path]),
     extra_load_options(Self, Options),
-    setup_call_cleanup(
-	http_open(URL, Stream, []),
-	load_files(Module:ID,
-		   [ stream(Stream),
-		     module(Module)
-		   | Options
-		   ]),
-	close(Stream)).
+    (	get_pengine_application(Self, Application),
+	setting(Application:debug_info, false)
+    ->	setup_call_cleanup(
+	    http_open(URL, Stream, []),
+	    ( set_stream(Stream, encoding(utf8)),
+	      load_files(Module:ID,
+			 [ stream(Stream),
+			   module(Module)
+			 | Options
+			 ])
+	    ),
+	    close(Stream))
+    ;	setup_call_cleanup(
+	    http_open(URL, TempStream, []),
+	    ( set_stream(TempStream, encoding(utf8)),
+	      read_string(TempStream, _, Src)
+	    ),
+	    close(TempStream)),
+	setup_call_cleanup(
+	    open_chars_stream(Src, Stream),
+	    load_files(Module:ID,
+		       [ stream(Stream),
+			 module(Module)
+		       | Options
+		       ]),
+	    close(Stream)),
+	keep_source(Self, ID, Src)
+    ).
+
 
 extra_load_options(Pengine, Options) :-
 	pengine_not_sandboxed(Pengine), !,
 	Options = [].
 extra_load_options(_, [sandboxed(true)]).
+
+
+keep_source(Pengine, ID, SrcText) :-
+	get_pengine_application(Pengine, Application),
+	setting(Application:debug_info, true), !,
+	to_string(SrcText, SrcString),
+	assertz(pengine_data(Pengine, source(ID, SrcString))).
+keep_source(_, _, _).
+
+to_string(String, String) :-
+	string(String), !.
+to_string(Atom, String) :-
+	atom_string(Atom, String), !.
+
 
 
 		 /*******************************
