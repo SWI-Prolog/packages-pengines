@@ -133,9 +133,12 @@ function Pengine(options) {
     }
 
     function send(event) {
-        var event = encodeURIComponent(event);
-        $.get(server + '/send?id=' + that.id +
-	      '&event=' + event + '&format=' + format, process_response);
+        $.get(server + '/send',
+	      { id: that.id,
+		event: event,
+		format: format
+	      },
+	      process_response);
     }
 
     function unregisterPengine(obj) {
