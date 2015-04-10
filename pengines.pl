@@ -2017,17 +2017,17 @@ http_pengine_send(Request) :-
 %	by an capital letter are ignored from the template.
 
 fix_bindings(Format,
-	     ask(Goal, Options), Bindings, VarNames,
+	     ask(Goal, Options0), Bindings, VarNames,
 	     ask(Goal, NewOptions)) :-
     json_lang(Format), !,
-    template(Bindings, VarNames, Template, Options),
-    option(chunk(Paging), Options, 1),
-    NewOptions = [template(Template), chunk(Paging)].
+    template(Bindings, VarNames, Template, Options0, Options1),
+    select_option(chunk(Paging), Options1, Options2, 1),
+    NewOptions = [template(Template), chunk(Paging) | Options2].
 fix_bindings(_, Command, _, -, Command).
 
-template(_, -, Template, Options) :-
-    option(template(Template), Options), !.
-template(Bindings, VarNames, Template, _Options) :-
+template(_, -, Template, Options0, Options) :-
+    select_option(template(Template), Options0, Options), !.
+template(Bindings, VarNames, Template, Options, Options) :-
     exclude(anon, Bindings, Bindings1),
     maplist(var_name, Bindings1, VarNames),
     dict_create(Template, json, Bindings1).
