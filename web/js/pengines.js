@@ -46,13 +46,19 @@ function Pengine(options) {
         }
         return src;
     }
+    /**
+     * Turn an object into a Prolog option list.  The option values
+     * must be valid Prolog syntax.  Use Pengine.stringify() when
+     * applicable.
+     */
     function options_to_list(options) {
         var opts = "[";
-        for (var i in options) {
-            opts += i + "(" + options[i] + "),";
-        }
-        if (opts.length > 1) {
-            opts = opts.slice(0, -1);
+        for (var name in options) {
+	    if ( opts !== "[" )
+	        opts += ",";
+	    if ( options.hasOwnProperty(name) ) {
+	        opts += name + "(" + options[name] + ")";
+	    }
         }
         return opts + "]";
     }
