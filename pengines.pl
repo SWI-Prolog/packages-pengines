@@ -98,6 +98,7 @@ from Prolog or JavaScript.
 	write_result/3,			% +Format, +Event, +VarNames
 	event_to_json/4,		% +Event, -JSON, +Format, +VarNames
 	prepare_module/3,		% +Module, +Application, +Options
+	prepare_goal/3,			% +GoalIn, -GoalOut, +Options
 	authentication_hook/3,		% +Request, +Application, -User
 	not_sandboxed/2.		% +User, +App
 
@@ -1198,7 +1199,7 @@ more_solutions(Event, ID, Choice, State, Time) :-
 %	prove the goal. It takes care of the chunk(N) option.
 
 ask(ID, Goal, Options) :-
-    catch(prepare_goal(ID, Goal, Goal1), Error, true), !,
+    catch(prepare_goal(ID, Goal, Goal1, Options), Error, true), !,
     (   var(Error)
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
@@ -1207,7 +1208,7 @@ ask(ID, Goal, Options) :-
 	guarded_main_loop(ID)
     ).
 
-%%	prepare_goal(+Pengine, +GoalIn, -GoalOut) is det.
+%%	prepare_goal(+Pengine, +GoalIn, -GoalOut, +Options) is det.
 %
 %	Prepare GoalIn for execution in Pengine.   This  implies we must
 %	perform goal expansion and, if the   system  is sandboxed, check
@@ -1219,16 +1220,31 @@ ask(ID, Goal, Options) :-
 %	to run `Y`. This happens in the  CQL package. Possibly we should
 %	disallow this reinterpretation?
 
-prepare_goal(ID, Goal, Module:Goal1) :-
+prepare_goal(ID, Goal0, Module:Goal, Options) :-
+	(   prepare_goal(Goal0, Goal1, Options)
+	->  true
+	;   Goal1 = Goal0
+	),
 	get_pengine_module(ID, Module),
 	setup_call_cleanup(
 	    '$set_source_module'(Old, Module),
-	    expand_goal(Goal, Goal1),
+	    expand_goal(Goal1, Goal),
 	    '$set_source_module'(_, Old)),
 	(   pengine_not_sandboxed(ID)
 	->  true
-	;   safe_goal(Module:Goal1)
+	;   safe_goal(Module:Goal)
 	).
+
+%%  prepare_goal(+Goal0, -Goal1, +Options) is semidet.
+%
+%   Pre-preparation hook for running Goal0. The hook runs in the context
+%   of the pengine. Goal is the raw   goal  given to _ask_. The returned
+%   Goal1 is subject  to  goal   expansion  (expand_goal/2)  and sandbox
+%   validation (safe_goal/1) prior to  execution.   If  this goal fails,
+%   Goal0 is used for further processing.
+%
+%   @arg Options provides the options as given to _ask_
+
 
 %%  pengine_not_sandboxed(+Pengine) is semidet.
 %
