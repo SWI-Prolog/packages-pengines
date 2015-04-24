@@ -2180,6 +2180,13 @@ event_term_to_json_data(destroy(ID, Event),
 			json{event:destroy, id:ID, data:JSON},
 			Style, VarNames) :- !,
     event_term_to_json_data(Event, JSON, Style, VarNames).
+event_term_to_json_data(create(ID, Features0), JSON, Style, VarNames) :- !,
+    (	select(answer(First0), Features0, Features1)
+    ->	event_term_to_json_data(First0, First, Style, VarNames),
+	Features = [answer(First)|Features1]
+    ;	Features = Features0
+    ),
+    dict_create(JSON, json, [event(create), id(ID)|Features]).
 event_term_to_json_data(Event, JSON, Lang, _) :-
     event_term_to_json_data(Event, JSON, Lang).
 
