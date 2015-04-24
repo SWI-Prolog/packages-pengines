@@ -84,8 +84,11 @@ to_json(Term, Term) :-
 to_json(Term, JsonList) :-
 	is_list(Term), !,
 	maplist(to_json, Term, JsonList).
-to_json(Term, Term) :-
-	is_dict(Term), !.
+to_json(Term0, Term) :-
+	is_dict(Term0), !,
+	dict_pairs(Term0, Tag, Pairs0),
+	maplist(pair_value_to_json, Pairs0, Pairs),
+	dict_pairs(Term, Tag, Pairs).
 to_json('$VAR'(Name), VarName) :- !,
 	format(string(VarName), '~W', ['$VAR'(Name), [numbervars(true)]]).
 to_json(Term, json{functor:F, args:JsonArgs}) :-
@@ -95,3 +98,6 @@ to_json(Term, json{functor:F, args:JsonArgs}) :-
 json_symbol(null).
 json_symbol(true).
 json_symbol(false).
+
+pair_value_to_json(Key-Value0, Key-Value) :-
+	to_json(Value0, Value).
