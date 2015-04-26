@@ -55,6 +55,7 @@
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_files)).
 :- use_module(library(http/http_dispatch)).
+:- use_module(library(http/json)).
 
 :- pengine_application(swish).
 :- use_module(swish:library(pengines_io)).
@@ -67,17 +68,26 @@ test_js :-
     run_tests([ js_pengines
 	      ]).
 
+:- dynamic
+	test_config/1.
+
 test_js(File, Atoms) :-
+	test_js(File, null, Atoms).
+
+test_js(File, Config, Atoms) :-
 	pengine_server(Server),
 	setup_call_cleanup(
-	    test_script(File, Server, Script),
-	    ( process_create(path(phantomjs), [Script],
-			     [ stdout(pipe(Input))
-			     ]),
-	      read_string(Input, _, String),
-	      close(Input)
-	    ),
-	    delete_file(Script)),
+	    asserta(test_config(Config), Ref),
+	    setup_call_cleanup(
+		test_script(File, Server, Script),
+		( process_create(path(phantomjs), [Script],
+				 [ stdout(pipe(Input))
+				 ]),
+		  read_string(Input, _, String),
+		  close(Input)
+		),
+		delete_file(Script)),
+	    erase(Ref)),
 	split_string(String, "\r\n", "\r\n", Lines),
 	maplist(atom_string, Atoms, Lines).
 
@@ -128,7 +138,11 @@ test(sepresults, Lines == ['1', '2', '3', '4', a, b, c, d]) :-
 	test_js('sepresults.html', Lines0),
 	sort(Lines0, Lines).
 test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
-	test_js('test_json_s.html', Lines).
+	test_js('test_json_s.html', _{}, Lines).
+test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+	test_js('test_json_s.html', _{askOptions:_{chunk:3}}, Lines).
+test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+	test_js('test_json_s.html', _{ask:"data(A)"}, Lines).
 test(json_html, Lines == [ 'A',
 			   '<span class="pl-int">1</span>',
 			   'A',
@@ -151,6 +165,7 @@ test(json_html, Lines == [ 'A',
 		 *******************************/
 
 :- http_handler(/, http_reply_from_files(web, []), [prefix]).
+:- http_handler('/test_js/config.js', page_config, []).
 
 :- dynamic
 	pengine_server_port/1.
@@ -169,3 +184,10 @@ stop_pengine_server :-
 	retract(pengine_server_port(Port)), !,
 	http_stop_server(Port, []).
 stop_pengine_server.
+
+page_config(_Request) :-
+	test_config(Config),
+	format('Content-type: text/javascript~n~n'),
+	format('var config = '),
+	json_write_dict(current_output, Config),
+	format(';\n').

@@ -5,6 +5,7 @@
     <head>
         <script src="/jquery-2.0.3.min.js"></script>
         <script src="/js/pengines.js"></script>
+        <script src="config.js"></script>
         <script type="text/x-prolog">
 
 	    data(1).
@@ -15,16 +16,22 @@
 
         </script>
         <script>
-            var pengine = new Pengine({
-                oncreate: handleCreate,
-                onsuccess: handleSuccess,
-                format: "json-s"
-            });
+	    var options = $.extend({},
+				   { onsuccess: handleSuccess,
+				     format: "json-s"
+				   },
+				   config);
+	    if ( !options.ask )
+	      options.oncreate = handleCreate;
+
+            var pengine = new Pengine(options);
             function handleCreate () {
-                pengine.ask('data(A)');
+                pengine.ask('data(A)', config.askOptions);
             }
             function handleSuccess() {
-		console.log(this.data[0].A);
+		for(var i=0; i<this.data.length; i++) {
+		    console.log(this.data[i].A);
+		}
 		if ( this.more )
                    pengine.next();
             }
