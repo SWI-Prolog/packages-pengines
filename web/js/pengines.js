@@ -26,206 +26,293 @@
     POSSIBILITY OF SUCH DAMAGE.
 */
 
+		 /*******************************
+		 *	    CONSTRUCTOR		*
+		 *******************************/
+
 function Pengine(options) {
-    if ( Pengine.ids === undefined ) {
-        Pengine.ids = [];
-    }
-    var src = options.src ? [options.src] : [];
-    var format = options.format ? options.format : "json";
-    var server = options.server !== undefined ? options.server : "/pengine";
-    this.options = options;
-    this.id = null;
-    var that = this;
-    // Private functions
-    function source() {
-        var scripts = document.getElementsByTagName('script');
-        for (var i = 0; i < scripts.length; i++) {
-            if (scripts[i].getAttribute('type') == 'text/x-prolog') {
-                src.push(scripts[i].textContent);
-            }
-        }
-        return src;
-    }
-    /**
-     * Turn an object into a Prolog option list.  The option values
-     * must be valid Prolog syntax.  Use Pengine.stringify() when
-     * applicable.
-     */
-    function options_to_list(options) {
-        var opts = "[";
-        for (var name in options) {
-	    if ( opts !== "[" )
-	        opts += ",";
-	    if ( options.hasOwnProperty(name) ) {
-	        opts += name + "(" + options[name] + ")";
-	    }
-        }
-        return opts + "]";
-    }
-    function process_response(obj) {
-        obj.pengine = that;
-        if (obj.event === 'create') {
-	    that.id = obj.id;
-	    Pengine.ids.push(obj.id);
-            if (Pengine.ids.length > obj.slave_limit) {
-		that.destroy();
-		obj.data = "Attempt to create too many pengines. "+
-		           "The limit is: " + obj.slave_limit;
-		obj.code = "too_many_pengines";
-		if (options.onerror)
-		    options.onerror.call(obj, obj);
-		else if ( console !== undefined )
-		    console.error(obj.data);
-		else
-		    alert(obj.data);
-	    } else {
-		if (options.oncreate) options.oncreate.call(obj, obj);
-		if (obj.answer) process_response(obj.answer);
-	    }
-        } else if (obj.event === 'stop') {
-            if (options.onstop) options.onstop.call(obj, obj);
-        } else if (obj.event === 'success') {
-            if (options.onsuccess) options.onsuccess.call(obj, obj);
-        } else if (obj.event === 'failure') {
-            if (options.onfailure) options.onfailure.call(obj, obj);
-        } else if (obj.event === 'error') {
-	    if ( obj.code == "existence_error" &&
-		 obj.arg1 == "pengine" &&
-		 obj.arg2 == that.id )
-	      unregisterPengine(that);
-            if (options.onerror)
-	        options.onerror.call(obj, obj);
-	    else if ( console !== undefined )
-	        console.error(obj.data);
-        } else if (obj.event === 'output') {
-            if (options.onoutput) options.onoutput.call(obj, obj);
-            that.pull_response(obj.id);
-        } else if (obj.event === 'debug') {
-            if (options.ondebug)
-	        options.ondebug.call(obj, obj);
-	    else if ( console !== undefined )
-		console.log(obj.data);
-            that.pull_response(obj.id);
-        } else if (obj.event === 'prompt') {
-            if (options.onprompt) options.onprompt.call(obj, obj);
-        } else if (obj.event === 'abort') {
-	    that.aborted = true;
-            if (options.onabort) options.onabort.call(obj, obj);
-        } else if (obj.event === 'destroy') {
-	    unregisterPengine(that);
-	    if (obj.data) process_response(obj.data);
-            if (options.ondestroy) options.ondestroy.call(obj, obj);
-        } else if (obj.event === 'died') {
-	    unregisterPengine(that);
-	    if ( !that.aborted ) {
-	        obj.data = "Pengine has died";
-		obj.code = "died";
-	        if (options.onerror)
-		    options.onerror.call(obj, obj);
-		else if ( console !== undefined )
-		    console.error(obj.data);
-	    }
-	}
-    };
-    /**
-     * Process the reply to a `pull_response`.  If the last answer was
-     * final, this question will be asked to a death pengine.  We do not
-     * consider this an error.
-     */
-    function process_pull_response(obj) {
-        obj.pengine = that;
-	if ( obj.event !== 'died')
-	    process_response(obj);
+  var that = this;
+
+  // private functions
+  function fillDefaultOptions(options) {
+    for(var k in Pengine.options) {
+      if ( Pengine.options.hasOwnProperty(k) &&
+	   options[k] === undefined )
+	options[k] = Pengine.options[k];
     }
 
-    function send(event) {
-        $.get(server + '/send',
-	      { id: that.id,
-		event: event,
-		format: format
-	      },
-	      process_response);
-    }
+    return options;
+  }
 
-    function unregisterPengine(obj) {
-      var index = Pengine.ids.indexOf(obj.id);
-      if ( index > -1 ) Pengine.ids.splice(index, 1);
-      obj.died = true;
+  function copyOptions(to, from, list) {
+    for(var i=0; i<list.length; i++) {
+      var k = list[i];
+      if ( from[k] !== undefined )
+	to[k] = from[k];
     }
+  }
 
-    // Public methods
-    Pengine.prototype = {
-        ask: function(query, options) {
-	    send('ask((' + query + '), ' + options_to_list(options) + ')');
-	},
-	next: function(n) {
-	    if ( n === undefined )
-	      send('next');
-	    else
-	      send('next('+n+')');
-	},
-        stop: function() {
-	    send('stop');
-	},
-	respond: function(input) {
-	    send('input((' + input + '))');
-	},
-        pull_response: function(id) {
-	    if ( id === undefined ) id = that.id;
-	    $.get(server + '/pull_response?id=' + id +
-		  '&format=' + format, process_pull_response);
-	},
-	abort: function() {
-	    $.get(server + '/abort?id=' + that.id +
-		  '&format=' + format, process_response);
-	},
-        destroy: function() {
-	    if ( !this.died )
-	      send('destroy');
-	}
-    };
-    // JW: Why is this needed!?
-    $.extend(this, Pengine.prototype);
+  // create instance
+  this.options = fillDefaultOptions(options);
+  this.id = null;
 
-    Pengine.destroy_all = function(async) {
-        if ( Pengine.ids.length > 0 ) {
-	    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
-	             async: async === undefined ? true : false
-		   });
-	    Pengine.ids = [];
-	}
-    }
-    // On creation
-    var createOptions = {};
-    createOptions["src_text"] = source().join('\n');
-    createOptions["format"] = format;
-    if (options.application) createOptions["application"] = options.application;
-    if (options.ask) createOptions["ask"] = options.ask;
-    if (options.template) createOptions["template"] = options.template;
-    if (options.chunk) createOptions["chunk"] = options.chunk;
-    if (typeof options.destroy == "boolean" )
-      createOptions["destroy"] = options.destroy;
-    $.ajax(server + '/create',
-	   { contentType: "application/json; charset=utf-8",
-	     dataType: "json",
-	     data: JSON.stringify(createOptions),
-	     type: "POST",
-	     success: process_response,
-	     error: function(jqXHR) {
+  // On creation
+  var src = this.options.src ? [this.options.src] : [];
+  var createOptions = {
+    src_text: this.script_sources(src).join('\n')
+  };
+
+  copyOptions(createOptions, options,
+	      [ "format",
+		"application",
+		"ask",
+		"template",
+		"chunk",
+		"destroy"
+	      ]);
+
+  $.ajax(this.options.server + '/create',
+	 { contentType: "application/json; charset=utf-8",
+	   dataType: "json",
+	   data: JSON.stringify(createOptions),
+	   type: "POST",
+	   success: function(obj) {
+	     that.process_response(obj);
+	   },
+	   error: function(jqXHR) {
+	     var obj = { event:"error", pengine:that };
+
+	     if ( jqXHR.responseText ) {
 	       var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
 					   .replace(/<\/body>/, "");
 	       var plain = $("<div></div>").html(msg).text();
-
-	       if ( options.onerror ) {
-		 obj = {pengine:that, data: plain, dataHTML: msg};
-		 options.onerror.call(obj, obj);
-	       } else {
-		 alert(plain);
-	       }
+	       obj.data = plain;
+	       obj.dataHTML = msg;
 	     }
-	   });
+
+	     that.process_response(obj);
+	   }
+	 });
+
 }/*end of Pengine()*/
 
+
+		 /*******************************
+		 *	     METHODS		*
+		 *******************************/
+
+(function() {
+Pengine.ids = [];
+
+Pengine.options = {
+  format: "json",
+  server: "/pengine"
+};
+
+
+Pengine.prototype.ask = function(query, options) {
+  this.send('ask((' + query + '), ' + options_to_list(options) + ')');
+};
+
+Pengine.prototype.next = function(n) {
+  if ( n === undefined )
+    this.send('next');
+  else
+    this.send('next('+n+')');
+};
+
+Pengine.prototype.stop = function() {
+  this.send('stop');
+};
+
+Pengine.prototype.respond = function(input) {
+  this.send('input((' + input + '))');
+};
+
+/**
+ * Process the reply to a `pull_response`.  If the last answer was
+ * final, this question will be asked to a death pengine.  We do not
+ * consider this an error.
+ */
+Pengine.prototype.pull_response = function(id) {
+  var pengine = this;
+
+  $.get(this.options.server + '/pull_response',
+	{ id: this.id,
+	  format: this.options.format
+	},
+	function(obj) {
+	  if ( obj.event !== 'died')
+	    pengine.process_response(obj);
+	});
+};
+
+Pengine.prototype.abort = function() {
+  var pengine = this;
+
+  $.get(this.options.server + '/abort',
+	{ id: this.id,
+	  format: this.options.format
+	},
+	function(obj) {
+	  pengine.process_response(obj);
+	});
+};
+
+Pengine.prototype.destroy = function() {
+  if ( !this.died )
+    this.send('destroy');
+};
+
+// internal methods
+
+Pengine.prototype.send = function(event) {
+  pengine = this;
+
+  $.get(pengine.options.server + '/send',
+	{ id: this.id,
+	  event: event,
+	  format: this.options.format
+	},
+	function(obj) {
+	  pengine.process_response(obj);
+	});
+};
+
+Pengine.prototype.script_sources = function(src) {
+  var scripts = document.getElementsByTagName('script');
+
+  src = src||[];
+  for (var i = 0; i < scripts.length; i++) {
+    if (scripts[i].getAttribute('type') == 'text/x-prolog') {
+      src.push(scripts[i].textContent);
+    }
+  }
+
+  return src;
+};
+
+Pengine.prototype.process_response = function(obj) {
+  obj.pengine = this;
+  Pengine.onresponse[obj.event].call(this, obj);
+};
+
+Pengine.prototype.callback = function(f, obj) {
+  if ( this.options[f] )
+  { this.options[f].call(obj, obj);
+    return true;
+  }
+};
+
+Pengine.prototype.report = function(level, data) {
+  if ( console !== undefined )
+    console[level](data);
+  else if ( level === 'error' )
+    alert(data);
+};
+
+
+		 /*******************************
+		 *	  HANDLE EVENTS		*
+		 *******************************/
+
+Pengine.onresponse = {
+  create: function(obj) {
+    this.id = obj.id;
+    Pengine.ids.push(obj.id);
+
+    if ( Pengine.ids.length > obj.slave_limit ) {
+      this.destroy();
+      obj.data = "Attempt to create too many pengines. "+
+		 "The limit is: " + obj.slave_limit;
+      obj.code = "too_many_pengines";
+      if ( !this.callback('onerror', obj) )
+	this.report('error', obj.data);
+    } else {
+      this.callback('oncreate', obj);
+      if ( obj.answer )
+	this.process_response(obj.answer);
+    }
+  },
+
+  stop:    function(obj) { this.callback('onstop',    obj); },
+  success: function(obj) { this.callback('onsuccess', obj); },
+  failure: function(obj) { this.callback('onfailure', obj); },
+  prompt:  function(obj) { this.callback('onprompt',  obj); },
+
+  error: function(obj) {
+    if ( obj.code == "existence_error" &&
+	 obj.arg1 == "pengine" &&
+	 obj.arg2 == this.id )
+      unregisterPengine(this);
+
+    if ( !this.callback('onerror', obj) )
+      this.report('error', obj.data);
+  },
+
+  output: function(obj) {
+    this.callback('onoutput', obj);
+    this.pull_response(obj.id);
+  },
+
+  debug: function(obj) {
+    if ( !this.callback('ondebug', obj) )
+      this.report('log', obj.data);
+    this.pull_response(obj.id);
+  },
+
+  abort: function(obj) {
+    this.aborted = true;
+    this.callback('onabort', obj);
+  },
+
+  destroy: function(obj) {
+    unregisterPengine(this);
+    if ( obj.data )
+      this.process_response(obj.data);
+    this.callback('ondestroy', obj);
+  },
+
+  died: function(obj) {
+    unregisterPengine(this);
+    if ( !this.aborted ) {
+      obj.data = "Pengine has died";
+      obj.code = "died";
+      if ( !this.callback('onerror', obj) )
+	this.report('error', obj.data);
+    }
+  }
+};
+
+
+		 /*******************************
+		 *	PRIVATE FUNCTIONS	*
+		 *******************************/
+
+function unregisterPengine(pengine) {
+  var index = Pengine.ids.indexOf(pengine.id);
+  if ( index > -1 ) Pengine.ids.splice(index, 1);
+  pengine.died = true;
+}
+
+/**
+ * Turn an object into a Prolog option list.  The option values
+ * must be valid Prolog syntax.  Use Pengine.stringify() when
+ * applicable.
+ */
+function options_to_list(options) {
+  var opts = "[";
+  for (var name in options) {
+    if ( opts !== "[" )
+      opts += ",";
+    if ( options.hasOwnProperty(name) ) {
+      opts += name + "(" + options[name] + ")";
+    }
+  }
+  return opts + "]";
+}
+
+})();
 
 /**
  * Serialize JavaScript data as a Prolog term.  The serialization
@@ -338,6 +425,20 @@ Pengine.stringify = function(data, options) {
   if ( serialize(data) )
     return msg;
 }/*end of Pengine.stringify*/
+
+
+		 /*******************************
+		 *	    DESTRUCTION		*
+		 *******************************/
+
+Pengine.destroy_all = function(async) {
+  if ( Pengine.ids.length > 0 ) {
+    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
+	     async: async === undefined ? true : false
+           });
+    Pengine.ids = [];
+  }
+};
 
 window.onunload = function() {
     try {
