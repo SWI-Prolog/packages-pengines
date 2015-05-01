@@ -30,6 +30,40 @@
 		 *	    CONSTRUCTOR		*
 		 *******************************/
 
+/**
+ * Create a Prolog engine (Pengine). The constructor is handed an object
+ * that specifies the behaviour. Defaults for this object may be
+ * specified by adding properties to `Pengine.options`.  For example
+ * `Pengine.options.chunk = 1000;`
+ *
+ * @param {Object} options
+ * @param {String} [options.format="json"] specifies the response
+ * format.
+ * @param {String} [options.ask] specifies the initial Prolog query.  If
+ * omitted, the user must provide an `oncreate` handler and use
+ * `.ask()` from the create handle.
+ * @param {Boolean} [options.destroy=true] If `true` destroy the pengine
+ * if initial query has finished.
+ * @param {Int} [options.chunk=1] Provide answers in chunks of this
+ * size.
+ * @param {String} [options.applicatio="pengine_sandbox"] Application in
+ * which to execute the query.
+ * @param {Function} [options.oncreate]
+ * @param {Function} [options.onsuccess]
+ * @param {Function} [options.onfailure]
+ * @param {Function} [options.onerror]
+ * @param {Function} [options.onprompt]
+ * @param {Function} [options.onoutput]
+ * @param {Function} [options.ondebug]
+ * @param {Function} [options.onabort]
+ * @param {Function} [options.ondestroy]
+ * Callback functions.  The callback function is called with an object
+ * argument.  This object always has a property `pengine` that refers
+ * to the JavaScript `Pengine` instance.  All callbacks are optional,
+ * although creating a Pengine without `onsuccess` is typically
+ * meaningless.
+ */
+
 function Pengine(options) {
   var that = this;
 
@@ -104,16 +138,32 @@ function Pengine(options) {
 (function() {
 Pengine.ids = [];
 
+/**
+ * Default options for `new Pengine()`
+ */
 Pengine.options = {
   format: "json",
   server: "/pengine"
 };
 
-
+/**
+ * Ask Prolog to execute a query. May also be specified as an option
+ * when creating the Pengine.
+ * @param {String} query is the Prolog query in Prolog syntax.  Use
+ * `Pengine.stringify()` when constructing the query from JavaScript
+ * data.
+ * @param {Object} [options] provides additional options.  The option
+ * values must be valid Prolog.  For example, `{chunk: 10}`.
+ */
 Pengine.prototype.ask = function(query, options) {
   this.send('ask((' + query + '), ' + options_to_list(options) + ')');
 };
 
+/**
+ * Ask for more results.  May be called from the `onsuccess` callback
+ * if `obj.more` equals `true`
+ * @param {Int} n is the chunk-size for the next chunk of answers.
+ */
 Pengine.prototype.next = function(n) {
   if ( n === undefined )
     this.send('next');
@@ -121,13 +171,46 @@ Pengine.prototype.next = function(n) {
     this.send('next('+n+')');
 };
 
+/**
+ * Ask the pengine to stop.  May be called from the `onsuccess` callback
+ * if `obj.more` equals `true`
+ */
 Pengine.prototype.stop = function() {
   this.send('stop');
 };
 
+/**
+ * Respond with a value after the pengines `onprompt` callback has been
+ * called.
+ */
 Pengine.prototype.respond = function(input) {
   this.send('input((' + input + '))');
 };
+
+/**
+ * Abort the pengine.  May be called at any time.
+ */
+Pengine.prototype.abort = function() {
+  var pengine = this;
+
+  $.get(this.options.server + '/abort',
+	{ id: this.id,
+	  format: this.options.format
+	},
+	function(obj) {
+	  pengine.process_response(obj);
+	});
+};
+
+/**
+ * Destroy the pengine. May be called at any time.
+ */
+Pengine.prototype.destroy = function() {
+  if ( !this.died )
+    this.send('destroy');
+};
+
+// internal methods
 
 /**
  * Process the reply to a `pull_response`.  If the last answer was
@@ -146,25 +229,6 @@ Pengine.prototype.pull_response = function(id) {
 	    pengine.process_response(obj);
 	});
 };
-
-Pengine.prototype.abort = function() {
-  var pengine = this;
-
-  $.get(this.options.server + '/abort',
-	{ id: this.id,
-	  format: this.options.format
-	},
-	function(obj) {
-	  pengine.process_response(obj);
-	});
-};
-
-Pengine.prototype.destroy = function() {
-  if ( !this.died )
-    this.send('destroy');
-};
-
-// internal methods
 
 Pengine.prototype.send = function(event) {
   pengine = this;
