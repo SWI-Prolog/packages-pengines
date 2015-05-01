@@ -217,7 +217,7 @@ Pengine.prototype.destroy = function() {
  * final, this question will be asked to a death pengine.  We do not
  * consider this an error.
  */
-Pengine.prototype.pull_response = function(id) {
+Pengine.prototype.pull_response = function() {
   var pengine = this;
 
   $.get(this.options.server + '/pull_response',
@@ -316,13 +316,13 @@ Pengine.onresponse = {
 
   output: function(obj) {
     this.callback('onoutput', obj);
-    this.pull_response(obj.id);
+    this.pull_response();
   },
 
   debug: function(obj) {
     if ( !this.callback('ondebug', obj) )
       this.report('log', obj.data);
-    this.pull_response(obj.id);
+    this.pull_response();
   },
 
   abort: function(obj) {
