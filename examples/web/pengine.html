@@ -15,15 +15,15 @@
                 pengine_ask(ID, a(X), [
                     template(X)
                 ]).
-            handle(success(ID, A, false)) :-
+            handle(success(_ID, A, false)) :-
                 pengine_output(A).
             handle(success(ID, A, true)) :-
                 pengine_output(A),
                 sleep(1),
                 pengine_next(ID, []).
-            handle(failure(ID)) :-
+            handle(failure(_ID)) :-
                 pengine_output(failure).
-            handle(error(ID, Err)) :-
+            handle(error(_ID, Err)) :-
                 message_to_string(Err, ErrS),
                 pengine_output(ErrS).
 

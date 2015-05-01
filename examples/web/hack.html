@@ -5,8 +5,7 @@
         <script type="text/x-prolog">
 
             main :-
-                pengine_set_prompt('Please enter a file to delete'),
-                pengine_input(X),
+                pengine_input('Please enter a file to delete', X),
 		delete_file(X).
 
         </script>
