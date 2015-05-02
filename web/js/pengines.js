@@ -136,7 +136,7 @@ function Pengine(options) {
 		 *******************************/
 
 (function() {
-Pengine.ids = [];
+Pengine.alive = [];
 
 /**
  * Default options for `new Pengine()`
@@ -283,9 +283,9 @@ Pengine.prototype.report = function(level, data) {
 Pengine.onresponse = {
   create: function(obj) {
     this.id = obj.id;
-    Pengine.ids.push(obj.id);
+    Pengine.alive.push(this);
 
-    if ( Pengine.ids.length > obj.slave_limit ) {
+    if ( Pengine.alive.length > obj.slave_limit ) {
       this.destroy();
       obj.data = "Attempt to create too many pengines. "+
 		 "The limit is: " + obj.slave_limit;
@@ -354,8 +354,8 @@ Pengine.onresponse = {
 		 *******************************/
 
 function unregisterPengine(pengine) {
-  var index = Pengine.ids.indexOf(pengine.id);
-  if ( index > -1 ) Pengine.ids.splice(index, 1);
+  var index = Pengine.alive.indexOf(pengine);
+  if ( index > -1 ) Pengine.alive.splice(index, 1);
   pengine.died = true;
 }
 
@@ -495,17 +495,37 @@ Pengine.stringify = function(data, options) {
 		 *	    DESTRUCTION		*
 		 *******************************/
 
+/**
+ * Destroy all living pengines.  This is called on page unload.  Note
+ * that the pengines may live on different servers.
+ */
 Pengine.destroy_all = function(async) {
-  if ( Pengine.ids.length > 0 ) {
-    $.ajax({ url:server + '/destroy_all?ids=' + Pengine.ids,
-	     async: async === undefined ? true : false
-           });
-    Pengine.ids = [];
+  if ( Pengine.alive.length > 0 ) {
+    var servers = {};
+
+    for(var i=0; i<Pengine.alive.length; i++) {
+      var pengine = Pengine.alive[i];
+      var server = pengine.options.server;
+
+      if ( servers[server] )
+	servers[server].push(pengine.id);
+      else
+	servers[server] = [pengine.id];
+    }
+
+    Pengine.alive = [];
+
+    for(var server in servers) {
+      if ( servers.hasOwnProperty(server) ) {
+	$.ajax({ url:server + '/destroy_all?ids=' + servers[server],
+	         async: async === undefined ? true : false,
+		 timeout: 1000
+	       });
+      }
+    }
   }
 };
 
 window.onunload = function() {
-    try {
-        Pengine.destroy_all();
-    } catch(e) {}
+  Pengine.destroy_all();
 };
