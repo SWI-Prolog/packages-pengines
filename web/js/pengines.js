@@ -206,8 +206,10 @@ Pengine.prototype.abort = function() {
  * Destroy the pengine. May be called at any time.
  */
 Pengine.prototype.destroy = function() {
-  if ( !this.died )
+  if ( !this.died ) {
+    this.died = true;
     this.send('destroy');
+  }
 };
 
 // internal methods
@@ -355,7 +357,10 @@ Pengine.onresponse = {
 
 function unregisterPengine(pengine) {
   var index = Pengine.alive.indexOf(pengine);
-  if ( index > -1 ) Pengine.alive.splice(index, 1);
+  if ( index > -1 )
+    Pengine.alive.splice(index, 1);
+  else
+    console.log("Could not unregister", Pengine.alive, pengine);
   pengine.died = true;
 }
 
