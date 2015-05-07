@@ -386,7 +386,8 @@ pengines:event_to_json(output(ID, Term), JSON, 'json-html', _) :- !,
 
 map_answer(ID, Bindings0, Answer) :-
 	dict_bindings(Bindings0, Bindings1),
-	prolog:translate_bindings(Bindings1, Bindings2, ID:Residuals),
+	prolog:translate_bindings(Bindings1, Bindings2, [],
+				  ID:Residuals-_HiddenResiduals),
 	maplist(binding_to_html(ID), Bindings2, VarBindings),
 	(   Residuals == []
 	->  Answer = json{variables:VarBindings}
