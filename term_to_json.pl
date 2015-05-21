@@ -2,8 +2,8 @@
 
     Author:        Torbjörn Lager and Jan Wielemaker
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014, Torbjörn Lager,
-			 VU University Amsterdam
+    Copyright (C): 2014-2015, Torbjörn Lager,
+			      VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -32,6 +32,7 @@
 	    term_to_json/2			% +Term, -Json
 	  ]).
 :- use_module(library(apply)).
+:- use_module(library(error)).
 
 %%	term_to_json(+Term, +Bindings, -JsonTerm) is det.
 %%	term_to_json(+Term, -JsonTerm) is det.
@@ -45,6 +46,10 @@
 %	  * Integer: =|{"type":"integer", "value":<integer>}|=
 %	  * Float: =|{"type":"float", "value":<float>}|=
 %	  * List: JSON array
+%	  * Dict: a JSON object. Values are processed recursively.
+%           (the tag is ignored)
+%	  * json([Key=Value, ...]): a JSON object Values are processed
+%	    recursively.
 %	  * compound: =|{"type":"compound", "functor":<string>, "args":<array>}|=
 %
 %	@param	Bindings is a list of Name=Var terms for variables that
@@ -73,6 +78,8 @@ to_json(@(Symbol), Symbol) :-			% compatibility
 	json_symbol(Symbol), !.
 to_json(Term, Term) :-
 	atom(Term), !.				% interpreted as a string
+to_json(Term, Term) :-
+	string(Term), !.
 to_json(Term, Value) :-
 	integer(Term), !,
 	(   Term >= -(2**31), Term < 2**31
@@ -84,6 +91,10 @@ to_json(Term, Term) :-
 to_json(Term, JsonList) :-
 	is_list(Term), !,
 	maplist(to_json, Term, JsonList).
+to_json(json(Pairs0), Term) :-
+	must_be(list, Pairs0),
+	maplist(pair_value_to_json_ex, Pairs0, Pairs),
+	dict_pairs(Term, json, Pairs).
 to_json(Term0, Term) :-
 	is_dict(Term0), !,
 	dict_pairs(Term0, Tag, Pairs0),
@@ -101,3 +112,10 @@ json_symbol(false).
 
 pair_value_to_json(Key-Value0, Key-Value) :-
 	to_json(Value0, Value).
+
+pair_value_to_json_ex(Key=Value0, Key-Value) :-
+	(atom(Key) ; integer(Key)), !,
+	to_json(Value0, Value).
+pair_value_to_json_ex(Elem, _) :-
+	domain_error(json_key_value, Elem).
+
