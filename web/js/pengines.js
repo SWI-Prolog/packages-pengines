@@ -233,7 +233,7 @@ Pengine.prototype.pull_response = function() {
 };
 
 Pengine.prototype.send = function(event) {
-  pengine = this;
+  var pengine = this;
 
   $.get(pengine.options.server + '/send',
 	{ id: this.id,
