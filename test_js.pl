@@ -56,6 +56,7 @@
 :- use_module(library(http/http_files)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/json)).
+:- use_module(library(http/jquery)).
 
 :- pengine_application(swish).
 :- use_module(swish:library(pengines_io)).
