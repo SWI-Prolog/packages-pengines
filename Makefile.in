@@ -51,7 +51,7 @@ html-install:	install-examples
 install-examples::
 		mkdir -p $(EXDIR)/web
 		(cd examples && $(INSTALL_DATA) *.pl $(EXDIR))
-		(cd examples/web && $(INSTALL_DATA) *.html *.js *.png $(EXDIR)/web)
+		(cd examples/web && $(INSTALL_DATA) *.html *.png $(EXDIR)/web)
 
 uninstall:
 		(cd $(PLLIBDIR) && rm -f $(LIBPL))
