@@ -634,7 +634,7 @@ pengine_uuid(Id) :-
 
 /** pengine_application(+Application) is det.
 
-Directive that must be used to declarate  a pengine application
+Directive that must be used to declare  a pengine application
 module. The module may not  be  associated   to  any  file.  The default
 application is =pengine_sandbox=.  The  example   below  creates  a  new
 application =address_book= and imports the  API   defined  in the module
