@@ -61,6 +61,7 @@ from Prolog or JavaScript.
 @author Torbjörn Lager and Jan Wielemaker
 */
 
+:- use_module(library(http/html_head)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/http_json)).
@@ -88,6 +89,12 @@ from Prolog or JavaScript.
 :- use_module(library(uuid)).
 :- endif.
 
+:- dynamic(user:file_search_path/2).
+:- multifile(user:file_search_path/2).
+
+user:file_search_path(js, 'web/js').
+
+:- html_resource(js(pengines), [requires([js('pengines.js')]),virtual(true)]).
 
 :- meta_predicate
 	pengine_create(:),
