@@ -127,7 +127,7 @@ pengine_ask/3 with the option template(X) would instead produce the output
 
 main :-
     pengine_create([
-        server('http://pengines.org'),
+        server('http://pengines.swi-prolog.org'),
         src_text("
             q(X) :- p(X).
             p(a). p(b). p(c).
@@ -137,8 +137,8 @@ main :-
 
 
 handle(create(ID, _)) :-
-    pengine_ask(ID, q(X), []).
-handle(success(ID, [X], false)) :-
+    pengine_ask(ID, q(_X), []).
+handle(success(_ID, [X], false)) :-
     writeln(X).
 handle(success(ID, [X], true)) :-
     writeln(X),
