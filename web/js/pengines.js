@@ -317,6 +317,8 @@ Pengine.onresponse = {
   },
 
   output: function(obj) {
+    if ( !this.id )
+      this.id = obj.id;
     this.callback('onoutput', obj);
     this.pull_response();
   },
