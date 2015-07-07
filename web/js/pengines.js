@@ -451,6 +451,9 @@ Pengine.stringify = function(data, options) {
     }
 
     switch ( typeof(data) ) {
+      case "boolean":
+	msg += data ? "true" : "false";
+        break;
       case "number":
 	msg += data;
 	break;
