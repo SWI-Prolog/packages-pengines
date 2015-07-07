@@ -390,8 +390,10 @@ function options_to_list(options) {
  * is performed according to the rules below:
  *
  *   - A number is serialized trivially
- *	 - A string is serialized into a Prolog string unless
- *	   `option.string == "atom"`
+ *   - A string is serialized into a Prolog string unless
+ *     `option.string == "atom"`
+ *   - `true`, `false`, `null` and `undefined` are serialized as
+ *     atoms.
  *   - An array is serialized into a Prolog list
  *   - An object is serialized into a Prolog dict.  Keys that are
  *     integers are mapped to Prolog integers, other keys are mapped
@@ -454,6 +456,9 @@ Pengine.stringify = function(data, options) {
       case "boolean":
 	msg += data ? "true" : "false";
         break;
+      case "undefined":
+	msg += "undefined";
+	break;
       case "number":
 	msg += data;
 	break;
@@ -461,7 +466,9 @@ Pengine.stringify = function(data, options) {
 	msg += stringEscape(data, strq);
 	break;
       case "object":
-	if ( Array.isArray(data) ) {
+	if ( data == null ) {
+	  msg += "null";
+	} else if ( Array.isArray(data) ) {
 	  msg += "[";
 	  for(var i=0; i<data.length; i++) {
 	    if ( !serialize(data[i]) )
