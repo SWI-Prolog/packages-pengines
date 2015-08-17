@@ -61,6 +61,9 @@
 :- use_module(library(sandbox)).
 :- use_module(library(http/html_write)).
 :- use_module(library(http/term_html)).
+:- if(exists_source(library(prolog_stream))).
+:- use_module(library(prolog_stream)).
+:- endif.
 :- html_meta send_html(html).
 
 :- meta_predicate
@@ -546,6 +549,54 @@ io_mapping(pengine_io_goal_expansion(Head, Mapped)) :-
 
 pengine_io_goal_expansion(_, _).
 
+
+		 /*******************************
+		 *	REBIND PENGINE I/O	*
+		 *******************************/
+
+:- if(current_predicate(open_prolog_stream/4)).
+:- public
+	stream_write/2,
+	stream_read/2,
+	stream_close/1.
+
+stream_write(_Stream, Out) :-
+	send_html(pre(class(console), Out)).
+stream_read(_Stream, Data) :-
+	prompt(Prompt, Prompt),
+	pengine_input(_{type:console, prompt:Prompt}, Data).
+stream_close(_Stream).
+
+%%	pengine_bind_user_streams
+%
+%	Bind the pengine user  I/O  streams   to  a  Prolog  stream that
+%	redirects  the  input  and   output    to   pengine_input/2  and
+%	pengine_output/1. This results in  less   pretty  behaviour then
+%	redefining the I/O predicates to  produce   nice  HTML, but does
+%	provide functioning I/O from included libraries.
+
+pengine_bind_user_streams :-
+	Err = Out,
+	open_prolog_stream(pengines_io, write, Out, []),
+	set_stream(Out, buffer(line)),
+	open_prolog_stream(pengines_io, read,  In, []),
+	set_stream(In,  alias(user_input)),
+        set_stream(Out, alias(user_output)),
+        set_stream(Err, alias(user_error)),
+	set_stream(In,  alias(current_input)),
+        set_stream(Out, alias(current_output)),
+	thread_at_exit(close_io(In, Out)).
+
+close_io(In, Out) :-
+	close(In, [force(true)]),
+	close(Out, [force(true)]).
+:- else.
+
+pengine_bind_user_streams.
+
+:- endif.
+
+
 %%	pengine_bind_io_to_html(+Module)
 %
 %	Redefine the built-in predicates for IO   to  send HTML messages
@@ -553,7 +604,8 @@ pengine_io_goal_expansion(_, _).
 
 pengine_bind_io_to_html(Module) :-
 	forall(pengine_io_predicate(Head),
-	       bind_io(Head, Module)).
+	       bind_io(Head, Module)),
+	pengine_bind_user_streams.
 
 bind_io(Head, Module) :-
 	prompt(_, ''),
