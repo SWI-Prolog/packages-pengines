@@ -198,25 +198,21 @@ pengine_format(Format, Args) :-
 %%	pengine_listing(+Spec)
 %
 %	List the content of the current pengine or a specified predicate
-%	in the pengine. Does not allow   for listing outside the pengine
-%	module.
+%	in the pengine.
 
 pengine_listing :-
 	pengine_listing(_).
 
 pengine_listing(Spec) :-
-	(   nonvar(Spec),
-	    Spec = M:_
-	->  permission_error(listing, module, M)
-	;   true
-	),
 	pengine_self(Module),
 	with_output_to(string(String), listing(Module:Spec)),
-	send_html(pre(class(listing), String)).
+	split_string(String, "", "\n", [Pre]),
+	send_html(pre(class(listing), Pre)).
 
 pengine_portray_clause(Term) :-
 	with_output_to(string(String), portray_clause(Term)),
-	send_html(pre(class(listing), String)).
+	split_string(String, "", "\n", [Pre]),
+	send_html(pre(class(listing), Pre)).
 
 
 		 /*******************************
