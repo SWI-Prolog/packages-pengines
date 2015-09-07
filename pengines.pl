@@ -1426,30 +1426,38 @@ create_option_type(template(_),    term).
 create_option_type(application(_), atom).
 
 remote_pengine_send(BaseURL, ID, Event, Options) :-
-    term_to_atom(Event, EventAtom),
-    remote_send_rec(BaseURL, send, [id=ID, event=EventAtom], Reply, Options),
+    remote_send_rec(BaseURL, send, ID, [event=Event], Reply, Options),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
 remote_pengine_pull_response(BaseURL, ID, Options) :-
-    remote_send_rec(BaseURL, pull_response, [id=ID], Reply, Options),
+    remote_send_rec(BaseURL, pull_response, ID, [], Reply, Options),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
 remote_pengine_abort(BaseURL, ID, Options) :-
-    remote_send_rec(BaseURL, abort, [id=ID], Reply, Options),
+    remote_send_rec(BaseURL, abort, ID, [], Reply, Options),
     thread_self(Queue),
     pengine_reply(Queue, Reply).
 
-%%	remote_send_rec(+Server, +Action, +Params, -Reply, +Options)
+%%	remote_send_rec(+Server, +Action, +ID, +Params, -Reply, +Options)
 %
 %	Issue a GET request on Server and   unify Reply with the replied
 %	term.
 
-remote_send_rec(Server, Action, Params, Reply, Options) :-
-    server_url(Server, Action, Params, URL),
-    http_open(URL, Stream, Options),	% putting this in setup_call_cleanup/3
-    call_cleanup(			% makes it impossible to interrupt.
+remote_send_rec(Server, Action, ID, [event=Event], Reply, Options) :- !,
+    server_url(Server, Action, [id=ID], URL),
+    http_open(URL, Stream,		% putting this in setup_call_cleanup/3
+	      [ post(prolog(Event))	% makes it impossible to interrupt.
+	      | Options
+	      ]),
+    call_cleanup(
+	read_prolog_reply(Stream, Reply),
+	close(Stream)).
+remote_send_rec(Server, Action, ID, Params, Reply, Options) :-
+    server_url(Server, Action, [id=ID|Params], URL),
+    http_open(URL, Stream, Options),
+    call_cleanup(
 	read_prolog_reply(Stream, Reply),
 	close(Stream)).
 
@@ -1459,7 +1467,7 @@ remote_post_rec(Server, Action, Data, Reply, Options) :-
 	      [ post(json(Data))
 	      | Options
 	      ]),
-    call_cleanup(			% makes it impossible to interrupt.
+    call_cleanup(
 	read_prolog_reply(Stream, Reply),
 	close(Stream)).
 
