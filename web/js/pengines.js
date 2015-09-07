@@ -232,17 +232,31 @@ Pengine.prototype.pull_response = function() {
 	});
 };
 
+/**
+ * Invoke `/pengine/send`.  This method takes three parameters: the
+ * reply format (one of `prolog` or `json`), the pengine id (a UUID)
+ * and the event (a serialized Prolog term).  In old versions, this
+ * was sent as a GET request.  This is undesirable, both because GET
+ * assumes a side-effect-free operation and because of the size limit
+ * to URLs imposed by some infrastructure.  The current version passes
+ * the format and id as URL parameters and the content as a POST body.
+ *
+ * Future versions might use the HTTP Accept header intead of format
+ * and add the id to the URL, i.e., using `/pengine/send/ID`
+ */
 Pengine.prototype.send = function(event) {
   var pengine = this;
 
-  $.get(pengine.options.server + '/send',
-	{ id: this.id,
-	  event: event,
-	  format: this.options.format
-	},
-	function(obj) {
-	  pengine.process_response(obj);
-	});
+  $.ajax({ type: "POST",
+	   url: pengine.options.server +
+		'/send?format=' + this.options.format +
+		'&id=' + this.id,
+	   data: event + " .\n",
+	   success: function(obj) {
+	     pengine.process_response(obj);
+	   },
+	   contentType: "application/x-prolog; charset=UTF-8"
+         });
 };
 
 Pengine.prototype.script_sources = function(src) {
