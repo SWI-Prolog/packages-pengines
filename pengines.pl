@@ -63,6 +63,7 @@ from Prolog or JavaScript.
 
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
+:- use_module(library(http/http_client)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_stream)).
@@ -1994,18 +1995,15 @@ sync_delay_destroy_queue(ID, Queue) :-
 
 
 http_pengine_send(Request) :-
-    reply_options(Request, [get]), !.
+    reply_options(Request, [get,post]), !.
 http_pengine_send(Request) :-
     http_parameters(Request,
 		    [ id(ID, [ type(atom) ]),
-		      event(EventString, []),
+		      event(EventString, [optional(true)]),
 		      format(Format, [default(prolog)])
 		    ]),
     get_pengine_module(ID, Module), !,
-    catch(( term_string(Event0, EventString,
-			[ variable_names(Bindings),
-			  module(Module)
-			]),
+    catch(( read_event(Request, EventString, Module, Event0, Bindings),
 	    fix_bindings(Format, Event0, Bindings, VarNames, Event1)
 	  ),
 	  Error,
@@ -2024,6 +2022,25 @@ http_pengine_send(Request) :-
 	)
     ;	output_result(Format, error(ID, Error))
     ).
+
+%%	read_event(+Request, +EventString, +Module, -Event, -Bindings)
+%
+%	Read the sent event. The event is   a Prolog term that is either
+%	in the =event= parameter or as a posted document.
+
+read_event(_Request, EventString, Module, Event, Bindings) :-
+	nonvar(EventString), !,
+	term_string(Event, EventString,
+		    [ variable_names(Bindings),
+		      module(Module)
+		    ]).
+read_event(Request, _EventString, Module, Event, Bindings) :-
+	option(method(post), Request),
+	http_read_data(Request,	Event,
+		       [ content_type('application/x-prolog'),
+			 module(Module),
+			 variable_names(Bindings)
+		       ]).
 
 
 %%	fix_bindings(+Format, +EventIn, +Bindings, -VarNames, -Event) is det.
