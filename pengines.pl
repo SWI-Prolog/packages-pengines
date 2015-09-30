@@ -593,7 +593,7 @@ pengine_register_remote(Id, URL, Application, Destroy) :-
 pengine_unregister(Id) :-
     thread_self(Me),
     (	current_pengine(Id, Queue, Me, http, _, _)
-    ->	with_mutex(pengine, sync_delay_destroy_queue(Id, Queue))
+    ->	with_mutex(pengine, sync_destroy_queue_from_pengine(Id, Queue))
     ;	true
     ),
     retractall(current_pengine(Id, _, Me, _, _, _)),
@@ -1837,7 +1837,8 @@ http_pengine_create(Request, Application, Format, Dict) :-
     ;	Error = existence_error(pengine_application, Application),
 	pengine_uuid(ID),
         output_result(Format, error(ID, error(Error, _)))
-    ).
+    ),
+    gc_abandoned_queues.
 
 dict_to_options(Dict, Application, CreateOptions, VarNames) :-
     dict_pairs(Dict, _, Pairs),
@@ -1919,7 +1920,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
 	      Error, true)
     ->  (   var(Error)
 	->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
-	    destroy_queue(Pengine, Event, Queue),
+	    destroy_queue_from_http(Pengine, Event, Queue),
 	    output_result(Format, Event, VarNames)
 	;   output_result(Format, died(Pengine))
 	)
@@ -1928,35 +1929,71 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
         pengine_abort(Pengine)
     ).
 
-%%	destroy_queue(+Pengine, +Event, +Queue) is det.
+%%	destroy_queue_from_http(+Pengine, +Event, +Queue) is det.
 %
-%	Destroy the output queue for Pengine.   We can destroy the queue
-%	if it is in _delayed mode_  (see pengine_unregister/1) and empty
-%	or if it is in normal mode and   the  event is the final destroy
-%	event.
+%	Consider destroying the output queue   for Pengine after sending
+%	Event back to the HTTP client. We can destroy the queue if
+%
+%	  - The pengine already died (output_queue/3 is present) and
+%	    the queue is empty.
+%	  - This is a final (destroy) event.
 %
 %	@tbd	If the client did not request all output, the queue will
 %		not be destroyed.  We need some timeout and GC for that.
 
-destroy_queue(ID, _, Queue) :-
+destroy_queue_from_http(ID, _, Queue) :-
     output_queue(ID, Queue, _), !,
-    (	thread_peek_message(Queue, _)
-    ->	true
-    ;	retractall(output_queue(ID, Queue, _)),
-	message_queue_destroy(Queue)
-    ).
-destroy_queue(ID, Event, Queue) :-
+    destroy_queue_if_empty(Queue).
+destroy_queue_from_http(ID, Event, Queue) :-
     debug(pengine(destroy), 'DESTROY? ~p', [Event]),
     is_destroy_event(Event), !,
     message_queue_property(Queue, size(Waiting)),
     debug(pengine(destroy), 'Destroy ~p (waiting ~D)', [Queue, Waiting]),
-    with_mutex(pengine, sync_destroy_queue(ID, Queue)).
-destroy_queue(_, _, _).
+    with_mutex(pengine, sync_destroy_queue_from_http(ID, Queue)).
+destroy_queue_from_http(_, _, _).
 
 is_destroy_event(destroy(_)).
 is_destroy_event(destroy(_,_)).
 
-%%	sync_destroy_queue(+Pengine, +Queue) is det.
+destroy_queue_if_empty(Queue) :-
+    thread_peek_message(Queue, _), !.
+destroy_queue_if_empty(Queue) :-
+    retractall(output_queue(_, Queue, _)),
+    message_queue_destroy(Queue).
+
+%%	gc_abandoned_queues
+%
+%	Check whether there are queues  that   have  been abadoned. This
+%	happens if the stream contains output events and not all of them
+%	are read by the client.
+
+:- dynamic
+	last_gc/1.
+
+gc_abandoned_queues :-
+	consider_queue_gc, !,
+	get_time(Now),
+	(   output_queue(_, Queue, Time),
+	    Now-Time > 15*60,
+	    retract(output_queue(_, Queue, Time)),
+	    message_queue_destroy(Queue),
+	    fail
+	;   retractall(last_gc(_)),
+	    asserta(last_gc(Now))
+	).
+gc_abandoned_queues.
+
+consider_queue_gc :-
+	predicate_property(output_queue(_,_,_), number_of_clauses(N)),
+	N > 100,
+	(   last_gc(Time),
+	    get_time(Now),
+	    Now-Time > 5*60
+	->  true
+	;   \+ last_gc(_)
+	).
+
+%%	sync_destroy_queue_from_http(+Pengine, +Queue) is det.
 %%	sync_delay_destroy_queue(+Pengine, +Queue) is det.
 %
 %	Handle destruction of the message queue connecting the HTTP side
@@ -1965,35 +2002,33 @@ is_destroy_event(destroy(_,_)).
 %	pengine and finishing the  HTTP  exchange   may  happen  in both
 %	orders. This means we need handle this using synchronization.
 %
-%	  * sync_delay_destroy_queue(+Pengine, +Queue)
+%	  * sync_destroy_queue_from_pengine(+Pengine, +Queue)
 %	  Called (indirectly) from pengine_done/1 if the pengine's
 %	  thread dies.
-%	  * sync_destroy_queue(+Pengine, +Queue)
-%	  Called from destroy_queue/3, from wait_and_output_result/4.
-%
-%	@tbd	If message queue handles were save, we could check the
-%		existence and get rid of output_queue_destroyed/1.  As
-%		is, they are small integer references, subject to the
-%		ABA issue.
-%
-%		(*) we exploit the recycling of message queue IDs ...
+%	  * sync_destroy_queue_from_http(+Pengine, +Queue)
+%	  Called from destroy_queue/3, from wait_and_output_result/4,
+%	  i.e., from the HTTP side.
 
 :- dynamic output_queue_destroyed/1.
 
-sync_destroy_queue(ID, Queue) :-
+sync_destroy_queue_from_http(ID, Queue) :-
     (	output_queue(ID, Queue, _)
-    ->  true
+    ->  destroy_queue_if_empty(Queue)
     ;	thread_peek_message(Queue, pengine_event(_, output(_,_)))
     ->	debug(pengine(destroy), 'Delay destruction of ~p because of output',
 	      [Queue]),
         get_time(Now),
 	asserta(output_queue(ID, Queue, Now))
     ;	message_queue_destroy(Queue),
-	retractall(output_queue_destroyed(Queue)), % (*)
 	asserta(output_queue_destroyed(Queue))
     ).
 
-sync_delay_destroy_queue(ID, Queue) :-
+%%	sync_destroy_queue_from_pengine(+Pengine, +Queue)
+%
+%	Called  from  pengine_unregister/1  when    the  pengine  thread
+%	terminates. It is called while the mutex `pengine` held.
+
+sync_destroy_queue_from_pengine(ID, Queue) :-
     (   retract(output_queue_destroyed(Queue))
     ->  true
     ;   get_time(Now),
