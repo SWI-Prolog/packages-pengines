@@ -2193,6 +2193,8 @@ output_result(prolog, Event, _) :- !,
 	       [ quoted(true),
 		 ignore_ops(true),
 		 fullstop(true),
+		 blobs(portray),
+		 portray_goal(portray_blob),
 		 nl(true)
 	       ]).
 output_result(Lang, Event, VarNames) :-
@@ -2207,6 +2209,19 @@ output_result(Lang, Event, VarNames) :-
     ).
 output_result(Lang, _Event, _) :-	% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
+
+%%	portray_blob(+Blob, +Options) is det.
+%
+%	Portray non-text blobs that may  appear   in  output  terms. Not
+%	really sure about that. Basically such  terms need to be avoided
+%	as they are meaningless outside the process. The generated error
+%	is hard to debug though, so now we send them as `'$BLOB'(Type)`.
+%	Future versions may include more info, depending on `Type`.
+
+:- public portray_blob/2.		% called from write-term
+portray_blob(Blob, _Options) :-
+	blob(Blob, Type),
+	writeq('$BLOB'(Type)).
 
 %%	write_result(+Lang, +Event, +VarNames) is semidet.
 %
