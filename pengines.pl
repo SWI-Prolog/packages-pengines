@@ -1378,7 +1378,9 @@ remote_pengine_create(BaseURL, Options) :-
     ),
     option(alias(Name), Options, ID),
     assert(child(Name, ID)),
-    (	functor(Reply, create, _)	% actually created
+    (	(   functor(Reply, create, _)	% actually created
+	;   functor(Reply, output, _)	% compiler messages
+	)
     ->	option(application(Application), PengineOptions, pengine_sandbox),
 	option(destroy(Destroy), PengineOptions, true),
 	pengine_register_remote(ID, BaseURL, Application, Destroy)
