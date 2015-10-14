@@ -622,7 +622,7 @@ get_pengine_application(Pengine, Application) :-
 
 get_pengine_module(Pengine, Pengine).
 
-:- if(current_predicate(uuid/1)).
+:- if(current_predicate(uuid/2)).
 pengine_uuid(Id) :-
     uuid(Id, [version(4)]).		% Version 4 is random.
 :- else.
