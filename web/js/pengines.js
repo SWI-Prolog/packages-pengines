@@ -114,17 +114,7 @@ function Pengine(options) {
 	     that.process_response(obj);
 	   },
 	   error: function(jqXHR) {
-	     var obj = { event:"error", pengine:that };
-
-	     if ( jqXHR.responseText ) {
-	       var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
-					   .replace(/<\/body>/, "");
-	       var plain = $("<div></div>").html(msg).text();
-	       obj.data = plain;
-	       obj.dataHTML = msg;
-	     }
-
-	     that.process_response(obj);
+	     that.error(jqXHR);
 	   }
 	 });
 
@@ -199,6 +189,8 @@ Pengine.prototype.abort = function() {
 	},
 	function(obj) {
 	  pengine.process_response(obj);
+	}).fail(function(jqXHR, status, error) {
+	  pengine.error(jqXHR);
 	});
 };
 
@@ -229,6 +221,8 @@ Pengine.prototype.pull_response = function() {
 	function(obj) {
 	  if ( obj.event !== 'died')
 	    pengine.process_response(obj);
+	}).fail(function(jqXHR, status, error) {
+	  pengine.error(jqXHR);
 	});
 };
 
@@ -252,10 +246,13 @@ Pengine.prototype.send = function(event) {
 		'/send?format=' + this.options.format +
 		'&id=' + this.id,
 	   data: event + " .\n",
+	   contentType: "application/x-prolog; charset=UTF-8",
 	   success: function(obj) {
 	     pengine.process_response(obj);
 	   },
-	   contentType: "application/x-prolog; charset=UTF-8"
+	   error: function(jqXHR) {
+	     pengine.error(jqXHR);
+	   }
          });
 };
 
@@ -283,6 +280,20 @@ Pengine.prototype.callback = function(f, obj) {
     return true;
   }
 };
+
+Pengine.prototype.error = function(jqXHR) {
+  var obj = { event:"error", pengine:this };
+  if ( jqXHR.responseText ) {
+    var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
+				.replace(/<\/body>/, "");
+    var plain = $("<div></div>").html(msg).text();
+    obj.data = plain;
+    obj.dataHTML = msg;
+  }
+
+  this.process_response(obj);
+}
+
 
 Pengine.prototype.report = function(level, data) {
   if ( console !== undefined )
