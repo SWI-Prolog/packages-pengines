@@ -2047,46 +2047,67 @@ http_pengine_send(Request) :-
 		      event(EventString, [optional(true)]),
 		      format(Format, [default(prolog)])
 		    ]),
-    get_pengine_module(ID, Module), !,
-    catch(( read_event(Request, EventString, Module, Event0, Bindings),
-	    fix_bindings(Format, Event0, Bindings, VarNames, Event1)
-	  ),
-	  Error,
-	  true),
-    (	var(Error)
-    ->	debug(pengine(event), 'HTTP send: ~p', [Event1]),
-	(   pengine_thread(ID, Thread)
-	->  pengine_queue(ID, Queue, TimeLimit, _),
-	    random_delay,
-	    broadcast(pengine(send(ID, Event1))),
-	    thread_send_message(Thread, pengine_request(Event1)),
-	    wait_and_output_result(ID, Queue, Format, TimeLimit, VarNames)
-	;   atom(ID)
-	->  output_result(Format, error(ID,error(existence_error(pengine, ID),_)))
-	;   http_404([], Request)
+    get_pengine_module(ID, Module),
+    (	current_module(Module)		% avoid re-creating the module
+    ->	catch(( read_event(Request, EventString, Module, Event0, Bindings),
+	        fix_bindings(Format, Event0, Bindings, VarNames, Event1)
+	      ),
+	      Error,
+	      true),
+	(   var(Error)
+	->  debug(pengine(event), 'HTTP send: ~p', [Event1]),
+	    (   pengine_thread(ID, Thread)
+	    ->  pengine_queue(ID, Queue, TimeLimit, _),
+		random_delay,
+		broadcast(pengine(send(ID, Event1))),
+		thread_send_message(Thread, pengine_request(Event1)),
+		wait_and_output_result(ID, Queue, Format, TimeLimit, VarNames)
+	    ;   atom(ID)
+	    ->  pengine_died(Format, ID)
+	    ;   http_404([], Request)
+	    )
+	;   output_result(Format, error(ID, Error))
 	)
-    ;	output_result(Format, error(ID, Error))
+    ;	debug(pengine(event), 'Pengine module ~q vanished', [Module]),
+	discard_post_data(Request),
+        pengine_died(Format, ID)
     ).
 
-%%	read_event(+Request, +EventString, +Module, -Event, -Bindings)
+pengine_died(Format, Pengine) :-
+    output_result(Format, error(Pengine,
+				error(existence_error(pengine, Pengine),_))).
+
+
+%%  read_event(+Request, +EventString, +Module, -Event, -Bindings)
 %
-%	Read the sent event. The event is   a Prolog term that is either
-%	in the =event= parameter or as a posted document.
+%   Read the sent event. The event is a   Prolog  term that is either in
+%   the =event= parameter or as a posted document.
 
 read_event(_Request, EventString, Module, Event, Bindings) :-
-	nonvar(EventString), !,
-	term_string(Event, EventString,
-		    [ variable_names(Bindings),
-		      module(Module)
-		    ]).
+    nonvar(EventString), !,
+    term_string(Event, EventString,
+		[ variable_names(Bindings),
+		  module(Module)
+		]).
 read_event(Request, _EventString, Module, Event, Bindings) :-
-	option(method(post), Request),
-	http_read_data(Request,	Event,
-		       [ content_type('application/x-prolog'),
-			 module(Module),
-			 variable_names(Bindings)
-		       ]).
+    option(method(post), Request),
+    http_read_data(Request,	Event,
+		   [ content_type('application/x-prolog'),
+		     module(Module),
+		     variable_names(Bindings)
+		   ]).
 
+%%  discard_post_data(+Request) is det.
+%
+%   If this is a POST request, discard the posted data.
+
+discard_post_data(Request) :-
+    option(method(post), Request), !,
+    setup_call_cleanup(
+	open_null_stream(NULL),
+	http_read_data(Request, _, [to(stream(NULL))]),
+	close(NULL)).
+discard_post_data(_).
 
 %%	fix_bindings(+Format, +EventIn, +Bindings, -VarNames, -Event) is det.
 %
