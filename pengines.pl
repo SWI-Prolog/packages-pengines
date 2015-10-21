@@ -122,7 +122,8 @@ from Prolog or JavaScript.
 		       chunk(integer)
 		     ]).
 :- predicate_options(pengine_next/2, 2,
-		     [ pass_to(pengine_send/3, 3)
+		     [ chunk(integer),
+		       pass_to(pengine_send/3, 3)
 		     ]).
 :- predicate_options(pengine_stop/2, 2,
 		     [ pass_to(pengine_send/3, 3)
