@@ -346,7 +346,9 @@ pengine_request(Request) :-
 %	Reply Event to the parent of the   current  Pengine or the given
 %	Queue.  Such  events  are  read   by    the   other   side  with
 %	pengine_event/1.
-
+%
+%	If the message cannot be sent within the `idle_limit` setting of
+%	the pengine, abort the pengine.
 
 pengine_reply(Event) :-
     pengine_parent(Queue),
@@ -357,7 +359,19 @@ pengine_reply(Queue, Event0) :-
     wrap_first_answer(ID, Event0, Event),
     random_delay,
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
-    thread_send_message(Queue, pengine_event(ID, Event)).
+    (	pengine_self(ID)
+    ->	get_pengine_application(ID, Application),
+	setting(Application:idle_limit, IdleLimit),
+	(   thread_send_message(Queue, pengine_event(ID, Event),
+				[ timeout(IdleLimit)
+				])
+	->  true
+	;   thread_self(Me),
+	    thread_detach(Me),
+	    abort
+	)
+    ;	thread_send_message(Queue, pengine_event(ID, Event))
+    ).
 
 wrap_first_answer(ID, Event0, CreateEvent) :-
     wrap_first_answer_in_create_event(CreateEvent, [answer(Event0)]),
