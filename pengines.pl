@@ -692,6 +692,8 @@ current_pengine_application(Application) :-
 	   'Maximum time to wait for output').
 :- setting(idle_limit, number, 300,
 	   'Pengine auto-destroys when idle for this time').
+:- setting(safe_goal_limit, number, 10,
+	   'Maximum time to try proving safity of the goal').
 :- setting(program_space, integer, 100_000_000,
 	   'Maximum memory used by predicates').
 :- setting(allow_from, list(atom), [*],
@@ -731,6 +733,10 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 			    setting(pengines:idle_limit),
 			    'Pengine auto-destroys when idle for this time')),
 		IdleLimitSetting),
+    expand_term((:- setting(Application:safe_goal_limit, number,
+			    setting(pengines:safe_goal_limit),
+			    'Maximum time to try proving safity of the goal')),
+		SafeGoalLimitSetting),
     expand_term((:- setting(Application:program_space, integer,
 			    setting(pengines:program_space),
 			    'Maximum memory used by predicates')),
@@ -756,6 +762,7 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
 	      SlaveLimitSetting,
 	      TimeLimitSetting,
 	      IdleLimitSetting,
+	      SafeGoalLimitSetting,
 	      ProgramSpaceSetting,
 	      AllowFromSetting,
 	      DenyFromSetting,
@@ -1248,7 +1255,17 @@ prepare_goal(ID, Goal0, Module:Goal, Options) :-
 	    '$set_source_module'(_, Old)),
 	(   pengine_not_sandboxed(ID)
 	->  true
-	;   safe_goal(Module:Goal)
+	;   get_pengine_application(ID, App),
+	    setting(App:safe_goal_limit, Limit),
+	    catch(call_with_time_limit(
+		      Limit,
+		      safe_goal(Module:Goal)), E, true)
+	->  (   var(E)
+	    ->	true
+	    ;	E = time_limit_exceeded
+	    ->	throw(error(sandbox(time_limit_exceeded, Limit),_))
+	    ;	throw(E)
+	    )
 	).
 
 %%  prepare_goal(+Goal0, -Goal1, +Options) is semidet.
@@ -2593,6 +2610,17 @@ to_string(String, String) :-
 to_string(Atom, String) :-
 	atom_string(Atom, String), !.
 
+
+		 /*******************************
+		 *	      MESSAGES		*
+		 *******************************/
+
+prolog:error_message(sandbox(time_limit_exceeded, Limit)) -->
+	[ 'Could not prove safety of your goal within ~f seconds.'-[Limit], nl,
+	  'This is normally caused by an insufficiently instantiated'-[], nl,
+	  'meta-call (e.g., call(Var)) for which it is too expensive to'-[], nl,
+	  'find all possible instantations of Var.'-[]
+	].
 
 
 		 /*******************************
