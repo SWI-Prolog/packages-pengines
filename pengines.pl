@@ -1127,7 +1127,8 @@ solve(Chunk, Template, Goal, ID) :-
     statistics(cputime, Epoch),
     Time = time(Epoch),
     (   call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
-			   Error, true), Det=true),
+			   Error, true),
+		     Det = true),
 	arg(1, Time, T0),
 	statistics(cputime, T1),
 	CPUTime is T1-T0,
@@ -1150,11 +1151,11 @@ solve(Chunk, Template, Goal, ID) :-
 	CPUTime is T1-T0,
 	destroy_or_continue(failure(ID, CPUTime))
     ).
-solve(_, _, _, _).				% leave a choice point
+solve(_, _, _, _).			% leave a choice point
 
 findnsols_no_empty(N, Template, Goal, List) :-
-	findnsols(N, Template, Goal, List),
-	List \== [].
+    findnsols(N, Template, Goal, List),
+    List \== [].
 
 destroy_or_continue(Event) :-
     arg(1, Event, ID),
