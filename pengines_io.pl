@@ -51,14 +51,15 @@
 	    pengine_bind_io_to_html/1,	% +Module
 	    pengine_io_goal_expansion/2	% +Goal, -Expanded
 	  ]).
+:- use_module(library(lists)).
 :- use_module(library(pengines)).
 :- use_module(library(option)).
 :- use_module(library(debug)).
 :- use_module(library(apply)).
 :- use_module(library(settings)).
-:- use_module(library(error)).
 :- use_module(library(listing)).
-:- use_module(library(sandbox)).
+:- use_module(library(yall)).
+:- use_module(library(sandbox), []).
 :- use_module(library(http/html_write)).
 :- use_module(library(http/term_html)).
 :- if(exists_source(library(prolog_stream))).
@@ -373,21 +374,34 @@ term_string_value(Pengine, N-V, N-A) :-
 				    quoted(true)
 				  ])).
 
-/* JSON-HTML */
+%%	pengines:event_to_json(+Event, -JSON, +Format, +VarNames)
+%
+%	Implement translation of a Pengine  event to =json-html= format.
+%	This format represents the answer  as   JSON,  but  the variable
+%	bindings are (structured) HTML strings rather than JSON objects.
+%
+%	CHR residual goals are not bound to the projection variables. We
+%	hacked a bypass to fetch these by   returning them in a variable
+%	named   `Residuals`,   which   must   be   bound   to   a   term
+%	'$residuals'(List).  Such  a  variable  is    removed  from  the
+%	projection and added to residual goals.
 
 pengines:event_to_json(success(ID, Answers0, Time, More),
 		       JSON, 'json-html', VarNames) :- !,
 	JSON0 = json{event:success, id:ID, time:Time, data:Answers, more:More},
-	maplist(map_answer(ID), Answers0, Answers),
-	add_projection(VarNames, JSON0, JSON).
+	maplist(map_answer(ID), Answers0, ResVars, Answers),
+	add_projection(VarNames, ResVars, JSON0, JSON).
 pengines:event_to_json(output(ID, Term), JSON, 'json-html', _) :- !,
 	map_output(ID, Term, JSON).
 
-map_answer(ID, Bindings0, Answer) :-
+map_answer(ID, Bindings0, ResVars, Answer) :-
 	dict_bindings(Bindings0, Bindings1),
-	prolog:translate_bindings(Bindings1, Bindings2, [],
-				  ID:Residuals-_HiddenResiduals),
-	maplist(binding_to_html(ID), Bindings2, VarBindings),
+	select_residuals(Bindings1, Bindings2, ResVars, Residuals0),
+	prolog:translate_bindings(Bindings2, Bindings3, [],
+				  ID:Residuals1-_HiddenResiduals),
+	append(Residuals0, [Residuals1], Residual2),
+	append(Residual2, Residuals),
+	maplist(binding_to_html(ID), Bindings3, VarBindings),
 	(   Residuals == []
 	->  Answer = json{variables:VarBindings}
 	;   residuals_html(Residuals, ID, ResHTML),
@@ -401,9 +415,29 @@ residuals_html([H0|T0], Module, [H|T]) :-
 
 dict_bindings(Dict, Bindings) :-
 	dict_pairs(Dict, _Tag, Pairs),
-	maplist(pair_eq, Pairs, Bindings).
+	maplist([N-V,N=V]>>true, Pairs, Bindings).
 
-pair_eq(N-V, N=V).
+select_residuals([], [], [], []).
+select_residuals([H|T], Bindings, Vars, Residuals) :-
+	binding_residual(H, Var, Residual), !,
+	Vars = [Var|TV],
+	Residuals = [Residual|TR],
+	select_residuals(T, Bindings, TV, TR).
+select_residuals([H|T0], [H|T], Vars, Residuals) :-
+	select_residuals(T0, T, Vars, Residuals).
+
+binding_residual('Residuals' = '$residuals'(Residuals), 'Residuals', Residuals) :-
+	is_list(Residuals).
+binding_residual('Residual'  = '$residual'(Residual),   'Residual', [Residual]) :-
+	callable(Residual).
+
+add_projection(-, _, JSON, JSON) :- !.
+add_projection(VarNames0, ResVars0, JSON0, JSON) :-
+	append(ResVars0, ResVars1),
+	sort(ResVars1, ResVars),
+	subtract(VarNames0, ResVars, VarNames),
+	add_projection(VarNames, JSON0, JSON).
+
 
 %%	binding_to_html(+Pengine, +Binding, -Dict) is det.
 %
