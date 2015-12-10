@@ -443,6 +443,7 @@ pengine_ask(ID, Query, Options) :-
 
 pengine_ask_option(template(_)).
 pengine_ask_option(chunk(_)).
+pengine_ask_option(breakpoints(_)).
 
 
 /** pengine_next(+NameOrID, +Options) is det
