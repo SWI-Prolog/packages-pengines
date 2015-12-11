@@ -354,6 +354,8 @@ pengine_reply(Event) :-
     pengine_parent(Queue),
     pengine_reply(Queue, Event).
 
+pengine_reply(_Queue, _Event0) :-
+    nb_current(pengine_idle_limit_exceeded, true), !.
 pengine_reply(Queue, Event0) :-
     arg(1, Event0, ID),
     wrap_first_answer(ID, Event0, Event),
@@ -362,11 +364,15 @@ pengine_reply(Queue, Event0) :-
     (	pengine_self(ID)
     ->	get_pengine_application(ID, Application),
 	setting(Application:idle_limit, IdleLimit),
+	debug(pengine(reply), 'Sending ~p, timout: ~q', [Event, IdleLimit]),
 	(   thread_send_message(Queue, pengine_event(ID, Event),
 				[ timeout(IdleLimit)
 				])
 	->  true
 	;   thread_self(Me),
+	    debug(pengine(reply), 'pengine_reply: timeout for ~q (thread ~q)',
+		  [ID, Me]),
+	    nb_setval(pengine_idle_limit_exceeded, true),
 	    thread_detach(Me),
 	    abort
 	)
