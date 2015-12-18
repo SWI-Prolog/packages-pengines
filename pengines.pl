@@ -581,7 +581,7 @@ pengine_destroy(ID, _) :-
 
 :- dynamic
 	current_pengine/6,		% Id, ParentId, Thread, URL, App, Destroy
-	pengine_queue/4,		% Pengine, Queue, TimeOut, Time
+	pengine_queue/4,		% Id, Queue, TimeOut, Time
 	output_queue/3,			% Id, Queue, Time
 	pengine_user/2,			% Id, User
 	pengine_data/2.			% Id, Data
