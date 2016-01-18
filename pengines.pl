@@ -1515,7 +1515,16 @@ remote_post_rec(Server, Action, Data, Reply, Options) :-
 
 read_prolog_reply(In, Reply) :-
     set_stream(In, encoding(utf8)),
-    read(In, Reply).
+    read(In, Reply0),
+    rebind_cycles(Reply0, Reply).
+
+rebind_cycles(@(Reply, Bindings), Reply) :-
+    is_list(Bindings), !,
+    maplist(bind, Bindings).
+rebind_cycles(Reply, Reply).
+
+bind(Var = Value) :-
+    Var = Value.
 
 server_url(Server, Action, Params, URL) :-
     uri_components(Server, Components0),
