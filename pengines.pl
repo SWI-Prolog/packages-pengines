@@ -170,9 +170,8 @@ do_random_delay :-
     Creates a new pengine. Valid options are:
 
     * id(-ID)
-      ID gets instantiated to the id of the pengine. The id is a complex
-      term, its structure will remain undocumented and should not be
-      relied on.
+      ID gets instantiated to the id of the created pengine.  ID is
+      atomic.
 
     * alias(+Name)
       The pengine is named Name (an atom). A slave pengine (child) can
