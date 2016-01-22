@@ -910,14 +910,20 @@ thread_pool:create_pool(Application) :-
 %	@arg Child is the identifier of the created pengine.
 %	@arg URL is one of =local= or =http=
 
+create(Queue, Child, Options, local, Application) :- !,
+    pengine_child_id(Child),
+    create0(Queue, Child, Options, local, Application).
 create(Queue, Child, Options, URL, Application) :-
-    (	nonvar(Child)
-    ->	true
-    ;	pengine_uuid(Child)
-    ),
+    pengine_child_id(Child),
     catch(create0(Queue, Child, Options, URL, Application),
 	  Error,
 	  create_error(Queue, Child, Error)).
+
+pengine_child_id(Child) :-
+    (	nonvar(Child)
+    ->	true
+    ;	pengine_uuid(Child)
+    ).
 
 create_error(Queue, Child, Error) :-
     pengine_reply(Queue, error(Child, Error)).
