@@ -1714,7 +1714,7 @@ pengine_rpc(URL, Query, M:Options0) :-
     ),
     term_variables(Query, Vars),
     Template =.. [v|Vars],
-    State = destroy(true),
+    State = destroy(true),		% modified by process_event/4
     setup_call_catcher_cleanup(
 	pengine_create([ ask(Query),
 			 template(Template),
@@ -1727,12 +1727,24 @@ pengine_rpc(URL, Query, M:Options0) :-
 	pengine_destroy_and_wait(State, Id, Why)).
 
 pengine_destroy_and_wait(destroy(true), Id, Why) :- !,
-    debug(pengine(destroy), 'Destroying RPC because of ~p', [Why]),
+    debug(pengine(rpc), 'Destroying RPC because of ~p', [Why]),
     pengine_destroy(Id),
-    pengine_event(destroy(Id)),
-    retractall(child(_,Id)).
+    wait_destroy(Id, 10).
 pengine_destroy_and_wait(_, _, Why) :-
-    debug(pengine(destroy), 'Not destroying RPC (~p)', [Why]).
+    debug(pengine(rpc), 'Not destroying RPC (~p)', [Why]).
+
+wait_destroy(Id, _) :-
+    \+ child(_, Id), !.
+wait_destroy(Id, N) :-
+    pengine_event(Event, [listen(Id),timeout(10)]), !,
+    (	destroy_event(Event)
+    ->	retractall(child(_,Id))
+    ;	succ(N1, N)
+    ->	wait_destroy(Id, N1)
+    ;	debug(pengine(rpc), 'RPC did not answer to destroy ~p', [Id]),
+	pengine_unregister_remote(Id),
+	retractall(child(_,Id))
+    ).
 
 wait_event(Template, State, Options) :-
     pengine_event(Event, Options),
