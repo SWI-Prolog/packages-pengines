@@ -1691,9 +1691,12 @@ to by URL, rather than locally.
 
 Valid options are:
 
-    * chunk(+Integer)
+    - chunk(+Integer)
       Can be used to reduce the number of network roundtrips being made.
       See pengine_ask/3.
+    - timeout(+Time)
+      Wait at most Time seconds for the next event from the server.
+      The default is defined by the setting `pengines:time_limit`.
 
 Remaining  options  (except   the   server    option)   are   passed  to
 pengine_create/1.
@@ -1703,7 +1706,12 @@ pengine_rpc(URL, Query) :-
     pengine_rpc(URL, Query, []).
 
 pengine_rpc(URL, Query, M:Options0) :-
-    translate_local_sources(Options0, Options, M),
+    translate_local_sources(Options0, Options1, M),
+    (  option(timeout(_), Options1)
+    -> Options = Options1
+    ;  setting(time_limit, Limit),
+       Options = [timeout(Limit)|Options1]
+    ),
     term_variables(Query, Vars),
     Template =.. [v|Vars],
     State = destroy(true),
