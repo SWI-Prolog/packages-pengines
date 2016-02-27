@@ -196,7 +196,7 @@ pengine_format(Format) :-
 pengine_format(Format, Args) :-
 	format(string(String), Format, Args),
 	split_string(String, "\n", "", Lines),
-	send_html(\lines(Lines)).
+	send_html(\lines(Lines, format)).
 
 
 		 /*******************************
@@ -272,13 +272,13 @@ pengine_read(Term) :-
 		 *	       HTML		*
 		 *******************************/
 
-lines([]) --> [].
-lines([H|T]) -->
-	html(H),
+lines([], _) --> [].
+lines([H|T], Class) -->
+	html(span(class(Class), H)),
 	(   { T == [] }
 	->  []
 	;   html(br([])),
-	    lines(T)
+	    lines(T, Class)
 	).
 
 %%	send_html(+HTML) is det.
