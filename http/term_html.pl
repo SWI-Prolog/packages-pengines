@@ -52,7 +52,13 @@ terms as structured HTML.
 
 %%	term(@Term, +Options)// is det.
 %
-%	Render a Prolog term as a structured HTML tree.
+%	Render a Prolog term as  a   structured  HTML  tree. Options are
+%	passed to write_term/3. In addition,   the following options are
+%	processed:
+%
+%	  - float_format(+Format)
+%	  If a float is rendered, it is rendered using
+%	  `format(string(S), Format, [Float])`%
 %
 %	@tbd	Cyclic terms.
 %	@tbd	Attributed terms.
@@ -451,6 +457,10 @@ dict_kvs2([K-V|T], Options) -->
 	    dict_kvs2(T, Options)
 	).
 
+quote_atomic(Float, String, Options) :-
+	float(Float),
+	Format = Options.get(float_format), !,
+	format(string(String), Format, [Float]).
 quote_atomic(Plain, Plain, _) :-
 	number(Plain), !.
 quote_atomic(Plain, String, Options) :-
