@@ -2574,6 +2574,7 @@ reply_options(Request, Allowed) :-
 	cors_enable(Request,
 		    [ methods(Allowed)
 		    ]),
+	format('Content-type: text/plain\r\n'),
 	format('~n').			% empty body
 
 
