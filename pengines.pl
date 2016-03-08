@@ -1510,6 +1510,7 @@ remote_send_rec(Server, Action, ID, Params, Reply, Options) :-
 
 remote_post_rec(Server, Action, Data, Reply, Options) :-
     server_url(Server, Action, [], URL),
+    probe(Action, URL),
     http_open(URL, Stream,
 	      [ post(json(Data))
 	      | Options
@@ -1517,6 +1518,17 @@ remote_post_rec(Server, Action, Data, Reply, Options) :-
     call_cleanup(
 	read_prolog_reply(Stream, Reply),
 	close(Stream)).
+
+%%	probe(+Action, +URL) is det.
+%
+%	Probe the target. This is a  good   idea  before posting a large
+%	document and be faced with an authentication challenge. Possibly
+%	we should make this an option for simpler scenarios.
+
+probe(create, URL) :- !,
+    http_open(URL, Stream, [method(options)]),
+    close(Stream).
+probe(_, _).
 
 read_prolog_reply(In, Reply) :-
     set_stream(In, encoding(utf8)),
