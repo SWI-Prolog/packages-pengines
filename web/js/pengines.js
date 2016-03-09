@@ -113,8 +113,8 @@ function Pengine(options) {
 	   success: function(obj) {
 	     that.process_response(obj);
 	   },
-	   error: function(jqXHR) {
-	     that.error(jqXHR);
+	   error: function(jqXHR, textStatus, errorThrown) {
+	     that.error(jqXHR, textStatus, errorThrown);
 	   }
 	 });
 
@@ -189,8 +189,8 @@ Pengine.prototype.abort = function() {
 	},
 	function(obj) {
 	  pengine.process_response(obj);
-	}).fail(function(jqXHR, status, error) {
-	  pengine.error(jqXHR);
+	}).fail(function(jqXHR, textStatus, errorThrown) {
+	  pengine.error(jqXHR, textStatus, errorThrown);
 	});
 };
 
@@ -221,8 +221,8 @@ Pengine.prototype.pull_response = function() {
 	function(obj) {
 	  if ( obj.event !== 'died')
 	    pengine.process_response(obj);
-	}).fail(function(jqXHR, status, error) {
-	  pengine.error(jqXHR);
+	}).fail(function(jqXHR, textStatus, errorThrown) {
+	  pengine.error(jqXHR, textStatus, errorThrown);
 	});
 };
 
@@ -250,8 +250,8 @@ Pengine.prototype.send = function(event) {
 	   success: function(obj) {
 	     pengine.process_response(obj);
 	   },
-	   error: function(jqXHR) {
-	     pengine.error(jqXHR);
+	   error: function(jqXHR, textStatus, errorThrown) {
+	     pengine.error(jqXHR, textStatus, errorThrown);
 	   }
          });
 };
@@ -281,15 +281,31 @@ Pengine.prototype.callback = function(f, obj) {
   }
 };
 
-Pengine.prototype.error = function(jqXHR) {
+/**
+ * Called on AJAX interaction error.  Unfortunately, we have little
+ * information.  Is this error permanent?  If so, we should unregister
+ * the pengine.  If not, we could just report the error and allow the
+ * application to retry.
+ */
+
+Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
   var obj = { event:"error", pengine:this };
+
   if ( jqXHR.responseText ) {
     var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
 				.replace(/<\/body>/, "");
     var plain = $("<div></div>").html(msg).text();
     obj.data = plain;
     obj.dataHTML = msg;
+  } else if ( textStatus )
+  { obj.data = "Server status: " + textStatus;
+  } else if ( errorThrown )
+  { obj.data = "Server error: " + errorThrown;
   }
+  if ( !obj.dataHTML && obj.data )
+    obj.dataHTML = '<span class="error">'+obj.data+'</span>';
+
+  unregisterPengine(this);		/* see above */
 
   this.process_response(obj);
 }
