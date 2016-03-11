@@ -1860,7 +1860,24 @@ pengine_rpc_output(_ID, Term) :-
 %
 %   HTTP POST handler  for  =/pengine/create=.   This  API  accepts  the
 %   pengine  creation  parameters  both  as  =application/json=  and  as
-%   =www-form-encoded=.
+%   =www-form-encoded=.  Accepted parameters:
+%
+%     | **Parameter** | **Default**       | **Comment                  |
+%     |---------------|-------------------|----------------------------|
+%     | format        | `prolog`	  | Output format	       |
+%     | application   | `pengine_sandbox` | Pengine application        |
+%     | chunk         | 1                 | Chunk-size for results     |
+%     | solutions     | chunked           | If `all`, emit all results |
+%     | ask           | -                 | The query                  |
+%     | template      | -		  | Output template            |
+%     | src_text      | ""                | Program                    |
+%     | src_url       | -		  | Program to download        |
+%
+%     Note that solutions=all internally  uses   chunking  to obtain the
+%     results from the pengine, but the results are combined in a single
+%     HTTP reply. This is currently only  implemented by the CSV backend
+%     that is part of SWISH for   downloading unbounded result sets with
+%     limited memory resources.
 
 http_pengine_create(Request) :-
     reply_options(Request, [post]), !.
@@ -1876,6 +1893,7 @@ http_pengine_create(Request) :-
     Form = [ format(Format, [default(prolog)]),
 	     application(Application, [default(pengine_sandbox)]),
 	     chunk(_, [integer, default(1)]),
+	     solutions(_, [oneof([all,chunked]), default(chunked)]),
 	     ask(_, [string, Optional]),
 	     template(_, [string, Optional]),
 	     src_text(_, [string, Optional]),
@@ -1909,24 +1927,26 @@ form_values([_|T], Pairs) :-
 
 
 http_pengine_create(Request, Application, Format, Dict) :-
-    (	current_application(Application)
-    ->  allowed(Request, Application),
-	authenticate(Request, Application, UserOptions),
-	dict_to_options(Dict, Application, CreateOptions0, VarNames),
-	append(UserOptions, CreateOptions0, CreateOptions),
-	pengine_uuid(Pengine),
-	message_queue_create(Queue, [max_size(25)]),
-	setting(Application:time_limit, TimeLimit),
-	get_time(Now),
-	asserta(pengine_queue(Pengine, Queue, TimeLimit, Now)),
-	broadcast(pengine(create(Pengine, Application, CreateOptions))),
-	create(Queue, Pengine, CreateOptions, http, Application),
-	wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames)
-    ;	Error = existence_error(pengine_application, Application),
-	pengine_uuid(ID),
-        output_result(Format, error(ID, error(Error, _)))
-    ),
+    current_application(Application), !,
+    allowed(Request, Application),
+    authenticate(Request, Application, UserOptions),
+    dict_to_options(Dict, Application, CreateOptions0, VarNames),
+    append(UserOptions, CreateOptions0, CreateOptions),
+    pengine_uuid(Pengine),
+    message_queue_create(Queue, [max_size(25)]),
+    setting(Application:time_limit, TimeLimit),
+    get_time(Now),
+    asserta(pengine_queue(Pengine, Queue, TimeLimit, Now)),
+    broadcast(pengine(create(Pengine, Application, CreateOptions))),
+    create(Queue, Pengine, CreateOptions, http, Application),
+    create_wait_and_output_result(Pengine, Queue, Format,
+				  TimeLimit, VarNames, Dict),
     gc_abandoned_queues.
+http_pengine_create(_Request, Application, Format, _Dict) :-
+    Error = existence_error(pengine_application, Application),
+    pengine_uuid(ID),
+    output_result(Format, error(ID, error(Error, _))).
+
 
 dict_to_options(Dict, Application, CreateOptions, VarNames) :-
     dict_pairs(Dict, _, Pairs),
@@ -2008,7 +2028,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
 	      Error, true)
     ->  (   var(Error)
 	->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
-	    destroy_queue_from_http(Pengine, Event, Queue),
+	    ignore(destroy_queue_from_http(Pengine, Event, Queue)),
 	    output_result(Format, Event, VarNames)
 	;   output_result(Format, died(Pengine))
 	)
@@ -2017,7 +2037,40 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
         pengine_abort(Pengine)
     ).
 
-%%	destroy_queue_from_http(+Pengine, +Event, +Queue) is det.
+%%	create_wait_and_output_result(+Pengine, +Queue, +Format,
+%%				      +TimeLimit, +VarNames, +Dict) is det.
+
+create_wait_and_output_result(Pengine, Queue, Format,
+			      TimeLimit, VarNames, Dict) :-
+    get_dict(solutions, Dict, all), !,
+    between(1, infinite, Page),
+    (   catch(thread_get_message(Queue, pengine_event(_, Event),
+				 [ timeout(TimeLimit)
+				 ]),
+	      Error, true)
+    ->  (   var(Error)
+	->  debug(pengine(wait), 'Page ~D: got ~q from ~q', [Page, Event, Queue]),
+	    (	destroy_queue_from_http(Pengine, Event, Queue)
+	    ->	output_result(Format, page(Page, Event), VarNames)
+	    ;	pengine_thread(Pengine, Thread),
+		thread_send_message(Thread, pengine_request(next)),
+	        output_result(Format, page(Page, Event), VarNames),
+		fail
+	    )
+	;   output_result(Format, died(Pengine))
+	)
+    ;   output_result(Format, error(Pengine,
+				    error(time_limit_exceeded, _))),
+        pengine_abort(Pengine)
+    ), !.
+
+
+create_wait_and_output_result(Pengine, Queue, Format,
+			      TimeLimit, VarNames, _Dict) :-
+    wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames).
+
+
+%%	destroy_queue_from_http(+Pengine, +Event, +Queue) is semidet.
 %
 %	Consider destroying the output queue   for Pengine after sending
 %	Event back to the HTTP client. We can destroy the queue if
@@ -2038,7 +2091,6 @@ destroy_queue_from_http(ID, Event, Queue) :-
     message_queue_property(Queue, size(Waiting)),
     debug(pengine(destroy), 'Destroy ~p (waiting ~D)', [Queue, Waiting]),
     with_mutex(pengine, sync_destroy_queue_from_http(ID, Queue)).
-destroy_queue_from_http(_, _, _).
 
 is_destroy_event(destroy(_)).
 is_destroy_event(destroy(_,_)).
