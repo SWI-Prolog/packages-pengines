@@ -50,6 +50,7 @@
  * which to execute the query.
  * @param {Function} [options.oncreate]
  * @param {Function} [options.onsuccess]
+ * @param {Function} [options.ondata]
  * @param {Function} [options.onfailure]
  * @param {Function} [options.onerror]
  * @param {Function} [options.onprompt]
@@ -60,8 +61,15 @@
  * Callback functions.  The callback function is called with an object
  * argument.  This object always has a property `pengine` that refers
  * to the JavaScript `Pengine` instance.  All callbacks are optional,
- * although creating a Pengine without `onsuccess` is typically
- * meaningless.
+ * although creating a Pengine without `onsuccess` or `ondata` is
+ * typically meaningless.
+ *
+ * On success, first `options.onsuccess` is called.  If this does not
+ * return `false` and `options.ondata` is defined, this function is
+ * called for each answer in the answer set with `this` refering to
+ * the data object as a whole while the first argument is an object
+ * holding a single answer.  If more answers are available, `next()`
+ * is called on the Pengine.
  */
 
 function Pengine(options) {
@@ -276,9 +284,7 @@ Pengine.prototype.process_response = function(obj) {
 
 Pengine.prototype.callback = function(f, obj) {
   if ( this.options[f] )
-  { this.options[f].call(obj, obj);
-    return true;
-  }
+    return this.options[f].call(obj, obj);
 };
 
 /**
@@ -343,9 +349,19 @@ Pengine.onresponse = {
   },
 
   stop:    function(obj) { this.callback('onstop',    obj); },
-  success: function(obj) { this.callback('onsuccess', obj); },
   failure: function(obj) { this.callback('onfailure', obj); },
   prompt:  function(obj) { this.callback('onprompt',  obj); },
+
+  success: function(obj) {
+    if ( this.callback('onsuccess', obj) != false &&
+	 this.options.ondata ) {
+      for(i=0; i<obj.data.length; i++) {
+	this.options.ondata.call(obj, obj.data[i]);
+	if ( obj.more )
+	  obj.pengine.next();
+      }
+    }
+  },
 
   error: function(obj) {
     if ( obj.code == "existence_error" &&
