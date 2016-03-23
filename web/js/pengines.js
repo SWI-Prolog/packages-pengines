@@ -357,9 +357,9 @@ Pengine.onresponse = {
 	 this.options.ondata ) {
       for(i=0; i<obj.data.length; i++) {
 	this.options.ondata.call(obj, obj.data[i]);
-	if ( obj.more )
-	  obj.pengine.next();
       }
+      if ( obj.more )
+	obj.pengine.next();
     }
   },
 
