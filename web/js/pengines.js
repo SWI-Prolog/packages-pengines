@@ -56,6 +56,7 @@
  * @param {Function} [options.onprompt]
  * @param {Function} [options.onoutput]
  * @param {Function} [options.ondebug]
+ * @param {Function} [options.onping]
  * @param {Function} [options.onabort]
  * @param {Function} [options.ondestroy]
  * Callback functions.  The callback function is called with an object
@@ -200,6 +201,36 @@ Pengine.prototype.abort = function() {
 	}).fail(function(jqXHR, textStatus, errorThrown) {
 	  pengine.error(jqXHR, textStatus, errorThrown);
 	});
+};
+
+/**
+ * Ping the status of the pengine.
+ * @param {Number} [interval] If `undefined`, send a single ping.  If
+ * > 0, set/change periodic ping event, if 0, clear periodic interval.
+ */
+Pengine.prototype.ping = function(interval) {
+  var pengine = this;
+
+  if ( interval == undefined ) {
+    $.get(this.options.server + '/ping',
+	  { id: this.id,
+	    format: this.options.format
+	  },
+	  function(obj) {
+	    pengine.process_response(obj);
+	  }).fail(function(jqXHR, textStatus, errorThrown) {
+	    pengine.error(jqXHR, textStatus, errorThrown);
+	  });
+  } else {
+    if ( pengine.pingid )
+      clearInterval(pengine.pingid);
+    if ( interval > 0 )
+      pengine.pingid = setInterval(function() {
+	pengine.ping();
+      }, interval);
+    else
+      delete pengine.pingid;
+  }
 };
 
 /**
@@ -380,6 +411,10 @@ Pengine.onresponse = {
     this.pull_response();
   },
 
+  ping: function(obj) {
+    this.callback('onping', obj);
+  },
+
   debug: function(obj) {
     if ( !this.callback('ondebug', obj) )
       this.report('log', obj.data);
@@ -415,6 +450,11 @@ Pengine.onresponse = {
 		 *******************************/
 
 function unregisterPengine(pengine) {
+  if ( pengine.pingid ) {
+    clearInterval(pengine.pingid);
+    delete pengine.pingid;
+  }
+
   var index = Pengine.alive.indexOf(pengine);
   if ( index > -1 )
     Pengine.alive.splice(index, 1);

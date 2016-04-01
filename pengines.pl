@@ -1848,6 +1848,7 @@ pengine_rpc_output(_ID, Term) :-
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response,
 		[ time_limit(infinite), spawn([]) ]).
 :- http_handler(root(pengine/abort),	     http_pengine_abort,	 []).
+:- http_handler(root(pengine/ping),	     http_pengine_ping,		 []).
 :- http_handler(root(pengine/destroy_all),   http_pengine_destroy_all,	 []).
 
 :- http_handler(root(pengine/'pengines.js'),
@@ -2338,6 +2339,26 @@ http_pengine_destroy_all(Request) :-
     forall(member(ID, IDs),
 	   pengine_destroy(ID, [force(true)])),
     reply_json("ok").
+
+%%	http_pengine_ping(+Request)
+%
+%	HTTP handler for /pengine/ping.  If   the  requested  Pengine is
+%	alive and event status(Pengine, Stats) is created, where `Stats`
+%	is the return of thread_statistics/2.
+
+http_pengine_ping(Request) :-
+    reply_options(Request, [get]), !.
+http_pengine_ping(Request) :-
+    http_parameters(Request,
+		    [ id(Pengine, []),
+		      format(Format, [default(prolog)])
+		    ]),
+    (	pengine_thread(Pengine, Thread),
+	catch(thread_statistics(Thread, Stats), _, fail)
+    ->	output_result(Format, ping(Pengine, Stats))
+    ;	output_result(Format, died(Pengine))
+    ).
+
 
 %%	output_result(+Format, +EventTerm) is det.
 %%	output_result(+Format, +EventTerm, +VarNames) is det.
