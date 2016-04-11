@@ -414,7 +414,7 @@ map_answer(ID, Bindings0, ResVars, Answer) :-
 
 residuals_html([], _, []).
 residuals_html([H0|T0], Module, [H|T]) :-
-	term_html_string(H0, [], Module, H),
+	term_html_string(H0, [], Module, H, [priority(999)]),
 	residuals_html(T0, Module, T).
 
 dict_bindings(Dict, Bindings) :-
@@ -453,25 +453,27 @@ add_projection(VarNames0, ResVars0, JSON0, JSON) :-
 
 binding_to_html(ID, binding(Vars,Term,Substitutions), JSON) :-
 	JSON0 = json{variables:Vars, value:HTMLString},
-	term_html_string(Term, Vars, ID, HTMLString),
+	term_html_string(Term, Vars, ID, HTMLString, [priority(699)]),
 	(   Substitutions == []
 	->  JSON = JSON0
 	;   maplist(subst_to_html(ID), Substitutions, HTMLSubst),
 	    JSON = JSON0.put(substitutions, HTMLSubst)
 	).
 
-%%	term_html_string(+Term, +VarNames, +Module, -HTMLString) is det.
+%%	term_html_string(+Term, +VarNames, +Module, -HTMLString,
+%%			 +Options) is det.
 %
 %	Translate  Term  into  an  HTML    string   using  the  operator
 %	declarations from Module. VarNames is a   list of variable names
 %	that have this value.
 
-term_html_string(Term, Vars, Module, HTMLString) :-
-	setting(write_options, Options),
-	merge_options(Options,
+term_html_string(Term, Vars, Module, HTMLString, Options) :-
+	setting(write_options, WOptions),
+	merge_options(WOptions,
 		      [ quoted(true),
 			numbervars(true),
 			module(Module)
+		      | Options
 		      ], WriteOptions),
 	phrase(term_html(Term, Vars, WriteOptions), Tokens),
 	with_output_to(string(HTMLString), print_html(Tokens)).
@@ -500,7 +502,7 @@ term_html(Term, _Vars, WriteOptions) -->
 %	factorization, in this case breaking a cycle.
 
 subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :- !,
-	term_html_string(Value, [Name], ID, HTMLString).
+	term_html_string(Value, [Name], ID, HTMLString, [priority(699)]).
 subst_to_html(_, Term, _) :-
 	assertion(Term = '$VAR'(_)).
 
