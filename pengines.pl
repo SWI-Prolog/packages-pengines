@@ -96,7 +96,8 @@ from Prolog or JavaScript.
 	pengine_event_loop(1, +).
 
 :- multifile
-	write_result/3,			% +Format, +Event, +VarNames
+	write_result/3,			% +Format, +Event, +VarNames (deprecated)
+	write_result/4,			% +Format, +Event, +VarNames, +Dict
 	event_to_json/4,		% +Event, -JSON, +Format, +VarNames
 	prepare_module/3,		% +Module, +Application, +Options
 	prepare_goal/3,			% +GoalIn, -GoalOut, +Options
@@ -1864,7 +1865,7 @@ pengine_rpc_output(_ID, Term) :-
 %   pengine  creation  parameters  both  as  =application/json=  and  as
 %   =www-form-encoded=.  Accepted parameters:
 %
-%     | **Parameter** | **Default**       | **Comment                  |
+%     | **Parameter** | **Default**       | **Comment**                |
 %     |---------------|-------------------|----------------------------|
 %     | format        | `prolog`	  | Output format	       |
 %     | application   | `pengine_sandbox` | Pengine application        |
@@ -1874,6 +1875,7 @@ pengine_rpc_output(_ID, Term) :-
 %     | template      | -		  | Output template            |
 %     | src_text      | ""                | Program                    |
 %     | src_url       | -		  | Program to download        |
+%     | disposition   | -		  | Download location          |
 %
 %     Note that solutions=all internally  uses   chunking  to obtain the
 %     results from the pengine, but the results are combined in a single
@@ -1891,15 +1893,17 @@ http_pengine_create(Request) :-
     dict_atom_option(application, Dict, Application, pengine_sandbox),
     http_pengine_create(Request, Application, Format, Dict).
 http_pengine_create(Request) :-
-    Optional = optional(true),
+    Optional = [optional(true)],
+    OptString = [string|Optional],
     Form = [ format(Format, [default(prolog)]),
 	     application(Application, [default(pengine_sandbox)]),
 	     chunk(_, [integer, default(1)]),
 	     solutions(_, [oneof([all,chunked]), default(chunked)]),
-	     ask(_, [string, Optional]),
-	     template(_, [string, Optional]),
-	     src_text(_, [string, Optional]),
-	     src_url(_, [Optional])
+	     ask(_, OptString),
+	     template(_, OptString),
+	     src_text(_, OptString),
+	     disposition(_, OptString),
+	     src_url(_, Optional)
 	   ],
     http_parameters(Request, Form),
     form_dict(Form, Dict),
@@ -2041,6 +2045,10 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
 
 %%	create_wait_and_output_result(+Pengine, +Queue, +Format,
 %%				      +TimeLimit, +VarNames, +Dict) is det.
+%
+%	Intercepts  the  `solutions=all'  case    used  for  downloading
+%	results. Dict may contain a  `disposition`   key  to  denote the
+%	download location.
 
 create_wait_and_output_result(Pengine, Queue, Format,
 			      TimeLimit, VarNames, Dict) :-
@@ -2056,7 +2064,7 @@ create_wait_and_output_result(Pengine, Queue, Format,
 	    ->	output_result(Format, page(Page, Event), VarNames)
 	    ;	pengine_thread(Pengine, Thread),
 		thread_send_message(Thread, pengine_request(next)),
-	        output_result(Format, page(Page, Event), VarNames),
+	        output_result(Format, page(Page, Event), VarNames, Dict),
 		fail
 	    )
 	;   output_result(Format, died(Pengine))
@@ -2065,8 +2073,6 @@ create_wait_and_output_result(Pengine, Queue, Format,
 				    error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
     ), !.
-
-
 create_wait_and_output_result(Pengine, Queue, Format,
 			      TimeLimit, VarNames, _Dict) :-
     wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames).
@@ -2366,14 +2372,17 @@ http_pengine_ping(Request) :-
 
 %%	output_result(+Format, +EventTerm) is det.
 %%	output_result(+Format, +EventTerm, +VarNames) is det.
+%%	output_result(+Format, +EventTerm, +VarNames, +OptionsDict) is det.
 %
 %	Formulate an HTTP response from a pengine event term. Format is
 %	one of =prolog=, =json= or =json-s=.
 
 output_result(Format, Event) :-
     output_result(Format, Event, -).
+output_result(Format, Event, VarNames) :-
+    output_result(Format, Event, VarNames, _{}).
 
-output_result(prolog, Event, _) :- !,
+output_result(prolog, Event, _, _) :- !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
     write_term(Event,
 	       [ quoted(true),
@@ -2383,9 +2392,11 @@ output_result(prolog, Event, _) :- !,
 		 portray_goal(portray_blob),
 		 nl(true)
 	       ]).
-output_result(Lang, Event, VarNames) :-
+output_result(Lang, Event, VarNames, Dict) :-
+    write_result(Lang, Event, VarNames, Dict), !.
+output_result(Lang, Event, VarNames, _) :-		% deprecated
     write_result(Lang, Event, VarNames), !.
-output_result(Lang, Event, VarNames) :-
+output_result(Lang, Event, VarNames, _) :-
     json_lang(Lang), !,
     (	event_term_to_json_data(Event, JSON, Lang, VarNames)
     ->	cors_enable,
@@ -2393,7 +2404,7 @@ output_result(Lang, Event, VarNames) :-
 	reply_json(JSON)
     ;	assertion(event_term_to_json_data(Event, _, Lang))
     ).
-output_result(Lang, _Event, _) :-	% FIXME: allow for non-JSON format
+output_result(Lang, _Event, _, _) :-	% FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
 
 %%	portray_blob(+Blob, +Options) is det.
@@ -2410,6 +2421,12 @@ portray_blob(Blob, _Options) :-
 	writeq('$BLOB'(Type)).
 
 %%	write_result(+Lang, +Event, +VarNames) is semidet.
+%
+%	Called after write_result/4 for backward compatibility reasons.
+%
+%	@deprecated Use write_result/4.
+
+%%	write_result(+Lang, +Event, +VarNames, +Dict) is semidet.
 %
 %	Hook that allows for different output formats. The core Pengines
 %	library supports `prolog` and various   JSON  dialects. The hook
