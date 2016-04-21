@@ -1585,8 +1585,9 @@ pengine_event(Event, Options) :-
     update_remote_destroy(Event).
 
 update_remote_destroy(Event) :-
-    pengine_remote(Id, _Server),
-    destroy_event(Event), !,
+    destroy_event(Event),
+    arg(1, Event, Id),
+    pengine_remote(Id, _Server), !,
     pengine_unregister_remote(Id).
 update_remote_destroy(_).
 
