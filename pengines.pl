@@ -2095,6 +2095,9 @@ destroy_queue_from_http(ID, Event, Queue) :-
 
 is_destroy_event(destroy(_)).
 is_destroy_event(destroy(_,_)).
+is_destroy_event(create(_, Options)) :-
+	memberchk(answer(Event), Options),
+	is_destroy_event(Event).
 
 destroy_queue_if_empty(Queue) :-
     thread_peek_message(Queue, _), !.
