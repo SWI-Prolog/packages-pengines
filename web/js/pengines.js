@@ -316,6 +316,7 @@ Pengine.prototype.process_response = function(obj) {
 Pengine.prototype.callback = function(f, obj) {
   if ( this.options[f] )
     return this.options[f].call(obj, obj);
+  return "not implemented";
 };
 
 /**
@@ -400,7 +401,7 @@ Pengine.onresponse = {
 	 obj.arg2 == this.id )
       unregisterPengine(this);
 
-    if ( !this.callback('onerror', obj) )
+    if ( this.callback('onerror', obj) == "not implemented" )
       this.report('error', obj.data);
   },
 
@@ -416,7 +417,7 @@ Pengine.onresponse = {
   },
 
   debug: function(obj) {
-    if ( !this.callback('ondebug', obj) )
+    if ( this.callback('ondebug', obj) == "not implemented" )
       this.report('log', obj.data);
     this.pull_response();
   },
