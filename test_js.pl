@@ -111,8 +111,6 @@ test_script(File, Server, Script) :-
 	       [Server, File]),
 	close(Out).
 
-:- public has_phantomjs/0.
-
 has_phantomjs :-
 	absolute_file_name(path(phantomjs), _,
 			   [ file_type(executable),
@@ -120,18 +118,49 @@ has_phantomjs :-
 			     access(execute)
 			   ]).
 
+phantomjs_version(Version) :-
+	setup_call_cleanup(
+	    process_create(path(phantomjs), ['--version'],
+			   [ stdout(pipe(Input))
+			   ]),
+	    read_string(Input, _, String),
+	    close(Input)
+	),
+	split_string(String, "", " \n\r\t", [Version]).
+
+% POST sends empty request in this version.  See
+% https://github.com/ariya/phantomjs/issues/14329
+phantomjs_version_bad("2.1.1").
+
 check_phantomjs :-
-	has_phantomjs, !.
+	has_phantomjs, !,
+	phantomjs_version(Version),
+	(   phantomjs_version_bad(Version)
+	->  print_message(
+		warning,
+		format('phantomjs version ~s is broken, \c
+		        skipping JavaScript tests~n',
+		       [Version]))
+	;   true
+	).
 check_phantomjs :-
-	format(user_error,
-	       'No phantomjs in $PATH, skipping JavaScript tests~n', []).
+	print_message(
+	    warning,
+	    format('No phantomjs in $PATH, skipping JavaScript tests~n', [])).
+
+:- public working_phantomjs/0.
+
+working_phantomjs :-
+	has_phantomjs,
+	phantomjs_version(Version),
+	\+ phantomjs_version_bad(Version).
 
 :- initialization check_phantomjs.
 
 :- begin_tests(js_pengines,
 	       [ setup(start_pengine_server(_Port)),
 		 cleanup(stop_pengine_server),
-		 condition(has_phantomjs)
+		 condition(working_phantomjs)
 	       ]).
 
 test(simple, Lines == [a,b,c,d,e,f,g]) :-
