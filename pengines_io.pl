@@ -523,6 +523,9 @@ map_output(ID, message(Term, Kind, HTMLString, Src), JSON) :-
 map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
 	(   atomic(Term)
 	->  Data = Term
+	;   is_dict(Term, json),
+	    ground(json)		% TBD: Check proper JSON object?
+	->  Data = Term
 	;   term_string(Term, Data)
 	).
 
