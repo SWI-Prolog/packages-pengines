@@ -430,6 +430,8 @@ select_residuals([H|T], Bindings, Vars, Residuals) :-
 select_residuals([H|T0], [H|T], Vars, Residuals) :-
 	select_residuals(T0, T, Vars, Residuals).
 
+binding_residual('_residuals' = '$residuals'(Residuals), '_residuals', Residuals) :-
+	is_list(Residuals).
 binding_residual('Residuals' = '$residuals'(Residuals), 'Residuals', Residuals) :-
 	is_list(Residuals).
 binding_residual('Residual'  = '$residual'(Residual),   'Residual', [Residual]) :-
