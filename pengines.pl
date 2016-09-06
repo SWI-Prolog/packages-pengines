@@ -1054,13 +1054,17 @@ pengine_prepare_source(Module:Application, Options) :-
     set_module(Module:program_space(SpaceLimit)),
     delete_import_module(Module, user),
     add_import_module(Module, Application, start),
-    ignore(prepare_module(Module, Application, Options)),
-    catch(maplist(process_create_option(Module), Options), Error, true),
+    catch(prep_module(Module, Application, Options), Error, true),
     (	var(Error)
     ->	true
     ;	send_error(Error),
 	throw(prepare_source_failed)
     ).
+
+prep_module(Module, Application, Options) :-
+	forall(prepare_module(Module, Application, Options),
+	       true),
+	maplist(process_create_option(Module), Options).
 
 process_create_option(Application, src_text(Text)) :- !,
     pengine_src_text(Text, Application).
