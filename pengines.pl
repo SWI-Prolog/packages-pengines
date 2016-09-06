@@ -1062,9 +1062,17 @@ pengine_prepare_source(Module:Application, Options) :-
     ).
 
 prep_module(Module, Application, Options) :-
-	forall(prepare_module(Module, Application, Options),
-	       true),
-	maplist(process_create_option(Module), Options).
+    maplist(copy_flag(Module, Application), [var_prefix]),
+    forall(prepare_module(Module, Application, Options), true),
+    setup_call_cleanup(
+	'$set_source_module'(OldModule, Module),
+	maplist(process_create_option(Module), Options),
+	'$set_source_module'(OldModule)).
+
+copy_flag(Module, Application, Flag) :-
+    current_prolog_flag(Application:Flag, Value), !,
+    set_prolog_flag(Module:Flag, Value).
+copy_flag(_, _, _).
 
 process_create_option(Application, src_text(Text)) :- !,
     pengine_src_text(Text, Application).
