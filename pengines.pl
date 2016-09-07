@@ -1698,8 +1698,8 @@ executed in (and in the Prolog context   of) the pengine server referred
 to by URL, rather than locally.
 
   ==
-    copy_term(Query, Copy),
-    call(Copy),			% executed on server at URL
+    copy_term_nat(Query, Copy),  % attributes are not copied to the server
+    call(Copy),			 % executed on server at URL
     Query = Copy.
   ==
 
