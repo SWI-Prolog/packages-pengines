@@ -118,22 +118,16 @@ for using this module with the following code:
 
 %%	pengine_writeln(+Term)
 %
-%	Emit Term as <div class=writeln>Term</div>.
+%	Emit Term as <span class=writeln>Term<br></span>.
 
-pengine_writeln(Line) :-
-	atomic(Line), \+ special_blob(Line), !,
-	send_html(div(class(writeln), Line)).
 pengine_writeln(Term) :-
 	pengine_module(Module),
-	send_html(div(class(writeln),
-		      \term(Term,
-			    [ quoted(true),
-			      module(Module)
-			    ]))).
-
-special_blob(X) :-
-	blob(X, _Type),
-	\+ atom(X).
+	send_html(span(class(writeln),
+		       [ \term(Term,
+			       [ module(Module)
+			       ]),
+			 br([])
+		       ])).
 
 %%	pengine_nl
 %
