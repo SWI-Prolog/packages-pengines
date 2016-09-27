@@ -2542,11 +2542,11 @@ add_error_code(error(Formal, _), Error0, Error) :-
     Error = Error0.put(code, Code).
 add_error_code(_, Error, Error).
 
-to_atomic(Obj, Atomic) :-
-    (   atomic(Obj)
-    ->	Atomic = Obj
-    ;	term_string(Obj, Atomic)
-    ).
+% What to do with large integers?
+to_atomic(Obj, Atomic) :- atom(Obj),   !, Atomic = Obj.
+to_atomic(Obj, Atomic) :- number(Obj), !, Atomic = Obj.
+to_atomic(Obj, Atomic) :- string(Obj), !, Atomic = Obj.
+to_atomic(Obj, Atomic) :- term_string(Obj, Atomic).
 
 
 %%  add_error_location(+Error, +JSON0, -JSON) is det.
