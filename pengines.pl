@@ -386,6 +386,17 @@ wrap_first_answer(ID, Event0, CreateEvent) :-
 wrap_first_answer(_ID, Event, Event).
 
 
+empty_queue :-
+    pengine_parent(Queue),
+    empty_queue(Queue, 0, Discarded),
+    debug(pengine(abort), 'Abort: discarded ~D messages', [Discarded]).
+
+empty_queue(Queue, C0, C) :-
+	thread_get_message(Queue, _Term, [timeout(0)]), !,
+	C1 is C0+1,
+	empty_queue(Queue, C1, C).
+empty_queue(_, C, C).
+
 
 /** pengine_ask(+NameOrID, @Query, +Options) is det
 
@@ -536,6 +547,7 @@ pengine_abort(Name) :-
     (	pengine_remote(Pengine, Server)
     ->	remote_pengine_abort(Server, Pengine, [])
     ;	pengine_thread(Pengine, Thread),
+	debug(pengine(abort), 'Signalling thread ~p', [Thread]),
 	catch(thread_signal(Thread, throw(abort_query)), _, true)
     ).
 
@@ -1102,10 +1114,13 @@ process_create_option(_, _).
 
 
 pengine_main_loop(ID) :-
-    catch(guarded_main_loop(ID), abort_query,
-	  ( debug(pengine(abort), 'Aborting ~p', [ID]),
-	    destroy_or_continue(abort(ID))
-	  )).
+    catch(guarded_main_loop(ID), abort_query, pengine_aborted(ID)).
+
+pengine_aborted(ID) :-
+    thread_self(Self),
+    debug(pengine(abort), 'Aborting ~p (thread ~p)', [ID, Self]),
+    empty_queue,
+    destroy_or_continue(abort(ID)).
 
 
 %%	guarded_main_loop(+Pengine) is det.
