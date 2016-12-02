@@ -2361,6 +2361,7 @@ http_pengine_abort(Request) :-
     (	pengine_thread(ID, _Thread),
 	pengine_queue(ID, Queue, TimeLimit, _)
     ->	broadcast(pengine(abort(ID))),
+	abort_pending_output(ID),
 	pengine_abort(ID),
 	wait_and_output_result(ID, Queue, Format, TimeLimit)
     ;	http_404([], Request)
@@ -2404,10 +2405,20 @@ http_pengine_ping(Request) :-
 %	Formulate an HTTP response from a pengine event term. Format is
 %	one of =prolog=, =json= or =json-s=.
 
+:- dynamic
+	pengine_replying/2.		% +Pengine, +Thread
+
 output_result(Format, Event) :-
     output_result(Format, Event, -).
 output_result(Format, Event, VarNames) :-
-    output_result(Format, Event, VarNames, _{}).
+    arg(1, Event, Pengine),
+    thread_self(Thread),
+    setup_call_cleanup(
+	asserta(pengine_replying(Pengine, Thread), Ref),
+	catch(output_result(Format, Event, VarNames, _{}),
+	      pengine_abort_output,
+	      true),
+	erase(Ref)).
 
 output_result(prolog, Event, _, _) :- !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
@@ -2446,6 +2457,20 @@ output_result(Lang, _Event, _, _) :-	% FIXME: allow for non-JSON format
 portray_blob(Blob, _Options) :-
 	blob(Blob, Type),
 	writeq('$BLOB'(Type)).
+
+%%	abort_pending_output(+Pengine) is det.
+%
+%	If we get an abort, it is possible that output is being produced
+%	for the client.  This predicate aborts these threads.
+
+abort_pending_output(Pengine) :-
+    forall(pengine_replying(Pengine, Thread),
+	   abort_output_thread(Thread)).
+
+abort_output_thread(Thread) :-
+    catch(thread_signal(Thread, throw(pengine_abort_output)),
+	  error(existence_error(thread, _), _),
+	  true).
 
 %%	write_result(+Lang, +Event, +VarNames) is semidet.
 %
