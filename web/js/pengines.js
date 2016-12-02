@@ -114,6 +114,7 @@ function Pengine(options) {
 		"destroy"
 	      ]);
 
+  this.request =
   $.ajax(this.options.server + '/create',
 	 { contentType: "application/json; charset=utf-8",
 	   dataType: "json",
@@ -124,6 +125,9 @@ function Pengine(options) {
 	   },
 	   error: function(jqXHR, textStatus, errorThrown) {
 	     that.error(jqXHR, textStatus, errorThrown);
+	   },
+	   complete: function() {
+	     that.request = undefined;
 	   }
 	 });
 
@@ -192,6 +196,12 @@ Pengine.prototype.respond = function(input) {
 Pengine.prototype.abort = function() {
   var pengine = this;
 
+  if ( this.request ) {
+    this.request.pengine_aborted = true;
+    this.request.abort();
+  }
+
+  this.request =
   $.get(this.options.server + '/abort',
 	{ id: this.id,
 	  format: this.options.format
@@ -200,6 +210,8 @@ Pengine.prototype.abort = function() {
 	  pengine.process_response(obj);
 	}).fail(function(jqXHR, textStatus, errorThrown) {
 	  pengine.error(jqXHR, textStatus, errorThrown);
+	}).always(function() {
+	  pengine.request = undefined;
 	});
 };
 
@@ -253,6 +265,7 @@ Pengine.prototype.destroy = function() {
 Pengine.prototype.pull_response = function() {
   var pengine = this;
 
+  this.request =
   $.get(this.options.server + '/pull_response',
 	{ id: this.id,
 	  format: this.options.format
@@ -262,6 +275,8 @@ Pengine.prototype.pull_response = function() {
 	    pengine.process_response(obj);
 	}).fail(function(jqXHR, textStatus, errorThrown) {
 	  pengine.error(jqXHR, textStatus, errorThrown);
+	}).always(function() {
+	  pengine.request = undefined;
 	});
 };
 
@@ -280,6 +295,7 @@ Pengine.prototype.pull_response = function() {
 Pengine.prototype.send = function(event) {
   var pengine = this;
 
+  this.request =
   $.ajax({ type: "POST",
 	   url: pengine.options.server +
 		'/send?format=' + this.options.format +
@@ -291,6 +307,9 @@ Pengine.prototype.send = function(event) {
 	   },
 	   error: function(jqXHR, textStatus, errorThrown) {
 	     pengine.error(jqXHR, textStatus, errorThrown);
+	   },
+	   complete: function() {
+	     pengine.request = undefined;
 	   }
          });
 };
@@ -327,6 +346,9 @@ Pengine.prototype.callback = function(f, obj) {
  */
 
 Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
+  if ( jqXHR.pengine_aborted )
+    return;
+
   var obj = { event:"error", pengine:this };
 
   if ( jqXHR.responseText ) {
@@ -461,6 +483,7 @@ function unregisterPengine(pengine) {
     Pengine.alive.splice(index, 1);
   else
     console.log("Could not unregister", Pengine.alive, pengine);
+
   pengine.died = true;
 }
 
