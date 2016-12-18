@@ -33,9 +33,9 @@
 */
 
 :- module(test_term_html,
-	  [ test_term_html/0,
-	    term_html_string/3			% @Term, -String, +Options
-	  ]).
+          [ test_term_html/0,
+            term_html_string/3                  % @Term, -String, +Options
+          ]).
 :- include(test_local).
 
 :- use_module(library(plunit)).
@@ -49,63 +49,63 @@
 :- use_module(http/term_html).
 
 test_term_html :-
-	run_tests([ term_html
-		  ]).
+    run_tests([ term_html
+              ]).
 
 
 term_html_string(Term, HTMLString, Options) :-
-	phrase(term(Term, Options), Tokens),
-	with_output_to(string(HTMLString), print_html(Tokens)).
+    phrase(term(Term, Options), Tokens),
+    with_output_to(string(HTMLString), print_html(Tokens)).
 
 string_dom(String, DOM) :-
-	setup_call_cleanup(
-	    new_memory_file(MF),
-	    ( setup_call_cleanup(
-		  open_memory_file(MF, write, Out),
-		  write(Out, String),
-		  close(Out)),
-	      setup_call_cleanup(
-		  open_memory_file(MF, read, In),
-		  load_html(stream(In), DOM, []),
-		  close(In))
-	    ),
-	    free_memory_file(MF)).
+    setup_call_cleanup(
+        new_memory_file(MF),
+        ( setup_call_cleanup(
+              open_memory_file(MF, write, Out),
+              write(Out, String),
+              close(Out)),
+          setup_call_cleanup(
+              open_memory_file(MF, read, In),
+              load_html(stream(In), DOM, []),
+              close(In))
+        ),
+        free_memory_file(MF)).
 
 string_plain(HTMLString, Plain) :-
-	string_dom(HTMLString, [DOM]),
-	xpath(DOM, /(*(text)), PlainAtom),
-	atom_string(PlainAtom, Plain).
+    string_dom(HTMLString, [DOM]),
+    xpath(DOM, /(*(text)), PlainAtom),
+    atom_string(PlainAtom, Plain).
 
 trip(TermIn, StringOut, TermOut, Options) :-
-	(   option(numbervars(true), Options)
-	->  copy_term(TermIn, Term1),
-	    numbervars(Term1, 1, _, [singletons(true)])
-	;   Term1 = TermIn
-	),
-	term_html_string(Term1, HTMLString, Options),
-	string_plain(HTMLString, StringOut),
-	debug(term_html(plain), 'Plain: ~p', [StringOut]),
-	(   option(quoted(true), Options),
-	    \+ option(max_depth(_), Options)
-	->  term_string(TermOut, StringOut)
-	;   true
-	).
+    (   option(numbervars(true), Options)
+    ->  copy_term(TermIn, Term1),
+        numbervars(Term1, 1, _, [singletons(true)])
+    ;   Term1 = TermIn
+    ),
+    term_html_string(Term1, HTMLString, Options),
+    string_plain(HTMLString, StringOut),
+    debug(term_html(plain), 'Plain: ~p', [StringOut]),
+    (   option(quoted(true), Options),
+        \+ option(max_depth(_), Options)
+    ->  term_string(TermOut, StringOut)
+    ;   true
+    ).
 
 test_term_html(String) :-
-	test_term_html(String, String,
-		       [ quoted(true),
-			 numbervars(true)
-		       ]).
+    test_term_html(String, String,
+                   [ quoted(true),
+                     numbervars(true)
+                   ]).
 
 test_term_html(In, Out, Options) :-
-	term_string(TermIn, In),
-	trip(TermIn, StringOut, TermOut, Options),
-	assertion(Out == StringOut),
-	(   option(quoted(true), Options),
-	    \+ option(max_depth(_), Options)
-	->  assertion(TermIn =@= TermOut)
-	;   true
-	).
+    term_string(TermIn, In),
+    trip(TermIn, StringOut, TermOut, Options),
+    assertion(Out == StringOut),
+    (   option(quoted(true), Options),
+        \+ option(max_depth(_), Options)
+    ->  assertion(TermIn =@= TermOut)
+    ;   true
+    ).
 
 :- begin_tests(term_html).
 
@@ -121,7 +121,7 @@ test(compound) :- test_term_html("a((h:-b))").
 
 test(dict) :- test_term_html("_{}").
 test(dict) :- test_term_html("_{a:1, b:2}").
-%test(dict) :- test_term_html("_{* :1}").	% FIXME: quoted keys do not work
+%test(dict) :- test_term_html("_{* :1}").       % FIXME: quoted keys do not work
 test(dict) :- test_term_html("_{a: *}").
 
 test(list) :- test_term_html("[]").
@@ -141,7 +141,7 @@ test(ellipsis) :- test_term_html("[a,b,c]",    "[a, b, c]",    [max_depth(4)]).
 test(ellipsis) :- test_term_html("[a(b),c]",   "[a(...)|...]", [max_depth(2)]).
 test(ellipsis) :- test_term_html("a{b:1,c:2}", "a{...}",       [max_depth(1)]).
 test(ellipsis) :- test_term_html("a{b:1,c:2}", "a{b:..., c:...}",
-				 [max_depth(2)]).
+    [max_depth(2)]).
 test(ellipsis) :- test_term_html("+a",         "+ ...",        [max_depth(1)]).
 
 :- end_tests(term_html).
