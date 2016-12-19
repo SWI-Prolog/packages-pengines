@@ -1,6 +1,6 @@
 :- module(pengine_server,
-	  [ server/1			% +Port
-	  ]).
+          [ server/1                    % +Port
+          ]).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_server_files)).
@@ -11,4 +11,4 @@
 :- http_handler(/, http_reply_from_files(web, []), [prefix]).
 
 server(Port) :-
-	http_server(http_dispatch, [port(Port)]).
+    http_server(http_dispatch, [port(Port)]).
