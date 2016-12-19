@@ -211,7 +211,7 @@ pengine_server(URL) :-
     format(atom(URL), 'http://localhost:~d', [Port]).
 
 start_pengine_server(Port) :-
-    pengine_server_port(Port), 
+    pengine_server_port(Port),
     !.
 start_pengine_server(Port) :-
     http_server(http_dispatch, [port(Port)]),

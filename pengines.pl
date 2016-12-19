@@ -365,7 +365,7 @@ pengine_reply(Event) :-
     pengine_reply(Queue, Event).
 
 pengine_reply(_Queue, _Event0) :-
-    nb_current(pengine_idle_limit_exceeded, true), 
+    nb_current(pengine_idle_limit_exceeded, true),
     !.
 pengine_reply(Queue, Event0) :-
     arg(1, Event0, ID),
@@ -661,14 +661,14 @@ pengine_parent(Parent) :-
 
 pengine_thread(Pengine, Thread) :-
     current_pengine(Pengine, _Parent, Thread, _URL, _Application, _Destroy),
-    Thread \== 0, 
+    Thread \== 0,
     !.
 
 pengine_remote(Pengine, URL) :-
     current_pengine(Pengine, _Parent, 0, URL, _Application, _Destroy).
 
 get_pengine_application(Pengine, Application) :-
-    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy), 
+    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy),
     !.
 
 get_pengine_module(Pengine, Pengine).
@@ -844,7 +844,7 @@ properties are:
 
 pengine_property(Id, Prop) :-
     nonvar(Id), nonvar(Prop),
-    pengine_property2(Id, Prop), 
+    pengine_property2(Id, Prop),
     !.
 pengine_property(Id, Prop) :-
     pengine_property2(Id, Prop).
@@ -1358,7 +1358,7 @@ prepare_goal(ID, Goal0, Module:Goal, Options) :-
 pengine_not_sandboxed(ID) :-
     pengine_user(ID, User),
     pengine_property(ID, application(App)),
-    not_sandboxed(User, App), 
+    not_sandboxed(User, App),
     !.
 
 %%  not_sandboxed(+User, +Application) is semidet.
@@ -1819,7 +1819,7 @@ pengine_destroy_and_wait(_, _, Why) :-
     debug(pengine(rpc), 'Not destroying RPC (~p)', [Why]).
 
 wait_destroy(Id, _) :-
-    \+ child(_, Id), 
+    \+ child(_, Id),
     !.
 wait_destroy(Id, N) :-
     pengine_event(Event, [listen(Id),timeout(10)]),
@@ -1883,7 +1883,7 @@ pengine_rpc_prompt(_ID, Prompt, Term) :-
         prompt(_, Old)).
 
 pengine_rpc_output(ID, Term) :-
-    output(ID, Term), 
+    output(ID, Term),
     !.
 pengine_rpc_output(_ID, Term) :-
     print(Term).
@@ -1961,7 +1961,7 @@ pengine_rpc_output(_ID, Term) :-
 %     limited memory resources.
 
 http_pengine_create(Request) :-
-    reply_options(Request, [post]), 
+    reply_options(Request, [post]),
     !.
 http_pengine_create(Request) :-
     memberchk(content_type(CT), Request),
@@ -2158,7 +2158,7 @@ create_wait_and_output_result(Pengine, Queue, Format,
     ;   output_result(Format, error(Pengine,
                                     error(time_limit_exceeded, _))),
         pengine_abort(Pengine)
-    ), 
+    ),
     !.
 create_wait_and_output_result(Pengine, Queue, Format,
                               TimeLimit, VarNames, _Dict) :-
@@ -2196,7 +2196,7 @@ is_destroy_event(create(_, Options)) :-
     is_destroy_event(Event).
 
 destroy_queue_if_empty(Queue) :-
-    thread_peek_message(Queue, _), 
+    thread_peek_message(Queue, _),
     !.
 destroy_queue_if_empty(Queue) :-
     retractall(output_queue(_, Queue, _)),
@@ -2280,7 +2280,7 @@ sync_destroy_queue_from_pengine(ID, Queue) :-
 
 
 http_pengine_send(Request) :-
-    reply_options(Request, [get,post]), 
+    reply_options(Request, [get,post]),
     !.
 http_pengine_send(Request) :-
     http_parameters(Request,
@@ -2369,7 +2369,7 @@ fix_bindings(Format,
 fix_bindings(_, Command, _, -, Command).
 
 template(_, -, Template, Options0, Options) :-
-    select_option(template(Template), Options0, Options), 
+    select_option(template(Template), Options0, Options),
     !.
 template(Bindings, VarNames, Template, Options, Options) :-
     exclude(anon, Bindings, Bindings1),
@@ -2398,7 +2398,7 @@ json_lang(Format) :-
 %   messages from the pengine.
 
 http_pengine_pull_response(Request) :-
-    reply_options(Request, [get]), 
+    reply_options(Request, [get]),
     !.
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
@@ -2422,7 +2422,7 @@ http_pengine_pull_response(Request) :-
 %   wait_and_output_result/4.
 
 http_pengine_abort(Request) :-
-    reply_options(Request, [get]), 
+    reply_options(Request, [get]),
     !.
 http_pengine_abort(Request) :-
     http_parameters(Request,
@@ -2439,7 +2439,7 @@ http_pengine_abort(Request) :-
     ).
 
 http_pengine_destroy_all(Request) :-
-    reply_options(Request, [get]), 
+    reply_options(Request, [get]),
     !.
 http_pengine_destroy_all(Request) :-
     http_parameters(Request,
@@ -2457,7 +2457,7 @@ http_pengine_destroy_all(Request) :-
 %   is the return of thread_statistics/2.
 
 http_pengine_ping(Request) :-
-    reply_options(Request, [get]), 
+    reply_options(Request, [get]),
     !.
 http_pengine_ping(Request) :-
     http_parameters(Request,
@@ -2505,10 +2505,10 @@ output_result(prolog, Event, _, _) :-
                  nl(true)
                ]).
 output_result(Lang, Event, VarNames, Dict) :-
-    write_result(Lang, Event, VarNames, Dict), 
+    write_result(Lang, Event, VarNames, Dict),
     !.
 output_result(Lang, Event, VarNames, _) :-              % deprecated
-    write_result(Lang, Event, VarNames), 
+    write_result(Lang, Event, VarNames),
     !.
 output_result(Lang, Event, VarNames, _) :-
     json_lang(Lang),
@@ -2575,7 +2575,7 @@ disable_client_cache :-
             Expires: 0\r\n').
 
 event_term_to_json_data(Event, JSON, Lang, VarNames) :-
-    event_to_json(Event, JSON, Lang, VarNames), 
+    event_to_json(Event, JSON, Lang, VarNames),
     !.
 event_term_to_json_data(Event, JSON, Lang, -) :-
     !,
@@ -2720,14 +2720,14 @@ allowed(Request, Application) :-
     setting(Application:allow_from, Allow),
     match_peer(Request, Allow),
     setting(Application:deny_from, Deny),
-    \+ match_peer(Request, Deny), 
+    \+ match_peer(Request, Deny),
     !.
 allowed(Request, _Application) :-
     memberchk(request_uri(Here), Request),
     throw(http_reply(forbidden(Here))).
 
 match_peer(_, Allowed) :-
-    memberchk(*, Allowed), 
+    memberchk(*, Allowed),
     !.
 match_peer(_, []) :- !, fail.
 match_peer(Request, Allowed) :-
@@ -2741,7 +2741,7 @@ match_peer(Request, Allowed) :-
 
 match_peer_pattern(Pattern, Peer) :-
     ip_term(Pattern, IP),
-    ip_term(Peer, IP), 
+    ip_term(Peer, IP),
     !.
 
 ip_term(Peer, Pattern) :-
@@ -2906,10 +2906,10 @@ keep_source(Pengine, ID, SrcText) :-
 keep_source(_, _, _).
 
 to_string(String, String) :-
-    string(String), 
+    string(String),
     !.
 to_string(Atom, String) :-
-    atom_string(Atom, String), 
+    atom_string(Atom, String),
     !.
 
 

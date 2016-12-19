@@ -78,17 +78,17 @@ bind_var(Name=Var) :-
     ).
 
 to_json(Term, '_') :-
-    var(Term), 
+    var(Term),
     !.
 to_json(@(Symbol), Symbol) :-                   % compatibility
     atom(Symbol),
-    json_symbol(Symbol), 
+    json_symbol(Symbol),
     !.
 to_json(Term, Term) :-
-    atom(Term), 
+    atom(Term),
     !.                          % interpreted as a string
 to_json(Term, Term) :-
-    string(Term), 
+    string(Term),
     !.
 to_json(Term, Value) :-
     integer(Term),
@@ -98,7 +98,7 @@ to_json(Term, Value) :-
     ;   atom_number(Value, Term)
     ).
 to_json(Term, Term) :-
-    float(Term), 
+    float(Term),
     !.
 to_json(Term, JsonList) :-
     is_list(Term),

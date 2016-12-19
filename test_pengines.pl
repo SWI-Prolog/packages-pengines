@@ -361,7 +361,7 @@ no_more_pengines :-
         sleep(0.01)
     ),
     \+ pengines:current_pengine(_,_,_,_,_,_),
-    \+ pengines:child(_,_), 
+    \+ pengines:child(_,_),
     !.
 
 
