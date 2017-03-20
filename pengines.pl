@@ -1314,6 +1314,8 @@ ask(ID, Goal, Options) :-
 %   disallow this reinterpretation?
 
 prepare_goal(ID, Goal0, Module:Goal, Options) :-
+    option(bindings(Bindings), Options, []),
+    b_setval('$variable_names', Bindings),
     (   prepare_goal(Goal0, Goal1, Options)
     ->  true
     ;   Goal1 = Goal0
@@ -1337,6 +1339,7 @@ prepare_goal(ID, Goal0, Module:Goal, Options) :-
         ;   throw(E)
         )
     ).
+
 
 %%  prepare_goal(+Goal0, -Goal1, +Options) is semidet.
 %
@@ -2365,7 +2368,11 @@ fix_bindings(Format,
     !,
     template(Bindings, VarNames, Template, Options0, Options1),
     select_option(chunk(Paging), Options1, Options2, 1),
-    NewOptions = [template(Template), chunk(Paging) | Options2].
+    NewOptions = [ template(Template),
+                   chunk(Paging),
+                   bindings(Bindings)
+                 | Options2
+                 ].
 fix_bindings(_, Command, _, -, Command).
 
 template(_, -, Template, Options0, Options) :-
