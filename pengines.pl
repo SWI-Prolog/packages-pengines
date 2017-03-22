@@ -2363,11 +2363,12 @@ fix_bindings(Format,
              ask(Goal, NewOptions)) :-
     json_lang(Format),
     !,
-    template(Bindings, Template, Options0, Options1),
+    exclude(anon, Bindings, NamedBindings),
+    template(NamedBindings, Template, Options0, Options1),
     select_option(chunk(Paging), Options1, Options2, 1),
     NewOptions = [ template(Template),
                    chunk(Paging),
-                   bindings(Bindings)
+                   bindings(NamedBindings)
                  | Options2
                  ].
 fix_bindings(_, Command, _, Command).
@@ -2376,8 +2377,7 @@ template(_, Template, Options0, Options) :-
     select_option(template(Template), Options0, Options),
     !.
 template(Bindings, Template, Options, Options) :-
-    exclude(anon, Bindings, Bindings1),
-    dict_create(Template, json, Bindings1).
+    dict_create(Template, json, Bindings).
 
 anon(Name=_) :-
     sub_atom(Name, 0, _, _, '_'),
