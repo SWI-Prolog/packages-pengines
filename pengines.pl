@@ -102,9 +102,8 @@ from Prolog or JavaScript.
     pengine_event_loop(1, +).
 
 :- multifile
-    write_result/3,                 % +Format, +Event, +VarNames (deprecated)
-    write_result/4,                 % +Format, +Event, +VarNames, +Dict
-    event_to_json/4,                % +Event, -JSON, +Format, +VarNames
+    write_result/3,                 % +Format, +Event, +Dict
+    event_to_json/3,                % +Event, -JSON, +Format
     prepare_module/3,               % +Module, +Application, +Options
     prepare_goal/3,                 % +GoalIn, -GoalOut, +Options
     authentication_hook/3,          % +Request, +Application, -User
@@ -119,6 +118,7 @@ from Prolog or JavaScript.
                        ask(compound),
                        template(compound),
                        chunk(integer),
+                       bindings(list),
                        src_list(list),
                        src_text(any),           % text
                        src_url(atom),
@@ -126,7 +126,8 @@ from Prolog or JavaScript.
                      ]).
 :- predicate_options(pengine_ask/3, 3,
                      [ template(any),
-                       chunk(integer)
+                       chunk(integer),
+                       bindings(list)
                      ]).
 :- predicate_options(pengine_next/2, 2,
                      [ chunk(integer),
@@ -427,6 +428,11 @@ Options is a list of options:
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk.
 
+    * bindings(+Bindings)
+      Sets the global variable '$variable_names' to a list of
+      `Name = Var` terms, providing access to the actual variable
+      names.
+
 Any remaining options are passed to pengine_send/3.
 
 Note that the predicate pengine_ask/3 is deterministic, even for queries
@@ -434,10 +440,12 @@ that have more than one solution. Also,  the variables in Query will not
 be bound. Instead, results will  be  returned   in  the  form  of _event
 terms_.
 
-    * success(ID, Terms, More)
+    * success(ID, Terms, Projection, Time, More)
       ID is the id of the pengine that succeeded in solving the query.
-      Terms is a list holding instantiations of `Template`. More is
-      either `true` or `false`, indicating whether we can expect the
+      Terms is a list holding instantiations of `Template`.  Projection
+      is a list of variable names that should be displayed. Time is
+      the CPU time used to produce the results and finally, More
+      is either `true` or `false`, indicating whether we can expect the
       pengine to be able to return more solutions or not, would we call
       pengine_next/2.
 
@@ -473,6 +481,7 @@ pengine_ask(ID, Query, Options) :-
 
 pengine_ask_option(template(_)).
 pengine_ask_option(chunk(_)).
+pengine_ask_option(bindings(_)).
 pengine_ask_option(breakpoints(_)).
 
 
@@ -489,12 +498,8 @@ Remaining  options  are  passed  to    pengine_send/3.   The  result  of
 re-executing the current goal is returned  to the caller's message queue
 in the form of _event terms_.
 
-    * success(ID, Terms, More)
-      ID is the id of the pengine that succeeded in finding yet another
-      solution to the query. Terms is a list holding instantiations of
-      `Template`. More is either `true` or `false`, indicating whether
-      we can expect the pengine to be able to return more solutions or
-      not, would we call pengine_next/2.
+    * success(ID, Terms, Projection, Time, More)
+      See pengine_ask/3.
 
     * failure(ID)
       ID is the id of the pengine that failed for lack of more solutions.
@@ -996,6 +1001,7 @@ pengine_create_option(application(_)).
 pengine_create_option(destroy(_)).
 pengine_create_option(ask(_)).
 pengine_create_option(template(_)).
+pengine_create_option(bindings(_)).
 pengine_create_option(chunk(_)).
 pengine_create_option(alias(_)).
 pengine_create_option(user(_)).
@@ -1052,7 +1058,12 @@ pengine_create_and_loop(Self, Application, Options) :-
     ->  asserta(wrap_first_answer_in_create_event(CreateEvent, Extra)),
         option(template(Template), Options, Query),
         option(chunk(Chunk), Options, 1),
-        pengine_ask(Self, Query, [template(Template), chunk(Chunk)])
+        option(bindings(Bindings), Options, []),
+        pengine_ask(Self, Query,
+                    [ template(Template),
+                      chunk(Chunk),
+                      bindings(Bindings)
+                    ])
     ;   Extra = [],
         pengine_reply(CreateEvent)
     ),
@@ -1196,11 +1207,14 @@ solve(Chunk, Template, Goal, ID) :-
         statistics(cputime, T1),
         CPUTime is T1-T0,
         (   var(Error)
-        ->  (   var(Det)
-            ->  pengine_reply(success(ID, Result, CPUTime, true)),
+        ->  projection(Projection),
+            (   var(Det)
+            ->  pengine_reply(success(ID, Result, Projection,
+                                      CPUTime, true)),
                 more_solutions(ID, Choice, State, Time)
             ;   !,                      % commit
-                destroy_or_continue(success(ID, Result, CPUTime, false))
+                destroy_or_continue(success(ID, Result, Projection,
+                                            CPUTime, false))
             )
         ;   !,                          % commit
             (   Error == abort_query
@@ -1215,6 +1229,13 @@ solve(Chunk, Template, Goal, ID) :-
         destroy_or_continue(failure(ID, CPUTime))
     ).
 solve(_, _, _, _).                      % leave a choice point
+
+projection(Projection) :-
+    nb_current('$variable_names', Bindings),
+    !,
+    maplist(var_name, Bindings, Projection).
+projection([]).
+
 
 findnsols_no_empty(N, Template, Goal, List) :-
     findnsols(N, Template, Goal, List),
@@ -1738,7 +1759,7 @@ pengine_process_event(debug(ID, Msg), Closure, true, _Options) :-
 pengine_process_event(prompt(ID, Term), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 5', [ID, prompt(Term)]),
     ignore(call(Closure, prompt(ID, Term))).
-pengine_process_event(success(ID, Sol, _Time, More), Closure, true, _Options) :-
+pengine_process_event(success(ID, Sol, _Proj, _Time, More), Closure, true, _) :-
     debug(pengine(transition), '~q: 3 = /~q => 6/2', [ID, success(Sol, More)]),
     ignore(call(Closure, success(ID, Sol, More))).
 pengine_process_event(failure(ID, _Time), Closure, true, _Options) :-
@@ -1860,10 +1881,12 @@ process_event(debug(ID, Message), Template, State, Options) :-
     debug(pengine(debug), '~w', [Message]),
     pengine_pull_response(ID, Options),
     wait_event(Template, State, Options).
-process_event(success(_ID, Solutions, _Time, false), Template, _, _Options) :-
+process_event(success(_ID, Solutions, _Proj, _Time, false),
+              Template, _, _Options) :-
     !,
     member(Template, Solutions).
-process_event(success(ID, Solutions, _Time, true), Template, State, Options) :-
+process_event(success(ID, Solutions, _Proj, _Time, true),
+              Template, State, Options) :-
     (   member(Template, Solutions)
     ;   pengine_next(ID, Options),
         wait_event(Template, State, Options)
@@ -2020,7 +2043,7 @@ http_pengine_create(Request, Application, Format, Dict) :-
     !,
     allowed(Request, Application),
     authenticate(Request, Application, UserOptions),
-    dict_to_options(Dict, Application, CreateOptions0, VarNames),
+    dict_to_options(Dict, Application, CreateOptions0),
     append(UserOptions, CreateOptions0, CreateOptions),
     pengine_uuid(Pengine),
     message_queue_create(Queue, [max_size(25)]),
@@ -2030,7 +2053,7 @@ http_pengine_create(Request, Application, Format, Dict) :-
     broadcast(pengine(create(Pengine, Application, CreateOptions))),
     create(Queue, Pengine, CreateOptions, http, Application),
     create_wait_and_output_result(Pengine, Queue, Format,
-                                  TimeLimit, VarNames, Dict),
+                                  TimeLimit, Dict),
     gc_abandoned_queues.
 http_pengine_create(_Request, Application, Format, _Dict) :-
     Error = existence_error(pengine_application, Application),
@@ -2038,36 +2061,33 @@ http_pengine_create(_Request, Application, Format, _Dict) :-
     output_result(Format, error(ID, error(Error, _))).
 
 
-dict_to_options(Dict, Application, CreateOptions, VarNames) :-
+dict_to_options(Dict, Application, CreateOptions) :-
     dict_pairs(Dict, _, Pairs),
-    pairs_create_options(Pairs, Application, CreateOptions, VarNames).
+    pairs_create_options(Pairs, Application, CreateOptions).
 
-pairs_create_options([], _, [], _) :- !.
-pairs_create_options(T0, App, [AskOpt, TemplateOpt|T], VarNames) :-
+pairs_create_options([], _, []) :- !.
+pairs_create_options(T0, App, CreateOpts) :-
     selectchk(ask-Ask, T0, T1),
     selectchk(template-Template, T1, T2),
     !,
+    CreateOpts = [ ask(Ask1), template(Template1), bindings(Bindings) | T ],
     format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
     term_string(t(Ask1,Template1), AskTemplate,
                 [ variable_names(Bindings),
                   module(App)
                 ]),
-    template_varnames(Template1, Bindings, VarNames),
-    AskOpt = ask(Ask1),
-    TemplateOpt = template(Template1),
-    pairs_create_options(T2, App, T, VarNames).
+    pairs_create_options(T2, App, T).
 pairs_create_options([ask-String|T0], App,
-                     [ask(Ask),template(Template)|T], VarNames) :-
+                     [ask(Ask),template(Template),bindings(Bindings1)|T]) :-
     !,
     term_string(Ask, String,
                 [ variable_names(Bindings),
                   module(App)
                 ]),
     exclude(anon, Bindings, Bindings1),
-    maplist(var_name, Bindings1, VarNames),
     dict_create(Template, json, Bindings1),
-    pairs_create_options(T0, App, T, VarNames).
-pairs_create_options([N-V0|T0], App, [Opt|T], VarNames) :-
+    pairs_create_options(T0, App, T).
+pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), N \== user,
     !,
@@ -2080,31 +2100,13 @@ pairs_create_options([N-V0|T0], App, [Opt|T], VarNames) :-
         )
     ;   V = V0
     ),
-    pairs_create_options(T0, App, T, VarNames).
-pairs_create_options([_|T0], App, T, VarNames) :-
-    pairs_create_options(T0, App, T, VarNames).
-
-
-%!  template_varnames(+Template, +Bindings, -VarNames)
-%
-%   Compute the variable names for the template.
-
-template_varnames(Template1, Bindings, VarNames) :-
-    term_variables(Template1, TemplateVars),
-    filter_template_varnames(TemplateVars, Bindings, VarNames).
-
-filter_template_varnames([], _, []).
-filter_template_varnames([H|T0], Bindings, [Name|T]) :-
-    member(Name=Var, Bindings),
-    Var == H,
-    !,
-    filter_template_varnames(T0, Bindings, T).
+    pairs_create_options(T0, App, T).
+pairs_create_options([_|T0], App, T) :-
+    pairs_create_options(T0, App, T).
 
 
 %!  wait_and_output_result(+Pengine, +Queue,
 %!                         +Format, +TimeLimit) is det.
-%!  wait_and_output_result(+Pengine, +Queue,
-%!                         +Format, +TimeLimit, +VarNames) is det.
 %
 %   Wait for the Pengine's Queue and if  there is a message, send it
 %   to the requester using  output_result/1.   If  Pengine  does not
@@ -2113,9 +2115,6 @@ filter_template_varnames([H|T0], Bindings, [Name|T]) :-
 %   _).
 
 wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
-    wait_and_output_result(Pengine, Queue, Format, TimeLimit, -).
-
-wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
     (   catch(thread_get_message(Queue, pengine_event(_, Event),
                                  [ timeout(TimeLimit)
                                  ]),
@@ -2123,7 +2122,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
             ignore(destroy_queue_from_http(Pengine, Event, Queue)),
-            output_result(Format, Event, VarNames)
+            output_result(Format, Event)
         ;   output_result(Format, died(Pengine))
         )
     ;   output_result(Format, error(Pengine,
@@ -2132,14 +2131,13 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames) :-
     ).
 
 %!  create_wait_and_output_result(+Pengine, +Queue, +Format,
-%!                                +TimeLimit, +VarNames, +Dict) is det.
+%!                                +TimeLimit, +Dict) is det.
 %
 %   Intercepts  the  `solutions=all'  case    used  for  downloading
 %   results. Dict may contain a  `disposition`   key  to  denote the
 %   download location.
 
-create_wait_and_output_result(Pengine, Queue, Format,
-                              TimeLimit, VarNames, Dict) :-
+create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
     get_dict(solutions, Dict, all),
     !,
     between(1, infinite, Page),
@@ -2150,10 +2148,10 @@ create_wait_and_output_result(Pengine, Queue, Format,
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Page ~D: got ~q from ~q', [Page, Event, Queue]),
             (   destroy_queue_from_http(Pengine, Event, Queue)
-            ->  output_result(Format, page(Page, Event), VarNames)
+            ->  output_result(Format, page(Page, Event))
             ;   pengine_thread(Pengine, Thread),
                 thread_send_message(Thread, pengine_request(next)),
-                output_result(Format, page(Page, Event), VarNames, Dict),
+                output_result(Format, page(Page, Event), Dict),
                 fail
             )
         ;   output_result(Format, died(Pengine))
@@ -2163,9 +2161,8 @@ create_wait_and_output_result(Pengine, Queue, Format,
         pengine_abort(Pengine)
     ),
     !.
-create_wait_and_output_result(Pengine, Queue, Format,
-                              TimeLimit, VarNames, _Dict) :-
-    wait_and_output_result(Pengine, Queue, Format, TimeLimit, VarNames).
+create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, _Dict) :-
+    wait_and_output_result(Pengine, Queue, Format, TimeLimit).
 
 
 %!  destroy_queue_from_http(+Pengine, +Event, +Queue) is semidet.
@@ -2294,7 +2291,7 @@ http_pengine_send(Request) :-
     get_pengine_module(ID, Module),
     (   current_module(Module)          % avoid re-creating the module
     ->  catch(( read_event(Request, EventString, Module, Event0, Bindings),
-                fix_bindings(Format, Event0, Bindings, VarNames, Event1)
+                fix_bindings(Format, Event0, Bindings, Event1)
               ),
               Error,
               true),
@@ -2305,7 +2302,7 @@ http_pengine_send(Request) :-
                 random_delay,
                 broadcast(pengine(send(ID, Event1))),
                 thread_send_message(Thread, pengine_request(Event1)),
-                wait_and_output_result(ID, Queue, Format, TimeLimit, VarNames)
+                wait_and_output_result(ID, Queue, Format, TimeLimit)
             ;   atom(ID)
             ->  pengine_died(Format, ID)
             ;   http_404([], Request)
@@ -2355,32 +2352,31 @@ discard_post_data(Request) :-
         close(NULL)).
 discard_post_data(_).
 
-%!  fix_bindings(+Format, +EventIn, +Bindings, -VarNames, -Event) is det.
+%!  fix_bindings(+Format, +EventIn, +Bindings, -Event) is det.
 %
 %   Generate the template for json(-s) Format  from the variables in
 %   the asked Goal. Variables starting  with an underscore, followed
 %   by an capital letter are ignored from the template.
 
 fix_bindings(Format,
-             ask(Goal, Options0), Bindings, VarNames,
+             ask(Goal, Options0), Bindings,
              ask(Goal, NewOptions)) :-
     json_lang(Format),
     !,
-    template(Bindings, VarNames, Template, Options0, Options1),
+    template(Bindings, Template, Options0, Options1),
     select_option(chunk(Paging), Options1, Options2, 1),
     NewOptions = [ template(Template),
                    chunk(Paging),
                    bindings(Bindings)
                  | Options2
                  ].
-fix_bindings(_, Command, _, -, Command).
+fix_bindings(_, Command, _, Command).
 
-template(_, -, Template, Options0, Options) :-
+template(_, Template, Options0, Options) :-
     select_option(template(Template), Options0, Options),
     !.
-template(Bindings, VarNames, Template, Options, Options) :-
+template(Bindings, Template, Options, Options) :-
     exclude(anon, Bindings, Bindings1),
-    maplist(var_name, Bindings1, VarNames),
     dict_create(Template, json, Bindings1).
 
 anon(Name=_) :-
@@ -2479,8 +2475,7 @@ http_pengine_ping(Request) :-
 
 
 %!  output_result(+Format, +EventTerm) is det.
-%!  output_result(+Format, +EventTerm, +VarNames) is det.
-%!  output_result(+Format, +EventTerm, +VarNames, +OptionsDict) is det.
+%!  output_result(+Format, +EventTerm, +OptionsDict) is det.
 %
 %   Formulate an HTTP response from a pengine event term. Format is
 %   one of =prolog=, =json= or =json-s=.
@@ -2489,18 +2484,16 @@ http_pengine_ping(Request) :-
     pengine_replying/2.             % +Pengine, +Thread
 
 output_result(Format, Event) :-
-    output_result(Format, Event, -).
-output_result(Format, Event, VarNames) :-
     arg(1, Event, Pengine),
     thread_self(Thread),
     setup_call_cleanup(
         asserta(pengine_replying(Pengine, Thread), Ref),
-        catch(output_result(Format, Event, VarNames, _{}),
+        catch(output_result(Format, Event, _{}),
               pengine_abort_output,
               true),
         erase(Ref)).
 
-output_result(prolog, Event, _, _) :-
+output_result(prolog, Event, _) :-
     !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
     write_term(Event,
@@ -2511,22 +2504,19 @@ output_result(prolog, Event, _, _) :-
                  portray_goal(portray_blob),
                  nl(true)
                ]).
-output_result(Lang, Event, VarNames, Dict) :-
-    write_result(Lang, Event, VarNames, Dict),
+output_result(Lang, Event, Dict) :-
+    write_result(Lang, Event, Dict),
     !.
-output_result(Lang, Event, VarNames, _) :-              % deprecated
-    write_result(Lang, Event, VarNames),
-    !.
-output_result(Lang, Event, VarNames, _) :-
+output_result(Lang, Event, _) :-
     json_lang(Lang),
     !,
-    (   event_term_to_json_data(Event, JSON, Lang, VarNames)
+    (   event_term_to_json_data(Event, JSON, Lang)
     ->  cors_enable,
         disable_client_cache,
         reply_json(JSON)
     ;   assertion(event_term_to_json_data(Event, _, Lang))
     ).
-output_result(Lang, _Event, _, _) :-    % FIXME: allow for non-JSON format
+output_result(Lang, _Event, _) :-    % FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
 
 %!  portray_blob(+Blob, +Options) is det.
@@ -2556,17 +2546,11 @@ abort_output_thread(Thread) :-
           error(existence_error(thread, _), _),
           true).
 
-%!  write_result(+Lang, +Event, +VarNames) is semidet.
-%
-%   Called after write_result/4 for backward compatibility reasons.
-%
-%   @deprecated Use write_result/4.
-
-%!  write_result(+Lang, +Event, +VarNames, +Dict) is semidet.
+%!  write_result(+Lang, +Event, +Dict) is semidet.
 %
 %   Hook that allows for different output formats. The core Pengines
 %   library supports `prolog` and various   JSON  dialects. The hook
-%   event_to_json/4 can be used to refine   the  JSON dialects. This
+%   event_to_json/3 can be used to refine   the  JSON dialects. This
 %   hook must be used if  a   completely  different output format is
 %   desired.
 
@@ -2581,40 +2565,20 @@ disable_client_cache :-
             Pragma: no-cache\r\n\c
             Expires: 0\r\n').
 
-event_term_to_json_data(Event, JSON, Lang, VarNames) :-
-    event_to_json(Event, JSON, Lang, VarNames),
+event_term_to_json_data(Event, JSON, Lang) :-
+    event_to_json(Event, JSON, Lang),
     !.
-event_term_to_json_data(Event, JSON, Lang, -) :-
-    !,
-    event_term_to_json_data(Event, JSON, Lang).
-event_term_to_json_data(success(ID, Bindings0, Time, More),
+event_term_to_json_data(success(ID, Bindings0, Projection, Time, More),
                         json{event:success, id:ID, time:Time,
-                             data:Bindings, more:More, projection:VarNames},
-                        json, VarNames) :-
+                             data:Bindings, more:More, projection:Projection},
+                        json) :-
     !,
     term_to_json(Bindings0, Bindings).
 event_term_to_json_data(destroy(ID, Event),
                         json{event:destroy, id:ID, data:JSON},
-                        Style, VarNames) :-
+                        Style) :-
     !,
-    event_term_to_json_data(Event, JSON, Style, VarNames).
-event_term_to_json_data(create(ID, Features0), JSON, Style, VarNames) :-
-    !,
-    (   select(answer(First0), Features0, Features1)
-    ->  event_term_to_json_data(First0, First, Style, VarNames),
-        Features = [answer(First)|Features1]
-    ;   Features = Features0
-    ),
-    dict_create(JSON, json, [event(create), id(ID)|Features]).
-event_term_to_json_data(Event, JSON, Lang, _) :-
-    event_term_to_json_data(Event, JSON, Lang).
-
-event_term_to_json_data(success(ID, Bindings0, Time, More),
-                        json{event:success, id:ID, time:Time,
-                             data:Bindings, more:More},
-                        json) :-
-    !,
-    term_to_json(Bindings0, Bindings).
+    event_term_to_json_data(Event, JSON, Style).
 event_term_to_json_data(create(ID, Features0), JSON, Style) :-
     !,
     (   select(answer(First0), Features0, Features1)
@@ -2626,7 +2590,7 @@ event_term_to_json_data(create(ID, Features0), JSON, Style) :-
 event_term_to_json_data(destroy(ID, Event),
                         json{event:destroy, id:ID, data:JSON}, Style) :-
     !,
-    event_term_to_json_data(Event, JSON, Style, -).
+    event_term_to_json_data(Event, JSON, Style).
 event_term_to_json_data(error(ID, ErrorTerm), Error, _Style) :-
     !,
     Error0 = json{event:error, id:ID, data:Message},
@@ -2704,12 +2668,11 @@ add_error_location(_, Term, Term).
 
 %!  event_to_json(+Event, -JSONTerm, +Lang) is semidet.
 %
-%   Hook that translates a Pengine event structure into a term
-%   suitable   for   reply_json/1,   according   to   the   language
-%   specification Lang. This can be used   to massage general Prolog
-%   terms, notably associated with   `success(ID,  Bindings0, More)`
-%   and `output(ID, Term)` into a format  suitable for processing at
-%   the client side.
+%   Hook that translates a Pengine event  structure into a term suitable
+%   for reply_json/1, according to the language specification Lang. This
+%   can be used to massage general Prolog terms, notably associated with
+%   `success(ID, Bindings, Projection,  Time,   More)`  and  `output(ID,
+%   Term)` into a format suitable for processing at the client side.
 
 %:- multifile pengines:event_to_json/3.
 

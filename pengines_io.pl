@@ -330,7 +330,7 @@ pengine_module(user).
 %           Array of strings representing HTML-ified residual goals.
 
 :- multifile
-    pengines:event_to_json/4.
+    pengines:event_to_json/3.
 
 %!  pengines:event_to_json(+PrologEvent, -JSONEvent, +Format, +VarNames)
 %
@@ -347,17 +347,17 @@ pengine_module(user).
 %       If the message is related to a source location, indicate the
 %       file and line and, if available, the character location.
 
-pengines:event_to_json(success(ID, Answers0, Time, More), JSON,
-                       'json-s', VarNames) :-
+pengines:event_to_json(success(ID, Answers0, Projection, Time, More), JSON,
+                       'json-s') :-
     !,
     JSON0 = json{event:success, id:ID, time:Time, data:Answers, more:More},
     maplist(answer_to_json_strings(ID), Answers0, Answers),
-    add_projection(VarNames, JSON0, JSON).
-pengines:event_to_json(output(ID, Term), JSON, 'json-s', _) :-
+    add_projection(Projection, JSON0, JSON).
+pengines:event_to_json(output(ID, Term), JSON, 'json-s') :-
     !,
     map_output(ID, Term, JSON).
 
-add_projection(-, JSON, JSON) :- !.
+add_projection([], JSON, JSON) :- !.
 add_projection(VarNames, JSON0, JSON0.put(projection, VarNames)).
 
 
@@ -390,13 +390,13 @@ term_string_value(Pengine, N-V, N-A) :-
 %   '$residuals'(List).  Such  a  variable  is    removed  from  the
 %   projection and added to residual goals.
 
-pengines:event_to_json(success(ID, Answers0, Time, More),
-                       JSON, 'json-html', VarNames) :-
+pengines:event_to_json(success(ID, Answers0, Projection, Time, More),
+                       JSON, 'json-html') :-
     !,
     JSON0 = json{event:success, id:ID, time:Time, data:Answers, more:More},
     maplist(map_answer(ID), Answers0, ResVars, Answers),
-    add_projection(VarNames, ResVars, JSON0, JSON).
-pengines:event_to_json(output(ID, Term), JSON, 'json-html', _) :-
+    add_projection(Projection, ResVars, JSON0, JSON).
+pengines:event_to_json(output(ID, Term), JSON, 'json-html') :-
     !,
     map_output(ID, Term, JSON).
 
