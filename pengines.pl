@@ -657,6 +657,10 @@ pengine_unregister(Id) :-
 pengine_unregister_remote(Id) :-
     retractall(current_pengine(Id, _Parent, 0, _, _, _)).
 
+%!  pengine_self(-Id) is det.
+%
+%   True if the current thread is a pengine with Id.
+
 pengine_self(Id) :-
     thread_self(Thread),
     current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy).
