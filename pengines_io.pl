@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2015, VU University Amsterdam
+    Copyright (c)  2014-2017, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,8 @@
             pengine_portray_clause/1,   % +Term
 
             pengine_read/1,             % -Term
+            pengine_read_line_to_string/2, % +Stream, -LineAsString
+            pengine_read_line_to_codes/2, % +Stream, -LineAsCodes
 
             pengine_io_predicate/1,     % ?Head
             pengine_bind_io_to_html/1,  % +Module
@@ -60,6 +62,7 @@
 :- use_module(library(pengines)).
 :- use_module(library(option)).
 :- use_module(library(debug)).
+:- use_module(library(error)).
 :- use_module(library(apply)).
 :- use_module(library(settings)).
 :- use_module(library(listing)).
@@ -262,6 +265,20 @@ message_lines([H|T]) -->
 pengine_read(Term) :-
     prompt(Prompt, Prompt),
     pengine_input(Prompt, Term).
+
+pengine_read_line_to_string(From, String) :-
+    must_be(oneof([current_input,user_input]), From),
+    (   prompt(Prompt, Prompt),
+        Prompt \== ''
+    ->  true
+    ;   Prompt = 'line> '
+    ),
+    pengine_input(_{type: console, prompt:Prompt}, StringNL),
+    string_concat(String, "\n", StringNL).
+
+pengine_read_line_to_codes(From, Codes) :-
+    pengine_read_line_to_string(From, String),
+    string_codes(String, Codes).
 
 
                  /*******************************
@@ -577,6 +594,8 @@ pengine_io_predicate(flush_output).
 pengine_io_predicate(format(_)).
 pengine_io_predicate(format(_,_)).
 pengine_io_predicate(read(_)).
+pengine_io_predicate(read_line_to_string(_,_)).
+pengine_io_predicate(read_line_to_codes(_,_)).
 pengine_io_predicate(write_term(_,_)).
 pengine_io_predicate(write(_)).
 pengine_io_predicate(writeq(_)).
