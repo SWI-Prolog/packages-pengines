@@ -2129,9 +2129,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
             output_result(Format, Event)
         ;   output_result(Format, died(Pengine))
         )
-    ;   output_result(Format, error(Pengine,
-                                    error(time_limit_exceeded, _))),
-        pengine_abort(Pengine)
+    ;   time_limit_exceeded(Pengine, Format)
     ).
 
 %!  create_wait_and_output_result(+Pengine, +Queue, +Format,
@@ -2160,13 +2158,28 @@ create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
             )
         ;   output_result(Format, died(Pengine))
         )
-    ;   output_result(Format, error(Pengine,
-                                    error(time_limit_exceeded, _))),
-        pengine_abort(Pengine)
+    ;   time_limit_exceeded(Pengine, Format)
     ),
     !.
 create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, _Dict) :-
     wait_and_output_result(Pengine, Queue, Format, TimeLimit).
+
+%!  time_limit_exceeded(+Pengine, +Format)
+%
+%   The Pengine did not reply within its time limit. Send a reply to the
+%   client in the requested format and interrupt the Pengine.
+%
+%   @bug Ideally, if the Pengine has `destroy` set to `false`, we should
+%   get the Pengine back to its main   loop.  Unfortunately we only have
+%   normal exceptions that may be  caught   by  the  Pengine and `abort`
+%   which cannot be caught and thus destroys the Pengine.
+
+time_limit_exceeded(Pengine, Format) :-
+    call_cleanup(
+        pengine_destroy(Pengine, [force(true)]),
+        output_result(Format,
+                      destroy(Pengine,
+                              error(Pengine, time_limit_exceeded)))).
 
 
 %!  destroy_queue_from_http(+Pengine, +Event, +Queue) is semidet.
