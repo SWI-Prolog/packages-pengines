@@ -2834,6 +2834,12 @@ pengine_src_text(Src, Module) :-
         close(Stream)),
     keep_source(Self, ID, Src).
 
+system:'#file'(File, _Line) :-
+    prolog_load_context(stream, Stream),
+    set_stream(Stream, file_name(File)),
+    set_stream(Stream, record_position(false)),
+    set_stream(Stream, record_position(true)).
+
 %%   pengine_src_url(+URL, +Module) is det
 %
 %    Asserts the clauses defined in URL in   the private database of the
@@ -2938,6 +2944,7 @@ sandbox:safe_primitive(pengines:pengine_debug(_,_)).
 sandbox:safe_primitive(pengines:pengine_ask(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_pull_response(_,_)).
 sandbox:safe_primitive(pengines:pengine_user(_)).
+sandbox:safe_primitive(system:'#file'(_,_)).
 
 %!  sandbox:safe_meta(+Goal, -Called) is semidet.
 %
