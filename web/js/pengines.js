@@ -662,6 +662,6 @@ Pengine.destroy_all = function(async) {
   }
 };
 
-window.onunload = function() {
+$(window).on("beforeunload", function() {
   Pengine.destroy_all();
-};
+});
