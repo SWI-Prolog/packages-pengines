@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014, VU University Amsterdam
+    Copyright (c)  2017, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -47,6 +47,7 @@
 :- use_module(library(lists)).
 :- use_module(library(debug)).
 :- use_module(library(pengines)).
+:- use_module(library(pengines_sandbox)).
 :- use_module(library(option)).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
