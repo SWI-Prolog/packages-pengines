@@ -13,7 +13,8 @@ CSSDIR=$(DESTDIR)$(PLLIBDIR)/http/web/css
 EXDIR=$(DESTDIR)$(PKGEXDIR)/pengines
 PHANTOMJS=@PHANTOMJS@
 
-LIBPL=		pengines.pl pengines_io.pl term_to_json.pl
+LIBPL=		pengines.pl pengines_io.pl term_to_json.pl \
+		pengines_sandbox.pl
 HTTPPL=		term_html.pl
 JS=		web/js/pengines.js
 CSS=		web/css/plterm.css
