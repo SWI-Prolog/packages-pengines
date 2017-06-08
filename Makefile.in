@@ -60,10 +60,10 @@ uninstall:
 
 
 check::
-		$(PL) -q -f test_pengines.pl -g test_pengines,halt -t 'halt(1)'
-		$(PL) -q -f test_term_html.pl -g test_term_html,halt -t 'halt(1)'
+		$(PL) -q -f test_pengines.pl -g test_pengines -t halt
+		$(PL) -q -f test_term_html.pl -g test_term_html -t halt
 ifneq ($(PHANTOMJS),:)
-		$(PL) -q -f test_js.pl -g test_js,halt -t 'halt(1)'
+		$(PL) -q -f test_js.pl -g test_js -t halt
 endif
 
 
