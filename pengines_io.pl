@@ -124,6 +124,8 @@ for using this module with the following code:
 %   Emit Term as <span class=writeln>Term<br></span>.
 
 pengine_writeln(Term) :-
+    pengine_output,
+    !,
     pengine_module(Module),
     send_html(span(class(writeln),
                    [ \term(Term,
@@ -131,20 +133,30 @@ pengine_writeln(Term) :-
                            ]),
                      br([])
                    ])).
+pengine_writeln(Term) :-
+    writeln(Term).
 
 %!  pengine_nl
 %
 %   Emit a <br/> to the pengine.
 
 pengine_nl :-
+    pengine_output,
+    !,
     send_html(br([])).
+pengine_nl :-
+    nl.
 
 %!  pengine_flush_output
 %
 %   No-op.  Pengines do not use output buffering (maybe they should
 %   though).
 
-pengine_flush_output.
+pengine_flush_output :-
+    pengine_output,
+    !.
+pengine_flush_output :-
+    flush_output.
 
 %!  pengine_write_term(+Term, +Options)
 %
@@ -155,9 +167,13 @@ pengine_flush_output.
 %       Specifies the class of the element.  Default is =write=.
 
 pengine_write_term(Term, Options) :-
+    pengine_output,
+    !,
     option(class(Class), Options, write),
     pengine_module(Module),
     send_html(span(class(Class), \term(Term,[module(Module)|Options]))).
+pengine_write_term(Term, Options) :-
+    write_term(Term, Options).
 
 %!  pengine_write(+Term) is det.
 %!  pengine_writeq(+Term) is det.
@@ -177,8 +193,12 @@ pengine_print(Term) :-
     current_prolog_flag(print_write_options, Options),
     pengine_write_term(Term, Options).
 pengine_write_canonical(Term) :-
+    pengine_output,
+    !,
     with_output_to(string(String), write_canonical(Term)),
     send_html(span(class([write, cononical]), String)).
+pengine_write_canonical(Term) :-
+    write_canonical(Term).
 
 %!  pengine_format(+Format) is det.
 %!  pengine_format(+Format, +Args) is det.
@@ -191,9 +211,13 @@ pengine_write_canonical(Term) :-
 pengine_format(Format) :-
     pengine_format(Format, []).
 pengine_format(Format, Args) :-
+    pengine_output,
+    !,
     format(string(String), Format, Args),
     split_string(String, "\n", "", Lines),
     send_html(\lines(Lines, format)).
+pengine_format(Format, Args) :-
+    format(Format, Args).
 
 
                  /*******************************
@@ -216,9 +240,13 @@ pengine_listing(Spec) :-
     send_html(pre(class(listing), Pre)).
 
 pengine_portray_clause(Term) :-
+    pengine_output,
+    !,
     with_output_to(string(String), portray_clause(Term)),
     split_string(String, "", "\n", [Pre]),
     send_html(pre(class(listing), Pre)).
+pengine_portray_clause(Term) :-
+    portray_clause(Term).
 
 
                  /*******************************
@@ -263,10 +291,16 @@ message_lines([H|T]) -->
                  *******************************/
 
 pengine_read(Term) :-
+    pengine_input,
+    !,
     prompt(Prompt, Prompt),
     pengine_input(Prompt, Term).
+pengine_read(Term) :-
+    read(Term).
 
 pengine_read_line_to_string(From, String) :-
+    pengine_input,
+    !,
     must_be(oneof([current_input,user_input]), From),
     (   prompt(Prompt, Prompt),
         Prompt \== ''
@@ -275,6 +309,8 @@ pengine_read_line_to_string(From, String) :-
     ),
     pengine_input(_{type: console, prompt:Prompt}, StringNL),
     string_concat(String, "\n", StringNL).
+pengine_read_line_to_string(From, String) :-
+    read_line_to_string(From, String).
 
 pengine_read_line_to_codes(From, Codes) :-
     pengine_read_line_to_string(From, String),
@@ -623,11 +659,13 @@ pengine_io_goal_expansion(_, _).
                  *      REBIND PENGINE I/O      *
                  *******************************/
 
-:- if(current_predicate(open_prolog_stream/4)).
 :- public
     stream_write/2,
     stream_read/2,
     stream_close/1.
+
+:- thread_local
+    pengine_io/2.
 
 stream_write(_Stream, Out) :-
     send_html(pre(class(console), Out)).
@@ -654,16 +692,28 @@ pengine_bind_user_streams :-
     set_stream(Err, alias(user_error)),
     set_stream(In,  alias(current_input)),
     set_stream(Out, alias(current_output)),
-    thread_at_exit(close_io(In, Out)).
+    assertz(pengine_io(In, Out)),
+    thread_at_exit(close_io).
 
-close_io(In, Out) :-
+close_io :-
+    retract(pengine_io(In, Out)),
+    !,
     close(In, [force(true)]),
     close(Out, [force(true)]).
-:- else.
+close_io.
 
-pengine_bind_user_streams.
+%!  pengine_output is semidet.
+%!  pengine_input is semidet.
+%
+%   True when output (input) is redirected to a pengine.
 
-:- endif.
+pengine_output :-
+    current_output(Out),
+    pengine_io(_, Out).
+
+pengine_input :-
+    current_input(In),
+    pengine_io(In, _).
 
 
 %!  pengine_bind_io_to_html(+Module)
