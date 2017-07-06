@@ -1901,6 +1901,12 @@ process_event(destroy(ID, Event), Template, State, Options) :-
     nb_setarg(1, State, false),
     debug(pengine(destroy), 'State: ~p~n', [State]),
     process_event(Event, Template, State, Options).
+% compatibility with older versions of the protocol.
+process_event(success(ID, Solutions, Time, More),
+              Template, State, Options) :-
+    process_event(success(ID, Solutions, _Proj, Time, More),
+                  Template, State, Options).
+
 
 pengine_rpc_prompt(ID, Prompt, Term) :-
     prompt(ID, Prompt, Term0),
