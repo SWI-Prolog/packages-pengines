@@ -134,31 +134,35 @@ compound({X}, Options) -->
     html(span(class('pl-curl'), [ '{', \any(X, ArgOptions), '}' ])).
 compound(OpTerm, Options) -->
     { compound_name_arity(OpTerm, Name, 1),
-      op1(Name, Type, Pri, ArgPri, Options),
-      \+ Options.get(ignore_ops) == true,
-      arg_options(Options, ArgOptions)
+      is_op1(Name, Type, Pri, ArgPri, Options),
+      \+ Options.get(ignore_ops) == true
     },
     !,
-    op1(Type, Pri, OpTerm, ArgPri, ArgOptions).
+    op1(Type, Pri, OpTerm, ArgPri, Options).
 compound(OpTerm, Options) -->
     { compound_name_arity(OpTerm, Name, 2),
-      op2(Name, LeftPri, Pri, RightPri, Options),
-      \+ Options.get(ignore_ops) == true,
-      arg_options(Options, ArgOptions)
+      is_op2(Name, LeftPri, Pri, RightPri, Options),
+      \+ Options.get(ignore_ops) == true
     },
     !,
-    op2(Pri, OpTerm, LeftPri, RightPri, ArgOptions).
+    op2(Pri, OpTerm, LeftPri, RightPri, Options).
 compound(Compound, Options) -->
     { compound_name_arity(Compound, Name, Arity),
       quote_atomic(Name, S, Options.put(embrace, never)),
-      arg_options(Options, _{priority:999}, ArgOptions)
+      arg_options(Options, _{priority:999}, ArgOptions),
+      extra_classes(Classes, Options)
     },
-    html(span(class('pl-compound'),
+    html(span(class(['pl-compound'|Classes]),
               [ span(class('pl-functor'), S),
                 '(',
                 \args(0, Arity, Compound, ArgOptions),
                 ')'
               ])).
+
+extra_classes(['pl-level-0'], Options) :-
+    Options.depth == 0,
+    !.
+extra_classes([], _).
 
 %!  arg_options(+Options, -OptionsOut) is det.
 %!  arg_options(+Options, +Extra, -OptionsOut) is det.
@@ -222,11 +226,11 @@ tail(Value, Options) -->
     },
     html(span(class(Class), \any(Value, Options))).
 
-%!  op1(+Name, -Type, -Priority, -ArgPriority, +Options) is semidet.
+%!  is_op1(+Name, -Type, -Priority, -ArgPriority, +Options) is semidet.
 %
 %   True if Name is an operator taking one argument of Type.
 
-op1(Name, Type, Pri, ArgPri, Options) :-
+is_op1(Name, Type, Pri, ArgPri, Options) :-
     operator_module(Module, Options),
     current_op(Pri, OpType, Module:Name),
     argpri(OpType, Type, Pri, ArgPri),
@@ -237,11 +241,11 @@ argpri(fy, prefix,  Pri,  Pri).
 argpri(xf, postfix, Pri0, Pri) :- Pri is Pri0 - 1.
 argpri(yf, postfix, Pri,  Pri).
 
-%!  op2(+Name, -LeftPri, -Pri, -RightPri, +Options) is semidet.
+%!  is_op2(+Name, -LeftPri, -Pri, -RightPri, +Options) is semidet.
 %
 %   True if Name is an operator taking two arguments of Type.
 
-op2(Name, LeftPri, Pri, RightPri, Options) :-
+is_op2(Name, LeftPri, Pri, RightPri, Options) :-
     operator_module(Module, Options),
     current_op(Pri, Type, Module:Name),
     infix_argpri(Type, LeftPri, Pri, RightPri),
@@ -272,22 +276,26 @@ op1(Type, _, Term, ArgPri, Options) -->
 
 op1(prefix, Term, ArgPri, Options) -->
     { Term =.. [Functor,Arg],
-      FuncOptions = Options.put(embrace, never),
-      ArgOptions  = Options.put(priority, ArgPri),
-      quote_atomic(Functor, S, FuncOptions)
+      arg_options(Options, DepthOptions),
+      FuncOptions = DepthOptions.put(embrace, never),
+      ArgOptions  = DepthOptions.put(priority, ArgPri),
+      quote_atomic(Functor, S, FuncOptions),
+      extra_classes(Classes, Options)
     },
-    html(span(class('pl-compound'),
+    html(span(class(['pl-compound'|Classes]),
               [ span(class('pl-prefix'), S),
                 \space(Functor, Arg, FuncOptions, ArgOptions),
                 \any(Arg, ArgOptions)
               ])).
 op1(postfix, Term, ArgPri, Options) -->
     { Term =.. [Functor,Arg],
-      ArgOptions = Options.put(priority, ArgPri),
-      FuncOptions = Options.put(embrace, never),
-      quote_atomic(Functor, S, FuncOptions)
+      arg_options(Options, DepthOptions),
+      ArgOptions = DepthOptions.put(priority, ArgPri),
+      FuncOptions = DepthOptions.put(embrace, never),
+      quote_atomic(Functor, S, FuncOptions),
+      extra_classes(Classes, Options)
     },
-    html(span(class('pl-compound'),
+    html(span(class(['pl-compound'|Classes]),
               [ \any(Arg, ArgOptions),
                 \space(Arg, Functor, ArgOptions, FuncOptions),
                 span(class('pl-postfix'), S)
@@ -304,18 +312,20 @@ op2(_, Term, LeftPri, RightPri, Options) -->
 
 op2(Term, LeftPri, RightPri, Options) -->
     { Term =.. [Functor,Left,Right],
-      LeftOptions  = Options.put(priority, LeftPri),
-      FuncOptions  = Options.put(embrace, never),
-      RightOptions = Options.put(priority, RightPri),
+      arg_options(Options, DepthOptions),
+      LeftOptions  = DepthOptions.put(priority, LeftPri),
+      FuncOptions  = DepthOptions.put(embrace, never),
+      RightOptions = DepthOptions.put(priority, RightPri),
       (   (   need_space(Left, Functor, LeftOptions, FuncOptions)
           ;   need_space(Functor, Right, FuncOptions, RightOptions)
           )
       ->  Space = ' '
       ;   Space = ''
       ),
-      quote_op(Functor, S, Options)
+      quote_op(Functor, S, Options),
+      extra_classes(Classes, Options)
     },
-    html(span(class('pl-compound'),
+    html(span(class(['pl-compound'|Classes]),
               [ \any(Left, LeftOptions),
                 Space,
                 span(class('pl-infix'), S),
@@ -387,7 +397,7 @@ end_code_type(List, Type, _) :-
     Type = punct.
 end_code_type(OpTerm, Type, Options) :-
     compound_name_arity(OpTerm, Name, 1),
-    op1(Name, Type, Pri, ArgPri, Options),
+    is_op1(Name, Type, Pri, ArgPri, Options),
     \+ Options.get(ignore_ops) == true,
     !,
     (   Pri > Options.priority
@@ -401,7 +411,7 @@ end_code_type(OpTerm, Type, Options) :-
     ).
 end_code_type(OpTerm, Type, Options) :-
     compound_name_arity(OpTerm, Name, 2),
-    op2(Name, LeftPri, Pri, _RightPri, Options),
+    is_op2(Name, LeftPri, Pri, _RightPri, Options),
     \+ Options.get(ignore_ops) == true,
     !,
     (   Pri > Options.priority
