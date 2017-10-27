@@ -273,17 +273,26 @@ user:message_hook(Term, Kind, Lines) :-
     ),
     pengine_output(message(Term, Kind, HTMlString, Src)).
 
-message_lines([]) --> [].
+message_lines([]) -->
+    !.
 message_lines([nl|T]) -->
     !,
     html('\n'),                     % we are in a <pre> environment
     message_lines(T).
 message_lines([flush]) -->
-    [].
-message_lines([H|T]) -->
+    !.
+message_lines([ansi(Attributes, Fmt, Args)|T]) -->
     !,
+    { foldl(style, Attributes, Fmt-Args, HTML) },
+    html(HTML),
+    message_lines(T).
+message_lines([H|T]) -->
     html(H),
     message_lines(T).
+
+style(bold, Content, b(Content)).
+style(fg(Color), Content, span(style('color:'+Color), Content)).
+style(_, Content, Content).
 
 
                  /*******************************
