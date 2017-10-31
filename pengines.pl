@@ -4,7 +4,7 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2016, Torbjörn Lager,
+    Copyright (C): 2014-2017, Torbjörn Lager,
                               VU University Amsterdam
     All rights reserved.
 
@@ -612,13 +612,13 @@ pengine_destroy(ID, _) :-
 %     - remote(URL)
 
 :- dynamic
-    current_pengine/6,              % Id, ParentId, Thread, URL, App, Destroy
+    current_pengine/7,              % Id, Pid, ParentId, Thread, URL, App, Destroy
     pengine_queue/4,                % Id, Queue, TimeOut, Time
     output_queue/3,                 % Id, Queue, Time
     pengine_user/2,                 % Id, User
     pengine_data/2.                 % Id, Data
 :- volatile
-    current_pengine/6,
+    current_pengine/7,
     pengine_queue/4,
     output_queue/3,
     pengine_user/2,
@@ -632,11 +632,35 @@ pengine_destroy(ID, _) :-
 %!  pengine_unregister(+Id) is det.
 
 pengine_register_local(Id, Thread, Queue, URL, Application, Destroy) :-
-    asserta(current_pengine(Id, Queue, Thread, URL, Application, Destroy)).
+    alloc_pid(Pid),
+    asserta(current_pengine(Id, Pid, Queue, Thread, URL, Application, Destroy)).
 
 pengine_register_remote(Id, URL, Application, Destroy) :-
     thread_self(Queue),
-    asserta(current_pengine(Id, Queue, 0, URL, Application, Destroy)).
+    alloc_pid(Pid),
+    asserta(current_pengine(Id, Pid, Queue, 0, URL, Application, Destroy)).
+
+alloc_pid(Pid) :-
+    repeat,
+    with_mutex(pengine_pid, next_pid_sync(Pid)),
+    \+ current_pengine(_Id, Pid, _Queue, 0, _URL, _Application, _Destroy),
+    !.
+
+:- dynamic
+    current_pid/1.
+
+next_pid_sync(Pid) :-
+    (   retract(current_pid(Pid0))
+    ->  true
+    ;   Pid0 = 0
+    ),
+    (   Pid0 == 100_000
+    ->  Pid = 1
+    ;   Pid is Pid0+1
+    ),
+    asserta(current_pid(Pid)).
+
+
 
 %!  pengine_unregister(+Id)
 %
@@ -646,16 +670,16 @@ pengine_register_remote(Id, URL, Application, Destroy) :-
 
 pengine_unregister(Id) :-
     thread_self(Me),
-    (   current_pengine(Id, Queue, Me, http, _, _)
+    (   current_pengine(Id, _Pid, Queue, Me, http, _, _)
     ->  with_mutex(pengine, sync_destroy_queue_from_pengine(Id, Queue))
     ;   true
     ),
-    retractall(current_pengine(Id, _, Me, _, _, _)),
+    retractall(current_pengine(Id, _, _, Me, _, _, _)),
     retractall(pengine_user(Id, _)),
     retractall(pengine_data(Id, _)).
 
 pengine_unregister_remote(Id) :-
-    retractall(current_pengine(Id, _Parent, 0, _, _, _)).
+    retractall(current_pengine(Id, _Pid, _Parent, 0, _, _, _)).
 
 %!  pengine_self(-Id) is det.
 %
@@ -663,21 +687,21 @@ pengine_unregister_remote(Id) :-
 
 pengine_self(Id) :-
     thread_self(Thread),
-    current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy).
+    current_pengine(Id, _Pid, _Parent, Thread, _URL, _Application, _Destroy).
 
 pengine_parent(Parent) :-
     nb_getval(pengine_parent, Parent).
 
 pengine_thread(Pengine, Thread) :-
-    current_pengine(Pengine, _Parent, Thread, _URL, _Application, _Destroy),
+    current_pengine(Pengine, _Pid, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0,
     !.
 
 pengine_remote(Pengine, URL) :-
-    current_pengine(Pengine, _Parent, 0, URL, _Application, _Destroy).
+    current_pengine(Pengine, _Pid, _Parent, 0, URL, _Application, _Destroy).
 
 get_pengine_application(Pengine, Application) :-
-    current_pengine(Pengine, _Parent, _, _URL, Application, _Destroy),
+    current_pengine(Pengine, _Pid, _Parent, _, _URL, Application, _Destroy),
     !.
 
 get_pengine_module(Pengine, Pengine).
@@ -828,6 +852,10 @@ properties are:
   - self(ID)
     Identifier of the pengine.  This is the same as the first argument,
     and can be used to enumerate all known pengines.
+  - pid(-Pid)
+    Small unique integer identifier for the Pengine.  Where the Pengine
+    ID is a secret, this ID can be shared, for example to show running
+    pengines and later refer to them.
   - alias(Name)
     Name is the alias name of the pengine, as provided through the
     `alias` option when creating the pengine.
@@ -864,23 +892,25 @@ pengine_property(Id, Prop) :-
     pengine_property2(Id, Prop).
 
 pengine_property2(Id, self(Id)) :-
-    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
+    current_pengine(Id, _Pid, _Parent, _Thread, _URL, _Application, _Destroy).
+pengine_property2(Id, pid(Pid)) :-
+    current_pengine(Id, Pid, _Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(Id, module(Id)) :-
-    current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
+    current_pengine(Id, _Pid, _Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(Id, alias(Alias)) :-
     child(Alias, Id),
     Alias \== Id.
 pengine_property2(Id, thread(Thread)) :-
-    current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy),
+    current_pengine(Id, _Pid, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0.
 pengine_property2(Id, remote(Server)) :-
-    current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
+    current_pengine(Id, _Pid, _Parent, 0, Server, _Application, _Destroy).
 pengine_property2(Id, application(Application)) :-
-    current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
+    current_pengine(Id, _Pid, _Parent, _Thread, _Server, Application, _Destroy).
 pengine_property2(Id, destroy(Destroy)) :-
-    current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
+    current_pengine(Id, _Pid, _Parent, _Thread, _Server, _Application, Destroy).
 pengine_property2(Id, parent(Parent)) :-
-    current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
+    current_pengine(Id, _Pid, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(Id, source(SourceID, Source)) :-
     pengine_data(Id, source(SourceID, Source)).
 pengine_property2(Id, user(User)) :-
