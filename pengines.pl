@@ -336,12 +336,20 @@ send_message(pengine(Pengine), Event, Options) :-
     ).
 
 %!  pengine_request(-Request) is det.
+%!  pengine_request(+State, -Request) is det.
 %
-%   To be used by a  pengine  to   wait  for  the next request. Such
+%   To be used by a  Pengine  to   wait  for  the next request. Such
 %   messages are placed in the queue by pengine_send/2.
 
 pengine_request(Request) :-
     pengine_self(Self),
+    pengine_read_request(Self, Request).
+pengine_request(State, Request) :-
+    pengine_self(Self),
+    pengine_set_state(Self, State),
+    pengine_read_request(Self, Request).
+
+pengine_read_request(Self, Request) :-
     get_pengine_application(Self, Application),
     setting(Application:idle_limit, IdleLimit),
     thread_self(Me),
@@ -616,13 +624,15 @@ pengine_destroy(ID, _) :-
     pengine_queue/4,                % Id, Queue, TimeOut, Time
     output_queue/3,                 % Id, Queue, Time
     pengine_user/2,                 % Id, User
-    pengine_data/2.                 % Id, Data
+    pengine_data/2,                 % Id, Data
+    pengine_state/2.                % Id, State
 :- volatile
     current_pengine/7,
     pengine_queue/4,
     output_queue/3,
     pengine_user/2,
-    pengine_data/2.
+    pengine_data/2,
+    pengine_state/2.
 
 :- thread_local
     child/2.                        % ?Name, ?Child
@@ -676,7 +686,8 @@ pengine_unregister(Id) :-
     ),
     retractall(current_pengine(Id, _, _, Me, _, _, _)),
     retractall(pengine_user(Id, _)),
-    retractall(pengine_data(Id, _)).
+    retractall(pengine_data(Id, _)),
+    retractall(pengine_state(Id, _)).
 
 pengine_unregister_remote(Id) :-
     retractall(current_pengine(Id, _Pid, _Parent, 0, _, _, _)).
@@ -748,6 +759,38 @@ pengine_application(Application) :-
 current_pengine_application(Application) :-
     current_application(Application).
 
+%!  pengine_set_state(+Pengine, +State) is det.
+%
+%   Record the Pengine is in a particular state.
+
+pengine_set_state(Pengine, State) :-
+    must_be(atom, Pengine),
+    pengine_state(Pengine, OldState),
+    (   OldState =@= State
+    ->  true
+    ;   asserta(pengine_state(Pengine, State)),
+        retract(pengine_state(Pengine, OldState))
+    ).
+pengine_set_state(Pengine, State) :-
+    asserta(pengine_state(Pengine, State)).
+
+%!  pengine_get_state(+Pengine, -State) is det.
+%
+%   True if State reflects the state of Pengine
+
+pengine_get_state(Pengine, State) :-
+    pengine_state(Pengine, State0), !,
+    expand_state(State0, Pengine, State).
+pengine_get_state(_, idle).
+
+expand_state(idle, Pengine, State) :- !,
+    current_pengine(Pengine, _Pid, Queue, _Thread, _URL, _App, _Destroy),
+    message_queue_property(Queue, size(Count)),
+    (   Count == 0
+    ->  State = idle
+    ;   State = output
+    ).
+expand_state(State, _, State).
 
 % Default settings for all applications
 
@@ -880,6 +923,35 @@ properties are:
     True when User is the user that created Pengine.  User is set from
     the user(User) option if a Pengine is created through the HTTP api.
     The user is obtained using authentication_hook/3.
+  - state(-State)
+    Pengine is in state State. Intended to provide a _ps_ like facility.
+    Future versions are likely to provide more detailed state
+    information.  Defined states are:
+
+    - input
+      Pengine is waiting for user input.  This can be a read event,
+      tracer interaction, etc.
+    - true(CpuTime)
+      Pengine provided a deterministic answer in CpuTime seconds
+      and is now idle.
+    - more(CpuTime)
+      Pengine provided a non-deterministic answer in CpuTime seconds
+      and waits how to continue.
+    - false(CpuTime)
+      Pengine query failed after using CpuTime.
+    - error(Error)
+      Pengine stopped with exception Error.
+    - output
+      Pengine either sent output using pengine_output/1 or produced
+      and answer that has not yet been read. Future versions may
+      distinguish these two.
+    - running
+      Pengine is computing an answer.
+    - idle
+      Pengine is waiting for a new action and has no pending input
+      or output.
+    - protocol_error
+      Client violated the protocol.
 */
 
 
@@ -915,6 +987,9 @@ pengine_property2(Id, source(SourceID, Source)) :-
     pengine_data(Id, source(SourceID, Source)).
 pengine_property2(Id, user(User)) :-
     pengine_user(Id, User).
+pengine_property2(Id, state(State)) :-
+    current_pengine(Id, _Pid, _Parent, _Thread, _URL, _Application, _Destroy),
+    pengine_get_state(Id, State).
 
 /** pengine_output(+Term) is det
 
@@ -1209,7 +1284,7 @@ pengine_aborted(ID) :-
 %     Solve Goal.
 
 guarded_main_loop(ID) :-
-    pengine_request(Request),
+    pengine_request(idle, Request),
     (   Request = destroy
     ->  debug(pengine(transition), '~q: 2 = ~q => 1', [ID, destroy]),
         pengine_terminate(ID)
@@ -1241,7 +1316,8 @@ solve(Chunk, Template, Goal, ID) :-
     State = count(Chunk),
     statistics(cputime, Epoch),
     Time = time(Epoch),
-    (   call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
+    (   pengine_set_state(ID, running),
+        call_cleanup(catch(findnsols_no_empty(State, Template, Goal, Result),
                            Error, true),
                      Det = true),
         arg(1, Time, T0),
@@ -1250,14 +1326,17 @@ solve(Chunk, Template, Goal, ID) :-
         (   var(Error)
         ->  projection(Projection),
             (   var(Det)
-            ->  pengine_reply(success(ID, Result, Projection,
+            ->  pengine_set_state(ID, more(CPUTime)),
+                pengine_reply(success(ID, Result, Projection,
                                       CPUTime, true)),
                 more_solutions(ID, Choice, State, Time)
             ;   !,                      % commit
+                pengine_set_state(ID, true(CPUTime)),
                 destroy_or_continue(success(ID, Result, Projection,
                                             CPUTime, false))
             )
         ;   !,                          % commit
+            pengine_set_state(ID, error(Error)),
             (   Error == abort_query
             ->  throw(Error)
             ;   destroy_or_continue(error(ID, Error))
@@ -1267,6 +1346,7 @@ solve(Chunk, Template, Goal, ID) :-
         arg(1, Time, T0),
         statistics(cputime, T1),
         CPUTime is T1-T0,
+        pengine_set_state(ID, false(CPUTime)),
         destroy_or_continue(failure(ID, CPUTime))
     ).
 solve(_, _, _, _).                      % leave a choice point
@@ -1317,12 +1397,14 @@ more_solutions(ID, Choice, State, Time) :-
 more_solutions(stop, ID, _Choice, _State, _Time) :-
     !,
     debug(pengine(transition), '~q: 6 = ~q => 7', [ID, stop]),
+    pengine_set_state(ID, stop),
     destroy_or_continue(stop(ID)).
 more_solutions(next, ID, _Choice, _State, Time) :-
     !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next]),
     statistics(cputime, T0),
     nb_setarg(1, Time, T0),
+    pengine_set_state(ID, running),
     fail.
 more_solutions(next(Count), ID, _Choice, State, Time) :-
     Count > 0,
@@ -1331,6 +1413,7 @@ more_solutions(next(Count), ID, _Choice, State, Time) :-
     nb_setarg(1, State, Count),
     statistics(cputime, T0),
     nb_setarg(1, Time, T0),
+    pengine_set_state(ID, running),
     fail.
 more_solutions(ask(Goal, Options), ID, Choice, _State, _Time) :-
     !,
@@ -1340,10 +1423,12 @@ more_solutions(ask(Goal, Options), ID, Choice, _State, _Time) :-
 more_solutions(destroy, ID, _Choice, _State, _Time) :-
     !,
     debug(pengine(transition), '~q: 6 = ~q => 1', [ID, destroy]),
+    pengine_set_state(ID, destroy),
     pengine_terminate(ID).
 more_solutions(Event, ID, Choice, State, Time) :-
     debug(pengine(transition), '~q: 6 = ~q => 6', [ID, protocol_error(Event)]),
     pengine_reply(error(ID, error(protocol_error, _))),
+    pengine_set_state(ID, protocol_error),
     more_solutions(ID, Choice, State, Time).
 
 %!  ask(+Pengine, :Goal, +Options)
@@ -1359,7 +1444,8 @@ ask(ID, Goal, Options) :-
     ->  option(template(Template), Options, Goal),
         option(chunk(N), Options, 1),
         solve(N, Template, Goal1, ID)
-    ;   pengine_reply(error(ID, Error)),
+    ;   pengine_set_state(ID, error(Error)),
+        pengine_reply(error(ID, Error)),
         guarded_main_loop(ID)
     ).
 
@@ -1463,7 +1549,7 @@ pengine_input(Prompt, Term) :-
     pengine_self(Self),
     pengine_parent(Parent),
     pengine_reply(Parent, prompt(Self, Prompt)),
-    pengine_request(Request),
+    pengine_request(input, Request),
     (   Request = input(Input)
     ->  Term = Input
     ;   Request == destroy
