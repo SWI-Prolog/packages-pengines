@@ -177,32 +177,32 @@ do_random_delay :-
 
     Creates a new pengine. Valid options are:
 
-    * id(-ID)
+    - id(-ID)
       ID gets instantiated to the id of the created pengine.  ID is
       atomic.
 
-    * alias(+Name)
+    - alias(+Name)
       The pengine is named Name (an atom). A slave pengine (child) can
       subsequently be referred to by this name.
 
-    * application(+Application)
+    - application(+Application)
       Application in which the pengine runs.  See pengine_application/1.
 
-    * server(+URL)
+    - server(+URL)
       The pengine will run in (and in the Prolog context of) the pengine
       server located at URL.
 
-    * src_list(+List_of_clauses)
+    - src_list(+List_of_clauses)
       Inject a list of Prolog clauses into the pengine.
 
-    * src_text(+Atom_or_string)
+    - src_text(+Atom_or_string)
       Inject the clauses specified by a source text into the pengine.
 
-    * src_url(+URL)
+    - src_url(+URL)
       Inject the clauses specified in the file located at URL into the
       pengine.
 
-    * src_predicates(+List)
+    - src_predicates(+List)
       Send the local predicates denoted by List to the remote pengine.
       List is a list of predicate indicators.
 
@@ -214,13 +214,13 @@ pass the detached or alias options..
 Successful creation of a pengine will return an _event term_ of the
 following form:
 
-    * create(ID, Term)
+    - create(ID, Term)
       ID is the id of the pengine that was created.
       Term is not used at the moment.
 
 An error will be returned if the pengine could not be created:
 
-    * error(ID, Term)
+    - error(ID, Term)
       ID is invalid, since no pengine was created.
       Term is the exception's error term.
 */
@@ -292,7 +292,7 @@ pengine_send(Target, Event) :-
 Succeeds immediately and  places  Term  in   the  queue  of  the pengine
 NameOrID. Options is a list of options:
 
-   * delay(+Time)
+   - delay(+Time)
      The actual sending is delayed by Time seconds. Time is an integer
      or a float.
 
@@ -418,17 +418,17 @@ Asks pengine NameOrID a query Query.
 
 Options is a list of options:
 
-    * template(+Template)
+    - template(+Template)
       Template is a variable (or a term containing variables) shared
       with the query. By default, the template is identical to the
       query.
 
-    * chunk(+Integer)
+    - chunk(+Integer)
       Retrieve solutions in chunks of Integer rather than one by one. 1
       means no chunking (default). Other integers indicate the maximum
       number of solutions to retrieve in one chunk.
 
-    * bindings(+Bindings)
+    - bindings(+Bindings)
       Sets the global variable '$variable_names' to a list of
       `Name = Var` terms, providing access to the actual variable
       names.
@@ -440,7 +440,7 @@ that have more than one solution. Also,  the variables in Query will not
 be bound. Instead, results will  be  returned   in  the  form  of _event
 terms_.
 
-    * success(ID, Terms, Projection, Time, More)
+    - success(ID, Terms, Projection, Time, More)
       ID is the id of the pengine that succeeded in solving the query.
       Terms is a list holding instantiations of `Template`.  Projection
       is a list of variable names that should be displayed. Time is
@@ -449,19 +449,19 @@ terms_.
       pengine to be able to return more solutions or not, would we call
       pengine_next/2.
 
-    * failure(ID)
+    - failure(ID)
       ID is the id of the pengine that failed for lack of a solutions.
 
-    * error(ID, Term)
+    - error(ID, Term)
       ID is the id of the pengine throwing the exception.
       Term is the exception's error term.
 
-    * output(ID, Term)
+    - output(ID, Term)
       ID is the id of a pengine running the query that called
       pengine_output/1. Term is the term that was passed in the first
       argument of pengine_output/1 when it was called.
 
-    * prompt(ID, Term)
+    - prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/2 and Term is
       the prompt.
 
@@ -490,7 +490,7 @@ pengine_ask_option(breakpoints(_)).
 Asks pengine NameOrID for the  next  solution   to  a  query  started by
 pengine_ask/3. Defined options are:
 
-    * chunk(+Count)
+    - chunk(+Count)
     Modify the chunk-size to Count before asking the next set of
     solutions.
 
@@ -498,22 +498,22 @@ Remaining  options  are  passed  to    pengine_send/3.   The  result  of
 re-executing the current goal is returned  to the caller's message queue
 in the form of _event terms_.
 
-    * success(ID, Terms, Projection, Time, More)
+    - success(ID, Terms, Projection, Time, More)
       See pengine_ask/3.
 
-    * failure(ID)
+    - failure(ID)
       ID is the id of the pengine that failed for lack of more solutions.
 
-    * error(ID, Term)
+    - error(ID, Term)
       ID is the id of the pengine throwing the exception.
       Term is the exception's error term.
 
-    * output(ID, Term)
+    - output(ID, Term)
       ID is the id of a pengine running the query that called
       pengine_output/1. Term is the term that was passed in the first
       argument of pengine_output/1 when it was called.
 
-    * prompt(ID, Term)
+    - prompt(ID, Term)
       ID is the id of the pengine that called pengine_input/2 and Term
       is the prompt.
 
@@ -825,29 +825,33 @@ True when Property is a property of   the  given Pengine. Enumerates all
 pengines  that  are  known  to  the   calling  Prolog  process.  Defined
 properties are:
 
-  * self(ID)
+  - self(ID)
     Identifier of the pengine.  This is the same as the first argument,
     and can be used to enumerate all known pengines.
-  * alias(Name)
+  - alias(Name)
     Name is the alias name of the pengine, as provided through the
     `alias` option when creating the pengine.
-  * thread(Thread)
+  - thread(Thread)
     If the pengine is a local pengine, Thread is the Prolog thread
     identifier of the pengine.
-  * remote(Server)
+  - remote(Server)
     If the pengine is remote, the URL of the server.
-  * application(Application)
+  - application(Application)
     Pengine runs the given application
-  * module(Module)
+  - module(Module)
     Temporary module used for running the Pengine.
-  * destroy(Destroy)
+  - destroy(Destroy)
     Destroy is =true= if the pengines is destroyed automatically
     after completing the query.
-  * parent(Queue)
+  - parent(Queue)
     Message queue to which the (local) pengine reports.
-  * source(?SourceID, ?Source)
+  - source(?SourceID, ?Source)
     Source is the source code with the given SourceID. May be present if
     the setting `debug_info` is present.
+  - user(?User)
+    True when User is the user that created Pengine.  User is set from
+    the user(User) option if a Pengine is created through the HTTP api.
+    The user is obtained using authentication_hook/3.
 */
 
 
@@ -879,6 +883,8 @@ pengine_property2(Id, parent(Parent)) :-
     current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(Id, source(SourceID, Source)) :-
     pengine_data(Id, source(SourceID, Source)).
+pengine_property2(Id, user(User)) :-
+    pengine_user(Id, User).
 
 /** pengine_output(+Term) is det
 
@@ -1263,14 +1269,14 @@ destroy_or_continue(Event) :-
 %   Called after a solution was found while  there can be more. This
 %   is state `6' of the state machine. It processes these events:
 %
-%     * stop
+%     - stop
 %     Go back via state `7' to state `2' (guarded_main_loop/1)
-%     * next
+%     - next
 %     Fail.  This causes solve/3 to backtrack on the goal asked,
 %     providing at most the current `chunk` solutions.
-%     * next(Count)
+%     - next(Count)
 %     As `next`, but sets the new chunk-size to Count.
-%     * ask(Goal, Options)
+%     - ask(Goal, Options)
 %     Ask another goal.  Note that we must commit the choice point
 %     of the previous goal asked for.
 
@@ -1661,11 +1667,11 @@ queue.
 
    Valid options are:
 
-   * timeout(+Time)
+   - timeout(+Time)
      Time is a float or integer and specifies the maximum time to wait
      in seconds. If no event has arrived before the time is up EventTerm
      is bound to the atom =timeout=.
-   * listen(+Id)
+   - listen(+Id)
      Only listen to events from the pengine identified by Id.
 */
 
@@ -1705,19 +1711,19 @@ or thread. For each such  event   E,  calls  ignore(call(Closure, E)). A
 closure thus acts as a _handler_  for   the  event. Some events are also
 treated specially:
 
-   * create(ID, Term)
+   - create(ID, Term)
      The ID is placed in a list of active pengines.
 
-   * destroy(ID)
+   - destroy(ID)
      The ID is removed from the list of active pengines. When the last
      pengine ID is removed, the loop terminates.
 
-   * output(ID, Term)
+   - output(ID, Term)
      The predicate pengine_pull_response/2 is called.
 
 Valid options are:
 
-   * autoforward(+To)
+   - autoforward(+To)
      Forwards received event terms to slaves. To is either =all=,
      =all_but_sender= or a Prolog list of NameOrIDs. [not yet
      implemented]
@@ -2268,10 +2274,10 @@ consider_queue_gc :-
 %   pengine and finishing the  HTTP  exchange   may  happen  in both
 %   orders. This means we need handle this using synchronization.
 %
-%     * sync_destroy_queue_from_pengine(+Pengine, +Queue)
+%     - sync_destroy_queue_from_pengine(+Pengine, +Queue)
 %     Called (indirectly) from pengine_done/1 if the pengine's
 %     thread dies.
-%     * sync_destroy_queue_from_http(+Pengine, +Queue)
+%     - sync_destroy_queue_from_http(+Pengine, +Queue)
 %     Called from destroy_queue/3, from wait_and_output_result/4,
 %     i.e., from the HTTP side.
 
