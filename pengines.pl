@@ -2157,19 +2157,28 @@ create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Page ~D: got ~q from ~q', [Page, Event, Queue]),
             (   destroy_queue_from_http(Pengine, Event, Queue)
-            ->  output_result(Format, page(Page, Event))
-            ;   pengine_thread(Pengine, Thread),
+            ->  !, output_result(Format, page(Page, Event))
+            ;   is_more_event(Event)
+            ->  pengine_thread(Pengine, Thread),
                 thread_send_message(Thread, pengine_request(next)),
                 output_result(Format, page(Page, Event), Dict),
                 fail
+            ;   !, output_result(Format, page(Page, Event), Dict)
             )
-        ;   output_result(Format, died(Pengine))
+        ;   !, output_result(Format, died(Pengine))
         )
-    ;   time_limit_exceeded(Pengine, Format)
+    ;   !, time_limit_exceeded(Pengine, Format)
     ),
     !.
 create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, _Dict) :-
     wait_and_output_result(Pengine, Queue, Format, TimeLimit).
+
+is_more_event(success(_Id, _Answers, _Projection, _Time, true)).
+is_more_event(create(_, Options)) :-
+    memberchk(answer(Event), Options),
+    is_more_event(Event).
+
+
 
 %!  time_limit_exceeded(+Pengine, +Format)
 %
