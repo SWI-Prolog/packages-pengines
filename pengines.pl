@@ -853,7 +853,6 @@ properties are:
 
 pengine_property(Id, Prop) :-
     nonvar(Id), nonvar(Prop),
-    current_module(Id),
     pengine_property2(Id, Prop),
     !.
 pengine_property(Id, Prop) :-
