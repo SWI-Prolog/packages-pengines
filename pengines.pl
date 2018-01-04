@@ -2642,7 +2642,8 @@ event_term_to_json_data(error(ID, ErrorTerm), Error, _Style) :-
     add_error_details(ErrorTerm, Error0, Error),
     message_to_string(ErrorTerm, Message).
 event_term_to_json_data(failure(ID, Time),
-                        json{event:failure, id:ID, time:Time}, _).
+                        json{event:failure, id:ID, time:Time}, _) :-
+    !.
 event_term_to_json_data(EventTerm, json{event:F, id:ID}, _) :-
     functor(EventTerm, F, 1),
     !,
