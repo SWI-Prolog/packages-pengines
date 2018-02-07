@@ -1048,6 +1048,7 @@ pengine_main(Parent, Options, Application) :-
     thread_get_message(pengine_registered(Self)),
     nb_setval(pengine_parent, Parent),
     pengine_register_user(Options),
+    set_prolog_flag(mitigate_spectre, true),
     catch(in_temporary_module(
               Self,
               pengine_prepare_source(Application, Options),
