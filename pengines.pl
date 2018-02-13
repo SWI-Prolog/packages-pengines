@@ -2094,22 +2094,11 @@ pairs_create_options(T0, App, CreateOpts) :-
     selectchk(ask-Ask, T0, T1),
     selectchk(template-Template, T1, T2),
     !,
-    CreateOpts = [ ask(Ask1), template(Template1), bindings(Bindings) | T ],
-    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
-    term_string(t(Ask1,Template1), AskTemplate,
-                [ variable_names(Bindings),
-                  module(App)
-                ]),
+    ask_to_term(Ask-Template, App, CreateOpts, T),
     pairs_create_options(T2, App, T).
-pairs_create_options([ask-String|T0], App,
-                     [ask(Ask),template(Template),bindings(Bindings1)|T]) :-
+pairs_create_options([ask-String|T0], App, CreateOpts) :-
     !,
-    term_string(Ask, String,
-                [ variable_names(Bindings),
-                  module(App)
-                ]),
-    exclude(anon, Bindings, Bindings1),
-    dict_create(Template, json, Bindings1),
+    ask_to_term(String, App, CreateOpts, T),
     pairs_create_options(T0, App, T).
 pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     Opt =.. [N,V],
@@ -2127,6 +2116,30 @@ pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     pairs_create_options(T0, App, T).
 pairs_create_options([_|T0], App, T) :-
     pairs_create_options(T0, App, T).
+
+%!  ask_to_term(+AskSpec, +Module, -Options, OptionsTail) is det.
+%
+%   Translate the AskSpec into a query, template and bindings. The trick
+%   is that we must parse using the  operator declarations of the source
+%   and we must make sure  variable   sharing  between  query and answer
+%   template are known.
+
+ask_to_term(Ask-Template, Module,
+            [ask(Ask1), template(Template1), bindings(Bindings)|T], T) :-
+    !,
+    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
+    term_string(t(Ask1,Template1), AskTemplate,
+                [ variable_names(Bindings),
+                  module(Module)
+                ]).
+ask_to_term(Ask, Module,
+            [ask(Ask1), template(Template), bindings(Bindings1)|T], T) :-
+    term_string(Ask, Ask1,
+                [ variable_names(Bindings),
+                  module(Module)
+                ]),
+    exclude(anon, Bindings, Bindings1),
+    dict_create(Template, json, Bindings1).
 
 
 %!  wait_and_output_result(+Pengine, +Queue,
