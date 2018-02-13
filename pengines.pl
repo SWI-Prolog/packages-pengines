@@ -856,27 +856,27 @@ pengine_property(Id, Prop) :-
     pengine_property2(Id, Prop),
     !.
 pengine_property(Id, Prop) :-
-    pengine_property2(Id, Prop).
+    pengine_property2(Prop, Id).
 
-pengine_property2(Id, self(Id)) :-
+pengine_property2(self(Id), Id) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
-pengine_property2(Id, module(Id)) :-
+pengine_property2(module(Id), Id) :-
     current_pengine(Id, _Parent, _Thread, _URL, _Application, _Destroy).
-pengine_property2(Id, alias(Alias)) :-
+pengine_property2(alias(Alias), Id) :-
     child(Alias, Id),
     Alias \== Id.
-pengine_property2(Id, thread(Thread)) :-
+pengine_property2(thread(Thread), Id) :-
     current_pengine(Id, _Parent, Thread, _URL, _Application, _Destroy),
     Thread \== 0.
-pengine_property2(Id, remote(Server)) :-
+pengine_property2(remote(Server), Id) :-
     current_pengine(Id, _Parent, 0, Server, _Application, _Destroy).
-pengine_property2(Id, application(Application)) :-
+pengine_property2(application(Application), Id) :-
     current_pengine(Id, _Parent, _Thread, _Server, Application, _Destroy).
-pengine_property2(Id, destroy(Destroy)) :-
+pengine_property2(destroy(Destroy), Id) :-
     current_pengine(Id, _Parent, _Thread, _Server, _Application, Destroy).
-pengine_property2(Id, parent(Parent)) :-
+pengine_property2(parent(Parent), Id) :-
     current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
-pengine_property2(Id, source(SourceID, Source)) :-
+pengine_property2(source(SourceID, Source), Id) :-
     pengine_data(Id, source(SourceID, Source)).
 
 /** pengine_output(+Term) is det
