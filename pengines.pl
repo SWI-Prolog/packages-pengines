@@ -1059,11 +1059,19 @@ pengine_main(Parent, Options, Application) :-
 pengine_create_and_loop(Self, Application, Options) :-
     setting(Application:slave_limit, SlaveLimit),
     CreateEvent = create(Self, [slave_limit(SlaveLimit)|Extra]),
-    (   option(ask(Query), Options)
+    (   option(ask(Query0), Options)
     ->  asserta(wrap_first_answer_in_create_event(CreateEvent, Extra)),
-        option(template(Template), Options, Query),
+        (   string(Query0)                      % string is not callable
+        ->  (   option(template(TemplateS), Options)
+            ->  Ask2 = Query0-TemplateS
+            ;   Ask2 = Query0
+            ),
+            ask_to_term(Ask2, Self, Query, Template, Bindings)
+        ;   Query = Query0,
+            option(template(Template), Options, Query),
+            option(bindings(Bindings), Options, [])
+        ),
         option(chunk(Chunk), Options, 1),
-        option(bindings(Bindings), Options, []),
         pengine_ask(Self, Query,
                     [ template(Template),
                       chunk(Chunk),
@@ -1074,6 +1082,28 @@ pengine_create_and_loop(Self, Application, Options) :-
     ),
     pengine_main_loop(Self).
 
+
+%!  ask_to_term(+AskSpec, +Module, -Options, OptionsTail) is det.
+%
+%   Translate the AskSpec into a query, template and bindings. The trick
+%   is that we must parse using the  operator declarations of the source
+%   and we must make sure  variable   sharing  between  query and answer
+%   template are known.
+
+ask_to_term(Ask-Template, Module, Ask1, Template1, Bindings) :-
+    !,
+    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
+    term_string(t(Ask1,Template1), AskTemplate,
+                [ variable_names(Bindings),
+                  module(Module)
+                ]).
+ask_to_term(Ask, Module, Ask1, Template, Bindings1) :-
+    term_string(Ask, Ask1,
+                [ variable_names(Bindings),
+                  module(Module)
+                ]),
+    exclude(anon, Bindings, Bindings1),
+    dict_create(Template, json, Bindings1).
 
 %!  fix_streams is det.
 %
@@ -2090,57 +2120,17 @@ dict_to_options(Dict, Application, CreateOptions) :-
     pairs_create_options(Pairs, Application, CreateOptions).
 
 pairs_create_options([], _, []) :- !.
-pairs_create_options(T0, App, CreateOpts) :-
-    selectchk(ask-Ask, T0, T1),
-    selectchk(template-Template, T1, T2),
-    !,
-    ask_to_term(Ask-Template, App, CreateOpts, T),
-    pairs_create_options(T2, App, T).
-pairs_create_options([ask-String|T0], App, CreateOpts) :-
-    !,
-    ask_to_term(String, App, CreateOpts, T),
-    pairs_create_options(T0, App, T).
 pairs_create_options([N-V0|T0], App, [Opt|T]) :-
     Opt =.. [N,V],
     pengine_create_option(Opt), N \== user,
     !,
-    (   create_option_type(Opt, Type)
-    ->  (   Type == term
-        ->  atom_to_term(V0, V, _)
-        ;   Type == atom
-        ->  atom_string(V, V0)
-        ;   assertion(false)
-        )
-    ;   V = V0
-    ),
+    (   create_option_type(Opt, atom)
+    ->  atom_string(V, V0)               % term creation must be done if
+    ;   V = V0                           % we created the source and know
+    ),                                   % the operators.
     pairs_create_options(T0, App, T).
 pairs_create_options([_|T0], App, T) :-
     pairs_create_options(T0, App, T).
-
-%!  ask_to_term(+AskSpec, +Module, -Options, OptionsTail) is det.
-%
-%   Translate the AskSpec into a query, template and bindings. The trick
-%   is that we must parse using the  operator declarations of the source
-%   and we must make sure  variable   sharing  between  query and answer
-%   template are known.
-
-ask_to_term(Ask-Template, Module,
-            [ask(Ask1), template(Template1), bindings(Bindings)|T], T) :-
-    !,
-    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
-    term_string(t(Ask1,Template1), AskTemplate,
-                [ variable_names(Bindings),
-                  module(Module)
-                ]).
-ask_to_term(Ask, Module,
-            [ask(Ask1), template(Template), bindings(Bindings1)|T], T) :-
-    term_string(Ask, Ask1,
-                [ variable_names(Bindings),
-                  module(Module)
-                ]),
-    exclude(anon, Bindings, Bindings1),
-    dict_create(Template, json, Bindings1).
-
 
 %!  wait_and_output_result(+Pengine, +Queue,
 %!                         +Format, +TimeLimit) is det.
