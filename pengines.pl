@@ -1066,7 +1066,13 @@ pengine_create_and_loop(Self, Application, Options) :-
             ->  Ask2 = Query0-TemplateS
             ;   Ask2 = Query0
             ),
-            ask_to_term(Ask2, Self, Query, Template, Bindings)
+            catch(ask_to_term(Ask2, Self, Query, Template, Bindings),
+                  Error, true),
+            (   var(Error)
+            ->  true
+            ;   send_error(Error),
+                throw(prepare_source_failed)
+            )
         ;   Query = Query0,
             option(template(Template), Options, Query),
             option(bindings(Bindings), Options, [])
