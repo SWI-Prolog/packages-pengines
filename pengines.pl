@@ -1098,7 +1098,7 @@ ask_to_term(Ask-Template, Module, Ask1, Template1, Bindings) :-
                   module(Module)
                 ]).
 ask_to_term(Ask, Module, Ask1, Template, Bindings1) :-
-    term_string(Ask, Ask1,
+    term_string(Ask1, Ask,
                 [ variable_names(Bindings),
                   module(Module)
                 ]),
