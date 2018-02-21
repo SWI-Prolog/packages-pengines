@@ -1109,7 +1109,7 @@ ask_to_term(Ask, Module, Ask1, Template, Bindings1) :-
                   module(Module)
                 ]),
     exclude(anon, Bindings, Bindings1),
-    dict_create(Template, json, Bindings1).
+    dict_create(Template, swish_default_template, Bindings1).
 
 %!  fix_streams is det.
 %
@@ -1242,7 +1242,8 @@ solve(Chunk, Template, Goal, ID) :-
     statistics(cputime, Epoch),
     Time = time(Epoch),
     nb_current('$variable_names', Bindings),
-    (   call_cleanup(catch(findnsols_no_empty(State, Template,
+    filter_template(Template, Bindings, Template2),
+    (   call_cleanup(catch(findnsols_no_empty(State, Template2,
                                               set_projection(Goal, Bindings),
                                               Result),
                            Error, true),
@@ -1290,6 +1291,19 @@ projection(Projection) :-
     maplist(var_name, Bindings, Projection).
 projection([]).
 
+%!  filter_template(+Template0, +Bindings, -Template) is det.
+%
+%   Establish the final template. This is   there  because hooks such as
+%   goal_expansion/2 and the SWISH query  hooks   can  modify the set of
+%   bindings.
+%
+%   @bug Projection and template handling is pretty messy.
+
+filter_template(Template0, Bindings, Template) :-
+    is_dict(Template0, swish_default_template),
+    !,
+    dict_create(Template, swish_default_template, Bindings).
+filter_template(Template, _Bindings, Template).
 
 findnsols_no_empty(N, Template, Goal, List) :-
     findnsols(N, Template, Goal, List),
@@ -2432,7 +2446,7 @@ template(_, Template, Options0, Options) :-
     select_option(template(Template), Options0, Options),
     !.
 template(Bindings, Template, Options, Options) :-
-    dict_create(Template, json, Bindings).
+    dict_create(Template, swish_default_template, Bindings).
 
 anon(Name=_) :-
     sub_atom(Name, 0, _, _, '_'),
