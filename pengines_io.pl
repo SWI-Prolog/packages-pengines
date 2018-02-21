@@ -442,15 +442,15 @@ term_string_value(Pengine, N-V, N-A) :-
 
 %!  pengines:event_to_json(+Event, -JSON, +Format, +VarNames)
 %
-%   Implement translation of a Pengine  event to =json-html= format.
-%   This format represents the answer  as   JSON,  but  the variable
-%   bindings are (structured) HTML strings rather than JSON objects.
+%   Implement translation of a Pengine event to =json-html= format. This
+%   format represents the answer as JSON,  but the variable bindings are
+%   (structured) HTML strings rather than JSON objects.
 %
-%   CHR residual goals are not bound to the projection variables. We
-%   hacked a bypass to fetch these by   returning them in a variable
-%   named   `Residuals`,   which   must   be   bound   to   a   term
-%   '$residuals'(List).  Such  a  variable  is    removed  from  the
-%   projection and added to residual goals.
+%   CHR residual goals are not  bound   to  the projection variables. We
+%   hacked a bypass to fetch these by returning them in a variable named
+%   `_residuals`, which must be bound to a term '$residuals'(List). Such
+%   a variable is removed from  the   projection  and  added to residual
+%   goals.
 
 pengines:event_to_json(success(ID, Answers0, Projection, Time, More),
                        JSON, 'json-html') :-
