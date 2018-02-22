@@ -1098,11 +1098,12 @@ pengine_create_and_loop(Self, Application, Options) :-
 
 ask_to_term(Ask-Template, Module, Ask1, Template1, Bindings) :-
     !,
-    format(string(AskTemplate), 't((~s),(~s))', [Ask, Template]),
-    term_string(t(Ask1,Template1), AskTemplate,
-                [ variable_names(Bindings),
+    format(string(AskTemplate), 't((~s),(~s))', [Template, Ask]),
+    term_string(t(Template1,Ask1), AskTemplate,
+                [ variable_names(Bindings0),
                   module(Module)
-                ]).
+                ]),
+    phrase(template_bindings(Template1, Bindings0), Bindings).
 ask_to_term(Ask, Module, Ask1, Template, Bindings1) :-
     term_string(Ask1, Ask,
                 [ variable_names(Bindings),
@@ -1110,6 +1111,29 @@ ask_to_term(Ask, Module, Ask1, Template, Bindings1) :-
                 ]),
     exclude(anon, Bindings, Bindings1),
     dict_create(Template, swish_default_template, Bindings1).
+
+template_bindings(Var, Bindings) -->
+    { var(Var) }, !,
+    (   { var_binding(Bindings, Var, Binding)
+        }
+    ->  [Binding]
+    ;   []
+    ).
+template_bindings([H|T], Bindings) -->
+    !,
+    template_bindings(H, Bindings),
+    template_bindings(T, Bindings).
+template_bindings(Compoound, Bindings) -->
+    { compound(Compoound), !,
+      compound_name_arguments(Compoound, _, Args)
+    },
+    template_bindings(Args, Bindings).
+template_bindings(_, _) --> [].
+
+var_binding(Bindings, Var, Binding) :-
+    member(Binding, Bindings),
+    arg(2, Binding, V),
+    V == Var, !.
 
 %!  fix_streams is det.
 %
