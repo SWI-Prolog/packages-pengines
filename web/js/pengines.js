@@ -224,15 +224,17 @@ Pengine.prototype.ping = function(interval) {
   var pengine = this;
 
   if ( interval == undefined ) {
-    $.get(this.options.server + '/ping',
-	  { id: this.id,
-	    format: this.options.format
-	  },
-	  function(obj) {
-	    pengine.process_response(obj);
-	  }).fail(function(jqXHR, textStatus, errorThrown) {
-	    pengine.error(jqXHR, textStatus, errorThrown);
-	  });
+    if ( this.id ) {				/* Might not be there yet */
+      $.get(this.options.server + '/ping',
+	    { id: this.id,
+	      format: this.options.format
+	    },
+	    function(obj) {
+	      pengine.process_response(obj);
+	    }).fail(function(jqXHR, textStatus, errorThrown) {
+	      pengine.error(jqXHR, textStatus, errorThrown);
+	    });
+    }
   } else {
     if ( pengine.pingid )
       clearInterval(pengine.pingid);
