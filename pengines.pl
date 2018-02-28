@@ -2982,6 +2982,17 @@ to_string(Atom, String) :-
     atom_string(Atom, String),
     !.
 
+		 /*******************************
+		 *            SANDBOX		*
+		 *******************************/
+
+:- multifile
+    sandbox:safe_primitive/1.
+
+sandbox:safe_primitive(pengines:pengine_input(_, _)).
+sandbox:safe_primitive(pengines:pengine_output(_)).
+sandbox:safe_primitive(pengines:pengine_debug(_,_)).
+
 
                  /*******************************
                  *            MESSAGES          *

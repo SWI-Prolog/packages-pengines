@@ -67,9 +67,6 @@ a protected network.
 sandbox:safe_primitive(pengines:pengine_destroy(_,_)).
 sandbox:safe_primitive(pengines:pengine_event(_, _)).
 sandbox:safe_primitive(pengines:pengine_send(_, _, _)).
-sandbox:safe_primitive(pengines:pengine_input(_, _)).
-sandbox:safe_primitive(pengines:pengine_output(_)).
-sandbox:safe_primitive(pengines:pengine_debug(_,_)).
 sandbox:safe_primitive(pengines:pengine_ask(_, _, _)).
 sandbox:safe_primitive(pengines:pengine_pull_response(_,_)).
 sandbox:safe_primitive(pengines:pengine_user(_)).
