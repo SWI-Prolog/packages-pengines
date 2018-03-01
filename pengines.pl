@@ -738,7 +738,7 @@ current_pengine_application(Application) :-
 :- setting(idle_limit, number, 300,
            'Pengine auto-destroys when idle for this time').
 :- setting(safe_goal_limit, number, 10,
-           'Maximum time to try proving safity of the goal').
+           'Maximum time to try proving safety of the goal').
 :- setting(program_space, integer, 100_000_000,
            'Maximum memory used by predicates').
 :- setting(allow_from, list(atom), [*],
@@ -780,7 +780,7 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
                 IdleLimitSetting),
     expand_term((:- setting(Application:safe_goal_limit, number,
                             setting(pengines:safe_goal_limit),
-                            'Maximum time to try proving safity of the goal')),
+                            'Maximum time to try proving safety of the goal')),
                 SafeGoalLimitSetting),
     expand_term((:- setting(Application:program_space, integer,
                             setting(pengines:program_space),
@@ -1506,7 +1506,7 @@ pengine_pull_response(_ID, _Options).
 
 /** pengine_input(+Prompt, -Term) is det
 
-Sends Prompt to the parent pengine and waits for input. Note that Prompt may be
+Sends Prompt to the master (parent) pengine and waits for input. Note that Prompt may be
 any term, compound as well as atomic.
 */
 
@@ -1525,8 +1525,8 @@ pengine_input(Prompt, Term) :-
 
 /** pengine_respond(+Pengine, +Input, +Options) is det
 
-Sends a response in the form of the term Input to a slave pengine
-that has prompted its master for input.
+Sends a response in the form of the term Input to a slave (child) pengine
+that has prompted its master (parent) for input.
 
 Defined in terms of pengine_send/3, as follows:
 
