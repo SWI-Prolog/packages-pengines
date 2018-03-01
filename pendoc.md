@@ -62,8 +62,8 @@ or a JavaScript process. A slave  is   always  a pengine, running either
 locally or remotely with respect to its   master.  Subject to a setting,
 slaves are also dependent on their masters in the sense that if a master
 terminates, so do its slaves. (Note that in the source code we often use
-the term ``parent" instead of ``master" and ``child" instead of ``slave".
-That is, we treat ``parent/child" as synonymous to ``master/slave".)
+the term _parent_ instead  of _master_  and _child_  instead of _slave_.
+That is, we treat _parent/child_ as synonymous to _master/slave_.)
 
 [[penarch.png]]
 
