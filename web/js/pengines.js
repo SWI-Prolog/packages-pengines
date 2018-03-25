@@ -120,16 +120,18 @@ function Pengine(options) {
           credentials: 'same-origin',
           body: JSON.stringify(createOptions),
           method: "POST" })
-    .then((resp) => {
+    .then(function (resp) {
           if (resp.ok) {
             resp.json()
-              .then((obj) => that.process_response(obj));
+              .then(function (obj) { that.process_response(obj); });
           } else {
             throw new Error(resp);
           }
     })
-    .catch(errorResp => that.error(errorResp, errorResp.statusText, undefined))
-    .then(() => that.request = undefined);
+    .catch(function (errorResp) {
+      that.error(errorResp, errorResp.statusText, undefined);
+    })
+    .then(function() { that.request = undefined; });
 
 }/*end of Pengine()*/
 
@@ -207,7 +209,7 @@ Pengine.prototype.abort = function() {
     .then(function(resp) {
       if (resp.ok) {
         resp.json()
-          .then((obj) => pengine.process_response(obj));
+          .then(function (obj) {pengine.process_response(obj); });
       } else {
         throw new Error(resp);
       }
@@ -235,7 +237,7 @@ Pengine.prototype.ping = function(interval) {
         .then(function(resp) {
           if (resp.ok) {
             resp.json()
-              .then(obj => pengine.process_response(obj));
+              .then(function (obj) { pengine.process_response(obj); });
           } else {
             throw new Error(resp);
           }
@@ -279,11 +281,11 @@ Pengine.prototype.pull_response = function() {
   this.request =
     fetch(this.options.server + `/pull_response?id=${this.id}&format=${this.options.format}`,
           {credentials: 'same-origin'})
-    .then((resp) => {
+    .then(function (resp) {
       if (resp.ok) {
         // TODO: obj.event !== died
         resp.json()
-          .then(obj => {
+          .then(function(obj) {
             if (obj.event !== 'died') {
               pengine.process_response(txt);
             }
@@ -292,8 +294,8 @@ Pengine.prototype.pull_response = function() {
         throw new Error(resp);
       }
     })
-    .catch(err => pengine.error(err, err.statusText, undefined))
-    .then(() => pengine.request = undefined);
+    .catch(function(err) { pengine.error(err, err.statusText, undefined); })
+    .then(function() { pengine.request = undefined; });
 };
 
 /**
@@ -317,16 +319,18 @@ Pengine.prototype.send = function(event) {
            body: event + " .\n",
            headers: {'content-type': "application/x-prolog; charset=UTF-8"},
            credentials: 'same-origin'})
-    .then((resp) => {
+    .then(function(resp) {
       if (resp.ok) {
         resp.json()
-          .then(obj => pengine.process_response(obj));
+          .then(function(obj) { pengine.process_response(obj); });
       } else {
         throw new Error(resp);
       }
     })
-    .catch(error => pengine.error(error, error.statusText, undefined))
-    .then(() => pengine.request = undefined);
+    .catch(function(error) {
+      pengine.error(error, error.statusText, undefined);
+    })
+    .then(function() { pengine.request = undefined; });
 };
 
 Pengine.prototype.script_sources = function(src) {
