@@ -115,21 +115,21 @@ function Pengine(options) {
 	      ]);
 
   this.request =
-  $.ajax(this.options.server + '/create',
-	 { contentType: "application/json; charset=utf-8",
-	   dataType: "json",
-	   data: JSON.stringify(createOptions),
-	   type: "POST",
-	   success: function(obj) {
-	     that.process_response(obj);
-	   },
-	   error: function(jqXHR, textStatus, errorThrown) {
-	     that.error(jqXHR, textStatus, errorThrown);
-	   },
-	   complete: function() {
-	     that.request = undefined;
-	   }
-	 });
+  fetch(this.options.server + '/create',
+        { headers: {'content-type': "application/json; charset=utf-8"},
+          credentials: 'same-origin',
+          body: JSON.stringify(createOptions),
+          method: "POST" })
+    .then((resp) => {
+          if (resp.ok) {
+            resp.json()
+              .then((obj) => that.process_response(obj));
+          } else {
+            throw new Error(resp);
+          }
+    })
+    .catch(errorResp => that.error(errorResp, errorResp.statusText, undefined))
+    .then(() => that.request = undefined);
 
 }/*end of Pengine()*/
 
@@ -202,17 +202,22 @@ Pengine.prototype.abort = function() {
   }
 
   this.request =
-  $.get(this.options.server + '/abort',
-	{ id: this.id,
-	  format: this.options.format
-	},
-	function(obj) {
-	  pengine.process_response(obj);
-	}).fail(function(jqXHR, textStatus, errorThrown) {
-	  pengine.error(jqXHR, textStatus, errorThrown);
-	}).always(function() {
-	  pengine.request = undefined;
-	});
+    fetch(this.options.server + `/abort?id=${this.id}&format=${this.options.format}`,
+          {credentials: 'same-origin'})
+    .then(function(resp) {
+      if (resp.ok) {
+        resp.json()
+          .then((obj) => pengine.process_response(obj));
+      } else {
+        throw new Error(resp);
+      }
+    })
+    .catch(function(resp) {
+      pengine.error(resp, resp.statusText, undefined);
+    })
+    .then(function() {
+      pengine.request = undefined;
+    });
 };
 
 /**
@@ -224,16 +229,20 @@ Pengine.prototype.ping = function(interval) {
   var pengine = this;
 
   if ( interval == undefined ) {
-    if ( this.id ) {				/* Might not be there yet */
-      $.get(this.options.server + '/ping',
-	    { id: this.id,
-	      format: this.options.format
-	    },
-	    function(obj) {
-	      pengine.process_response(obj);
-	    }).fail(function(jqXHR, textStatus, errorThrown) {
-	      pengine.error(jqXHR, textStatus, errorThrown);
-	    });
+    if ( this.id ) {        /* Might not be there yet */
+      fetch(this.options.server + `/ping?id=${this.id}&format=${this.options.format}`,
+            {credentials: 'same-origin'})
+        .then(function(resp) {
+          if (resp.ok) {
+            resp.json()
+              .then(obj => pengine.process_response(obj));
+          } else {
+            throw new Error(resp);
+          }
+        })
+        .catch(function(resp) {
+          pengine.error(resp, resp.statusText, undefined);
+        });
     }
   } else {
     if ( pengine.pingid )
@@ -268,18 +277,23 @@ Pengine.prototype.pull_response = function() {
   var pengine = this;
 
   this.request =
-  $.get(this.options.server + '/pull_response',
-	{ id: this.id,
-	  format: this.options.format
-	},
-	function(obj) {
-	  if ( obj.event !== 'died')
-	    pengine.process_response(obj);
-	}).fail(function(jqXHR, textStatus, errorThrown) {
-	  pengine.error(jqXHR, textStatus, errorThrown);
-	}).always(function() {
-	  pengine.request = undefined;
-	});
+    fetch(this.options.server + `/pull_response?id=${this.id}&format=${this.options.format}`,
+          {credentials: 'same-origin'})
+    .then((resp) => {
+      if (resp.ok) {
+        // TODO: obj.event !== died
+        resp.json()
+          .then(obj => {
+            if (obj.event !== 'died') {
+              pengine.process_response(txt);
+            }
+          });
+      } else {
+        throw new Error(resp);
+      }
+    })
+    .catch(err => pengine.error(err, err.statusText, undefined))
+    .then(() => pengine.request = undefined);
 };
 
 /**
@@ -298,22 +312,21 @@ Pengine.prototype.send = function(event) {
   var pengine = this;
 
   this.request =
-  $.ajax({ type: "POST",
-	   url: pengine.options.server +
-		'/send?format=' + this.options.format +
-		'&id=' + this.id,
-	   data: event + " .\n",
-	   contentType: "application/x-prolog; charset=UTF-8",
-	   success: function(obj) {
-	     pengine.process_response(obj);
-	   },
-	   error: function(jqXHR, textStatus, errorThrown) {
-	     pengine.error(jqXHR, textStatus, errorThrown);
-	   },
-	   complete: function() {
-	     pengine.request = undefined;
-	   }
-         });
+    fetch(pengine.options.server + `/send?format=${this.options.format}&id=${this.id}`,
+          {method: 'POST',
+           body: event + " .\n",
+           headers: {'content-type': "application/x-prolog; charset=UTF-8"},
+           credentials: 'same-origin'})
+    .then((resp) => {
+      if (resp.ok) {
+        resp.json()
+          .then(obj => pengine.process_response(obj));
+      } else {
+        throw new Error(resp);
+      }
+    })
+    .catch(error => pengine.error(error, error.statusText, undefined))
+    .then(() => pengine.request = undefined);
 };
 
 Pengine.prototype.script_sources = function(src) {
@@ -355,8 +368,10 @@ Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
 
   if ( jqXHR.responseText ) {
     var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
-				.replace(/<\/body>/, "");
-    var plain = $("<div></div>").html(msg).text();
+        .replace(/<\/body>/, "");
+    var dummy = document.createElement('div');
+    dummy.innerHTML = msg;
+    var plain = dummy.innerText;
     obj.data = plain;
     obj.dataHTML = msg;
   } else if ( textStatus )
@@ -655,15 +670,13 @@ Pengine.destroy_all = function(async) {
 
     for(var server in servers) {
       if ( servers.hasOwnProperty(server) ) {
-	$.ajax({ url:server + '/destroy_all?ids=' + servers[server],
-	         async: async === undefined ? true : false,
-		 timeout: 1000
-	       });
+        fetch(server + `/destroy_all?ids=${servers[server]}`,
+              {credentials: 'same-origin'});
       }
     }
   }
 };
 
-$(window).on("beforeunload", function() {
+window.addEventListener("beforeunload", function() {
   Pengine.destroy_all();
 });
