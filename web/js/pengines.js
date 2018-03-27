@@ -204,7 +204,8 @@ Pengine.prototype.abort = function() {
   }
 
   this.request =
-    fetch(this.options.server + "/abort?id=" + this.id + "&format=" + this.options.format,
+    fetch(this.options.server + "/abort?id=" + encodeURIComponent(this.id) +
+          "&format=" + encodeURIComponent(this.options.format),
           {credentials: 'same-origin'})
     .then(function(resp) {
       if (resp.ok) {
@@ -232,7 +233,8 @@ Pengine.prototype.ping = function(interval) {
 
   if ( interval == undefined ) {
     if ( this.id ) {        /* Might not be there yet */
-      fetch(this.options.server + "/ping?id=" + this.id + "&format=" + this.options.format,
+      fetch(this.options.server + "/ping?id=" + encodeURIComponent(this.id) +
+            "&format=" + encodeURIComponent(this.options.format),
             {credentials: 'same-origin'})
         .then(function(resp) {
           if (resp.ok) {
@@ -279,7 +281,8 @@ Pengine.prototype.pull_response = function() {
   var pengine = this;
 
   this.request =
-    fetch(this.options.server + "/pull_response?id=" + this.id + "&format=" + this.options.format,
+    fetch(this.options.server + "/pull_response?id=" + encodeURIComponent(this.id)
+          + "&format=" + encodeURIComponent(this.options.format),
           {credentials: 'same-origin'})
     .then(function (resp) {
       if (resp.ok) {
@@ -314,7 +317,8 @@ Pengine.prototype.send = function(event) {
   var pengine = this;
 
   this.request =
-    fetch(pengine.options.server + "/send?format=" + this.options.format + "&id=" + this.id,
+    fetch(pengine.options.server + "/send?format=" + encodeURIComponent(this.options.format)
+          + "&id=" + encodeURIComponent(this.id),
           {method: 'POST',
            body: event + " .\n",
            headers: {'content-type': "application/x-prolog; charset=UTF-8"},
