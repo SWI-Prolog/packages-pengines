@@ -290,7 +290,7 @@ Pengine.prototype.pull_response = function() {
         resp.json()
           .then(function(obj) {
             if (obj.event !== 'died') {
-              pengine.process_response(txt);
+              pengine.process_response(obj);
             }
           });
       } else {
