@@ -8,6 +8,8 @@
 
         </script>
         <script>
+	    var result = [];
+
             var pengine = new Pengine({
                 oncreate: handleCreate,
                 onsuccess: handleSuccess
@@ -18,7 +20,7 @@
                 });
             }
             function handleSuccess() {
-		console.log(this.data);
+		result.push(this.data);
 		if ( this.more )
                    pengine.next();
             }

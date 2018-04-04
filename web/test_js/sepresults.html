@@ -53,14 +53,16 @@
         </script>
 
         <script type="text/javascript">
+	    var result = [];
+
             function handleCreate() {
                 pengine.ask('start');
             }
             function handleOutput() {
-		console.log(this.data);
+		result.push(this.data);
             }
             function handleError() {
-                console.log(this.data);
+                result.push(this.data);
             }
             var pengine = new Pengine({
                 oncreate: handleCreate,

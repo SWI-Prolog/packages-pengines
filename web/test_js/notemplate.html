@@ -12,6 +12,8 @@
 
         </script>
         <script>
+	    var result = [];
+
             var pengine = new Pengine({
                 oncreate: handleCreate,
                 onsuccess: handleSuccess
@@ -20,8 +22,8 @@
                 pengine.ask('weekday(N,D)');
             }
             function handleSuccess() {
-		console.log(this.data[0].N);
-		console.log(this.data[0].D);
+		result.push(this.data[0].N);
+		result.push(this.data[0].D);
 		if ( this.more )
                    pengine.next();
             }

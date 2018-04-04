@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2015, VU University Amsterdam
+    Copyright (c)  2014-2018, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,20 @@
           [ test_js/0
           ]).
 
+/** <module> Test JavaScript Pengines interaction
+
+This module scripts the browser  interaction   with  a  Pengines server.
+Initially this used phantomjs,  but  as   this  seems  unbmaintained and
+contains a blocking bug for us we moved to slimerjs.
+
+To run this  code,  install  slimerjs   and  firefox.  SlimerJS  can  be
+installed as a node module using
+
+    % npm install -g slimerjs
+
+@see https://github.com/laurentj/slimerjs
+*/
+
 % setup paths to load relevant packages from development environment
 :- asserta(user:file_search_path(foreign, '../http')).
 :- asserta(user:file_search_path(foreign, '../clib')).
@@ -55,6 +69,7 @@
 
 :- use_module(library(plunit)).
 :- use_module(library(pengines)).
+:- use_module(library(pengines_sandbox)).
 :- use_module(pengine_sandbox:library(pengines)).
 :- use_module(library(process)).
 :- use_module(library(http/thread_httpd)).
@@ -80,47 +95,95 @@ test_js :-
 test_js(File, Atoms) :-
     test_js(File, null, Atoms).
 
-test_js(File, Config, Atoms) :-
+test_js(File, Config, JSON) :-
     pengine_server(Server),
     setup_call_cleanup(
         asserta(test_config(Config), Ref),
         setup_call_cleanup(
             test_script(File, Server, Script),
-            ( process_create(path(phantomjs), [Script],
+            ( process_create(path(slimerjs), ['--headless', Script],
                              [ stdout(pipe(Input))
                              ]),
-              read_string(Input, _, String),
+              json_read_dict(Input, JSON, []),
               close(Input)
             ),
             delete_file(Script)),
-        erase(Ref)),
-    split_string(String, "\r\n", "\r\n", Lines),
-    maplist(atom_string, Atoms, Lines).
+        erase(Ref)).
 
 test_script(File, Server, Script) :-
-    tmp_file_stream(text, Script, Out),
-    format(Out,
-           'var page = require("webpage").create();\n\c
-                var url = "~w/test_js/~w";\n\c
-                page.onConsoleMessage = function(msg){\n\c
-                  console.log(msg);\n\c
-                };\n\c
-                page.open(url, function (status) {\n\c
-                  phantom.exit();\n\c
-                });\n',
+    tmp_file_stream(Script, Out, [ encoding(utf8), extension(js) ]),
+    format(Out, '
+var page = require("webpage").create();
+var url = "~w/test_js/~w";
+
+var resourceWait = 300,
+    maxRenderWait = 10000;
+var count = 0,
+    forcedRenderTimeout,
+    renderTimeout;
+
+function getResult() {
+  return result;
+}
+
+function printResult() {
+  console.log(JSON.stringify(page.evaluate(getResult)));
+}
+
+function doRender() {
+  printResult();
+  phantom.exit();
+}
+
+page.onResourceRequested = function(req) {
+  count += 1;
+  clearTimeout(renderTimeout);
+};
+
+page.onResourceReceived = function(res) {
+  if (!res.stage || res.stage === "end") {
+    count -= 1;
+    if ( count === 0 ) {
+      renderTimeout = setTimeout(doRender, resourceWait);
+    }
+  }
+};
+
+page.open(url, function(status) {
+  if (status !== "success") {
+    console.log("\\\"Unable to load url\\\"");
+    phantom.exit();
+  } else {
+    forcedRenderTimeout = setTimeout(function () {
+      doRender();
+    }, maxRenderWait);
+  }
+});
+',
            [Server, File]),
     close(Out).
 
-has_phantomjs :-
-    absolute_file_name(path(phantomjs), _,
-                       [ file_type(executable),
-                         file_errors(fail),
-                         access(execute)
-                       ]).
+has_slimerjs(Missing) :-
+    phrase(has_slimerjs, Missing).
 
-phantomjs_version(Version) :-
+has_slimerjs -->
+    has_executable(slimerjs),
+    has_executable(firefox).
+
+has_executable(Exe) -->
+    { absolute_file_name(path(Exe), _,
+                         [ file_type(executable),
+                           file_errors(fail),
+                           access(execute)
+                         ])
+    },
+    !.
+has_executable(Exe) -->
+    [Exe].
+
+slimerjs_version(Version) :-
     setup_call_cleanup(
-        process_create(path(phantomjs), ['--version'],
+        process_create(path(slimerjs), ['--version'],
                        [ stdout(pipe(Input))
                        ]),
         read_string(Input, _, String),
@@ -128,67 +191,82 @@ phantomjs_version(Version) :-
     ),
     split_string(String, "", " \n\r\t", [Version]).
 
-% POST sends empty request in this version.  See
+% POST sends empty request in this version of phantomjs.  See
 % https://github.com/ariya/phantomjs/issues/14329
-phantomjs_version_bad("2.1.1").
+% phantomjs seems unmaintained (Apr 4, 2018), so we switched to
+% slimerjs.
+slimerjs_version_bad("2.1.1").
 
-check_phantomjs :-
-    has_phantomjs,
+check_slimerjs :-
+    has_slimerjs([]),
     !,
-    phantomjs_version(Version),
-    (   phantomjs_version_bad(Version)
+    slimerjs_version(Version),
+    (   slimerjs_version_bad(Version)
     ->  print_message(
             warning,
-            format('phantomjs version ~s is broken, \c
+            format('slimerjs version ~s is broken, \c
                         skipping JavaScript tests~n',
                    [Version]))
     ;   true
     ).
-check_phantomjs :-
+check_slimerjs :-
+    has_slimerjs(Missing),
     print_message(
         warning,
-        format('No phantomjs in $PATH, skipping JavaScript tests~n', [])).
+        format('No ~p in $PATH, skipping JavaScript tests~n', [Missing])).
 
-:- public working_phantomjs/0.
+:- public working_slimerjs/0.
+:- dynamic working_slimerjs_checked/1.
 
-working_phantomjs :-
-    has_phantomjs,
-    phantomjs_version(Version),
-    \+ phantomjs_version_bad(Version).
+working_slimerjs :-
+    working_slimerjs_checked(True),
+    !,
+    True == true.
+working_slimerjs :-
+    (   has_slimerjs([]),
+        slimerjs_version(Version),
+        \+ slimerjs_version_bad(Version)
+    ->  True = true
+    ;   True = false
+    ),
+    asserta(working_slimerjs_checked(True)),
+    True == true.
 
-:- initialization check_phantomjs.
+:- initialization check_slimerjs.
 
 :- begin_tests(js_pengines,
                [ setup(start_pengine_server(_Port)),
                  cleanup(stop_pengine_server),
-                 condition(working_phantomjs)
+                 condition(working_slimerjs)
                ]).
 
-test(simple, Lines == [a,b,c,d,e,f,g]) :-
-    test_js('simple.html', Lines).
-test(notemplate, Lines == ['1','sunday','2','monday']) :-
+test(simple, Answers == ["a","b","c","d","e","f","g"]) :-
+    test_js('simple.html', JSON),
+    flatten(JSON, Answers).
+test(notemplate, Lines == [1,"sunday",2,"monday"]) :-
     test_js('notemplate.html', Lines).
-test(ask_syntax, Lines == [a]) :-
+test(ask_syntax, Lines == [["a"]]) :-
     test_js('ask_syntax.html', Lines).
-test(sepresults, Lines == ['1', '2', '3', '4', a, b, c, d]) :-
-    test_js('sepresults.html', Lines0),
+test(sepresults, [Lines == [1, 2, 3, 4, "a", "b", "c", "d"]]) :-
+    test_js('sepresults.html', JSON),
+    flatten(JSON, Lines0),
     sort(Lines0, Lines).
-test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+test(json_s, Lines == ["1", "a", "\'a b\'", "\"s\"", "c(a)"]) :-
     test_js('test_json_s.html', _{}, Lines).
-test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+test(json_s, Lines == ["1", "a", "\'a b\'", "\"s\"", "c(a)"]) :-
     test_js('test_json_s.html', _{askOptions:_{chunk:3}}, Lines).
-test(json_s, Lines == ['1', 'a', '\'a b\'', '"s"', 'c(a)']) :-
+test(json_s, Lines == ["1", "a", "\'a b\'", "\"s\"", "c(a)"]) :-
     test_js('test_json_s.html', _{ask:"data(A)"}, Lines).
-test(json_html, Lines == [ 'A',
-                           '<span class="pl-int">1</span>',
-                           'A',
-                           '<span class="pl-atom">a</span>',
-                           'A',
-                           '<span class="pl-quoted-atom">\'a b\'</span>',
-                           'A',
-                           '<span class="pl-string">"s"</span>',
-                           'A',
-                           '<span class="pl-compound"><span class="pl-functor">c</span>(<span class="pl-atom">a</span>)</span>'
+test(json_html, Lines == [ "A",
+                           "<span class=\"pl-int\">1</span>",
+                           "A",
+                           "<span class=\"pl-atom\">a</span>",
+                           "A",
+                           "<span class=\"pl-quoted-atom\">'a b'</span>",
+                           "A",
+                           "<span class=\"pl-string\">\"s\"</span>",
+                           "A",
+                           "<span class=\"pl-compound pl-level-0\"><span class=\"pl-functor\">c</span>(<span class=\"pl-atom\">a</span>)</span>"
                          ]) :-
     test_js('test_json_html.html', Lines).
 

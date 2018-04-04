@@ -16,6 +16,8 @@
 
         </script>
         <script>
+	    var result = [];
+
 	    var options = $.extend({},
 				   { onsuccess: handleSuccess,
 				     format: "json-s"
@@ -30,7 +32,7 @@
             }
             function handleSuccess() {
 		for(var i=0; i<this.data.length; i++) {
-		    console.log(this.data[i].A);
+		    result.push(this.data[i].A);
 		}
 		if ( this.more )
                    pengine.next();
