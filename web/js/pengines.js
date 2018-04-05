@@ -114,24 +114,26 @@ function Pengine(options) {
 		"destroy"
 	      ]);
 
-  this.request =
-  fetch(this.options.server + '/create',
-        { headers: {'content-type': "application/json; charset=utf-8"},
-          credentials: 'same-origin',
-          body: JSON.stringify(createOptions),
-          method: "POST" })
-    .then(function (resp) {
-          if (resp.ok) {
-            resp.json()
-              .then(function (obj) { that.process_response(obj); });
-          } else {
-            throw new Error(resp);
-          }
-    })
-    .catch(function (errorResp) {
-      that.error(errorResp, errorResp.statusText, undefined);
-    })
-    .then(function() { that.request = undefined; });
+  Pengine.requireFetch(function() {
+    that.request =
+    fetch(that.options.server + '/create',
+	  { headers: {'content-type': "application/json; charset=utf-8"},
+	    credentials: 'same-origin',
+	    body: JSON.stringify(createOptions),
+	    method: "POST" })
+      .then(function (resp) {
+	    if (resp.ok) {
+	      resp.json()
+		.then(function (obj) { that.process_response(obj); });
+	    } else {
+	      throw new Error(resp);
+	    }
+      })
+      .catch(function (errorResp) {
+	that.error(errorResp, errorResp.statusText, undefined);
+      })
+      .then(function() { that.request = undefined; });
+  });
 
 }/*end of Pengine()*/
 
@@ -688,3 +690,40 @@ Pengine.destroy_all = function(async) {
 window.addEventListener("beforeunload", function() {
   Pengine.destroy_all();
 });
+
+		 /*******************************
+		 *	      FETCH		*
+		 *******************************/
+
+Pengine.fetchScript =
+    "https://cdn.polyfill.io/v2/polyfill.min.js?features=fetch";
+
+/**
+ * Ensure we have fetch() and promises.  Code based on
+ * https://philipwalton.com/articles/loading-polyfills-only-when-needed/
+ * @param {Function} f is called after fetch and promises are
+ * available in the browser.
+ */
+Pengine.requireFetch = function(f) {
+  function browserSupportsFetch() {
+    return window.Promise && window.fetch;
+  }
+
+  function loadScript(src, done) {
+    var js = document.createElement('script');
+    js.src = src;
+    js.onload = function() {
+      done();
+    };
+    js.onerror = function() {
+      done(new Error('Failed to load script ' + src));
+    };
+    document.head.appendChild(js);
+  }
+
+  if ( browserSupportsFetch() )
+  { f();
+  } else
+  { loadScript(Pengine.fetchScript, f);
+  }
+}
