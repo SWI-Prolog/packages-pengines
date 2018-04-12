@@ -114,13 +114,20 @@ function Pengine(options) {
 		"destroy"
 	      ]);
 
+  if ( window.AbortController ) {
+    this.abort_controller = new AbortController();
+    this.signal = this.abort_controller.signal;
+  }
+
   Pengine.requireFetch(function() {
     that.request =
     fetch(that.options.server + '/create',
 	  { headers: {'content-type': "application/json; charset=utf-8"},
 	    credentials: 'same-origin',
 	    body: JSON.stringify(createOptions),
-	    method: "POST" })
+	    method: "POST",
+	    signal: that.signal
+	  })
       .then(function (resp) {
 	    if (resp.ok) {
 	      resp.json()
@@ -202,7 +209,9 @@ Pengine.prototype.abort = function() {
 
   if ( this.request ) {
     this.request.pengine_aborted = true;
-    this.request.abort();
+    if ( this.abort_controller ) {
+      this.abort_controller.abort();
+    }
   }
 
   this.request =
@@ -217,8 +226,8 @@ Pengine.prototype.abort = function() {
         throw new Error(resp);
       }
     })
-    .catch(function(resp) {
-      pengine.error(resp, resp.statusText, undefined);
+    .catch(function(error) {
+      pengine.error(error);
     })
     .then(function() {
       pengine.request = undefined;
@@ -246,8 +255,8 @@ Pengine.prototype.ping = function(interval) {
             throw new Error(resp);
           }
         })
-        .catch(function(resp) {
-          pengine.error(resp, resp.statusText, undefined);
+        .catch(function(error) {
+          pengine.error(error);
         });
     }
   } else {
@@ -285,7 +294,7 @@ Pengine.prototype.pull_response = function() {
   this.request =
     fetch(this.options.server + "/pull_response?id=" + encodeURIComponent(this.id)
           + "&format=" + encodeURIComponent(this.options.format),
-          {credentials: 'same-origin'})
+          {credentials: 'same-origin', signal:this.signal})
     .then(function (resp) {
       if (resp.ok) {
         // TODO: obj.event !== died
@@ -299,7 +308,7 @@ Pengine.prototype.pull_response = function() {
         throw new Error(resp);
       }
     })
-    .catch(function(err) { pengine.error(err, err.statusText, undefined); })
+    .catch(function(err) { pengine.error(err); })
     .then(function() { pengine.request = undefined; });
 };
 
@@ -324,7 +333,7 @@ Pengine.prototype.send = function(event) {
           {method: 'POST',
            body: event + " .\n",
            headers: {'content-type': "application/x-prolog; charset=UTF-8"},
-           credentials: 'same-origin'})
+	   credentials: 'same-origin', signal: this.signal})
     .then(function(resp) {
       if (resp.ok) {
         resp.json()
@@ -334,7 +343,7 @@ Pengine.prototype.send = function(event) {
       }
     })
     .catch(function(error) {
-      pengine.error(error, error.statusText, undefined);
+      pengine.error(error);
     })
     .then(function() { pengine.request = undefined; });
 };
@@ -370,31 +379,29 @@ Pengine.prototype.callback = function(f, obj) {
  * application to retry.
  */
 
-Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
-  if ( jqXHR.pengine_aborted )
+Pengine.prototype.error = function(error) {
+  console.log(error);
+  console.log(error instanceof DOMException);
+
+  if ( this.request && this.request.pengine_aborted )
     return;
 
   var obj = { event:"error", pengine:this };
 
-  if ( jqXHR.responseText ) {
-    var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
-        .replace(/<\/body>/, "");
-    var dummy = document.createElement('div');
-    dummy.innerHTML = msg;
-    var plain = dummy.innerText;
-    obj.data = plain;
-    obj.dataHTML = msg;
-  } else if ( textStatus )
-  { obj.data = "Server status: " + textStatus;
-  } else if ( errorThrown )
-  { obj.data = "Server error: " + errorThrown;
-  }
-  if ( !obj.dataHTML && obj.data )
-    obj.dataHTML = '<span class="error">'+obj.data+'</span>';
-
   unregisterPengine(this);		/* see above */
 
-  this.process_response(obj);
+  if ( error instanceof DOMException ) {
+    if ( error.name == "AbortError" )
+      return;
+
+    obj.data = "Server error: " + error.message;
+    this.process_response(obj);
+  } else
+  { error.json().then(function(err) {
+      obj.data = err;
+      this.process_response(obj);
+    });
+  }
 }
 
 
