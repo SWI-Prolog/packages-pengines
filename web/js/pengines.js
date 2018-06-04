@@ -114,33 +114,22 @@ function Pengine(options) {
 		"destroy"
 	      ]);
 
-  if ( window.AbortController ) {
-    this.abort_controller = new AbortController();
-    this.signal = this.abort_controller.signal;
-  }
-
-  Pengine.requireFetch(function() {
-    that.request =
-    fetch(that.options.server + '/create',
-	  { headers: {'content-type': "application/json; charset=utf-8"},
-	    credentials: 'same-origin',
-	    body: JSON.stringify(createOptions),
-	    method: "POST",
-	    signal: that.signal
-	  })
-      .then(function (resp) {
-	    if (resp.ok) {
-	      resp.json()
-		.then(function (obj) { that.process_response(obj); });
-	    } else {
-	      throw new Error(resp);
-	    }
-      })
-      .catch(function (errorResp) {
-	that.error(errorResp, errorResp.statusText, undefined);
-      })
-      .then(function() { that.request = undefined; });
-  });
+  this.request =
+  $.ajax(this.options.server + '/create',
+	 { contentType: "application/json; charset=utf-8",
+	   dataType: "json",
+	   data: JSON.stringify(createOptions),
+	   type: "POST",
+	   success: function(obj) {
+	     that.process_response(obj);
+	   },
+	   error: function(jqXHR, textStatus, errorThrown) {
+	     that.error(jqXHR, textStatus, errorThrown);
+	   },
+	   complete: function() {
+	     that.request = undefined;
+	   }
+	 });
 
 }/*end of Pengine()*/
 
@@ -209,29 +198,21 @@ Pengine.prototype.abort = function() {
 
   if ( this.request ) {
     this.request.pengine_aborted = true;
-    if ( this.abort_controller ) {
-      this.abort_controller.abort();
-    }
+    this.request.abort();
   }
 
   this.request =
-    fetch(this.options.server + "/abort?id=" + encodeURIComponent(this.id) +
-          "&format=" + encodeURIComponent(this.options.format),
-          {credentials: 'same-origin'})
-    .then(function(resp) {
-      if (resp.ok) {
-        resp.json()
-          .then(function (obj) {pengine.process_response(obj); });
-      } else {
-        throw new Error(resp);
-      }
-    })
-    .catch(function(error) {
-      pengine.error(error);
-    })
-    .then(function() {
-      pengine.request = undefined;
-    });
+  $.get(this.options.server + '/abort',
+	{ id: this.id,
+	  format: this.options.format
+	},
+	function(obj) {
+	  pengine.process_response(obj);
+	}).fail(function(jqXHR, textStatus, errorThrown) {
+	  pengine.error(jqXHR, textStatus, errorThrown);
+	}).always(function() {
+	  pengine.request = undefined;
+	});
 };
 
 /**
@@ -243,21 +224,16 @@ Pengine.prototype.ping = function(interval) {
   var pengine = this;
 
   if ( interval == undefined ) {
-    if ( this.id ) {        /* Might not be there yet */
-      fetch(this.options.server + "/ping?id=" + encodeURIComponent(this.id) +
-            "&format=" + encodeURIComponent(this.options.format),
-            {credentials: 'same-origin'})
-        .then(function(resp) {
-          if (resp.ok) {
-            resp.json()
-              .then(function (obj) { pengine.process_response(obj); });
-          } else {
-            throw new Error(resp);
-          }
-        })
-        .catch(function(error) {
-          pengine.error(error);
-        });
+    if ( this.id ) {				/* Might not be there yet */
+      $.get(this.options.server + '/ping',
+	    { id: this.id,
+	      format: this.options.format
+	    },
+	    function(obj) {
+	      pengine.process_response(obj);
+	    }).fail(function(jqXHR, textStatus, errorThrown) {
+	      pengine.error(jqXHR, textStatus, errorThrown);
+	    });
     }
   } else {
     if ( pengine.pingid )
@@ -292,24 +268,18 @@ Pengine.prototype.pull_response = function() {
   var pengine = this;
 
   this.request =
-    fetch(this.options.server + "/pull_response?id=" + encodeURIComponent(this.id)
-          + "&format=" + encodeURIComponent(this.options.format),
-          {credentials: 'same-origin', signal:this.signal})
-    .then(function (resp) {
-      if (resp.ok) {
-        // TODO: obj.event !== died
-        resp.json()
-          .then(function(obj) {
-            if (obj.event !== 'died') {
-              pengine.process_response(obj);
-            }
-          });
-      } else {
-        throw new Error(resp);
-      }
-    })
-    .catch(function(err) { pengine.error(err); })
-    .then(function() { pengine.request = undefined; });
+  $.get(this.options.server + '/pull_response',
+	{ id: this.id,
+	  format: this.options.format
+	},
+	function(obj) {
+	  if ( obj.event !== 'died')
+	    pengine.process_response(obj);
+	}).fail(function(jqXHR, textStatus, errorThrown) {
+	  pengine.error(jqXHR, textStatus, errorThrown);
+	}).always(function() {
+	  pengine.request = undefined;
+	});
 };
 
 /**
@@ -328,24 +298,22 @@ Pengine.prototype.send = function(event) {
   var pengine = this;
 
   this.request =
-    fetch(pengine.options.server + "/send?format=" + encodeURIComponent(this.options.format)
-          + "&id=" + encodeURIComponent(this.id),
-          {method: 'POST',
-           body: event + " .\n",
-           headers: {'content-type': "application/x-prolog; charset=UTF-8"},
-	   credentials: 'same-origin', signal: this.signal})
-    .then(function(resp) {
-      if (resp.ok) {
-        resp.json()
-          .then(function(obj) { pengine.process_response(obj); });
-      } else {
-        throw new Error(resp);
-      }
-    })
-    .catch(function(error) {
-      pengine.error(error);
-    })
-    .then(function() { pengine.request = undefined; });
+  $.ajax({ type: "POST",
+	   url: pengine.options.server +
+		'/send?format=' + this.options.format +
+		'&id=' + this.id,
+	   data: event + " .\n",
+	   contentType: "application/x-prolog; charset=UTF-8",
+	   success: function(obj) {
+	     pengine.process_response(obj);
+	   },
+	   error: function(jqXHR, textStatus, errorThrown) {
+	     pengine.error(jqXHR, textStatus, errorThrown);
+	   },
+	   complete: function() {
+	     pengine.request = undefined;
+	   }
+         });
 };
 
 Pengine.prototype.script_sources = function(src) {
@@ -379,29 +347,29 @@ Pengine.prototype.callback = function(f, obj) {
  * application to retry.
  */
 
-Pengine.prototype.error = function(error) {
-  console.log(error);
-  console.log(error instanceof DOMException);
-
-  if ( this.request && this.request.pengine_aborted )
+Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
+  if ( jqXHR.pengine_aborted )
     return;
 
   var obj = { event:"error", pengine:this };
 
+  if ( jqXHR.responseText ) {
+    var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
+				.replace(/<\/body>/, "");
+    var plain = $("<div></div>").html(msg).text();
+    obj.data = plain;
+    obj.dataHTML = msg;
+  } else if ( textStatus )
+  { obj.data = "Server status: " + textStatus;
+  } else if ( errorThrown )
+  { obj.data = "Server error: " + errorThrown;
+  }
+  if ( !obj.dataHTML && obj.data )
+    obj.dataHTML = '<span class="error">'+obj.data+'</span>';
+
   unregisterPengine(this);		/* see above */
 
-  if ( error instanceof DOMException ) {
-    if ( error.name == "AbortError" )
-      return;
-
-    obj.data = "Server error: " + error.message;
-    this.process_response(obj);
-  } else
-  { error.json().then(function(err) {
-      obj.data = err;
-      this.process_response(obj);
-    });
-  }
+  this.process_response(obj);
 }
 
 
@@ -687,50 +655,15 @@ Pengine.destroy_all = function(async) {
 
     for(var server in servers) {
       if ( servers.hasOwnProperty(server) ) {
-        fetch(server + "/destroy_all?ids=" + servers[server],
-              {credentials: 'same-origin'});
+	$.ajax({ url:server + '/destroy_all?ids=' + servers[server],
+	         async: async === undefined ? true : false,
+		 timeout: 1000
+	       });
       }
     }
   }
 };
 
-window.addEventListener("beforeunload", function() {
+$(window).on("beforeunload", function() {
   Pengine.destroy_all();
 });
-
-		 /*******************************
-		 *	      FETCH		*
-		 *******************************/
-
-Pengine.fetchScript =
-    "https://cdn.polyfill.io/v2/polyfill.min.js?features=fetch";
-
-/**
- * Ensure we have fetch() and promises.  Code based on
- * https://philipwalton.com/articles/loading-polyfills-only-when-needed/
- * @param {Function} f is called after fetch and promises are
- * available in the browser.
- */
-Pengine.requireFetch = function(f) {
-  function browserSupportsFetch() {
-    return window.Promise && window.fetch;
-  }
-
-  function loadScript(src, done) {
-    var js = document.createElement('script');
-    js.src = src;
-    js.onload = function() {
-      done();
-    };
-    js.onerror = function() {
-      done(new Error('Failed to load script ' + src));
-    };
-    document.head.appendChild(js);
-  }
-
-  if ( browserSupportsFetch() )
-  { f();
-  } else
-  { loadScript(Pengine.fetchScript, f);
-  }
-}

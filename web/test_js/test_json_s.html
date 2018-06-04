@@ -3,6 +3,7 @@
          keys are the variables that do not start with '_'.
     -->
     <head>
+        <script src="/js/jquery-1.11.3.min.js"></script>
         <script src="/js/pengines.js"></script>
         <script src="config.js"></script>
         <script type="text/x-prolog">
@@ -17,14 +18,11 @@
         <script>
 	    var result = [];
 
-	    var options = { onsuccess: handleSuccess,
-			    format: "json-s"
-			  };
-	    for(var k in config) {
-		if ( config.hasOwnProperty(k) )
-		    options[k] = config[k];
-	    }
-
+	    var options = $.extend({},
+				   { onsuccess: handleSuccess,
+				     format: "json-s"
+				   },
+				   config);
 	    if ( !options.ask )
 	      options.oncreate = handleCreate;
 
