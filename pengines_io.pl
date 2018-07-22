@@ -612,6 +612,8 @@ sandbox:safe_primitive(pengines_io:pengine_nl).
 sandbox:safe_primitive(pengines_io:pengine_print(_)).
 sandbox:safe_primitive(pengines_io:pengine_write(_)).
 sandbox:safe_primitive(pengines_io:pengine_read(_)).
+sandbox:safe_primitive(pengines_io:pengine_read_line_to_string(_,_)).
+sandbox:safe_primitive(pengines_io:pengine_read_line_to_codes(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_write_canonical(_)).
 sandbox:safe_primitive(pengines_io:pengine_write_term(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_writeln(_)).
