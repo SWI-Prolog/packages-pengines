@@ -609,6 +609,7 @@ map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
 
 sandbox:safe_primitive(pengines_io:pengine_listing(_)).
 sandbox:safe_primitive(pengines_io:pengine_nl).
+sandbox:safe_primitive(pengines_io:pengine_flush_output).
 sandbox:safe_primitive(pengines_io:pengine_print(_)).
 sandbox:safe_primitive(pengines_io:pengine_write(_)).
 sandbox:safe_primitive(pengines_io:pengine_read(_)).
