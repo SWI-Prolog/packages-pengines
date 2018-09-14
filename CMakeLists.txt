@@ -27,3 +27,9 @@ test_libs(pengines term_html
 
 swipl_examples(examples/client.pl examples/server.pl)
 swipl_examples(${WEB_EXAMPLES} SUBDIR web)
+
+pkg_doc(pengines
+	SOURCE pendoc.md pendoc.tex
+	SUBSECTION
+	SOURCE pengines.pl penlib.tex
+	SOURCE term_to_json.pl termtojson.tex)
