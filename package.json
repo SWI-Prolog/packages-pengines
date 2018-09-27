@@ -1,0 +1,13 @@
+{
+    "name": "pengines",
+    "version": "1.0.0",
+    "dependencies": {
+        "najax": "^1.0.4"
+    },
+    "devDependencies": {
+        "mocha": "^5.2.0"
+    },
+    "scripts": {
+        "test": "mocha node/test.js"
+    }
+}

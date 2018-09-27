@@ -115,7 +115,7 @@ function Pengine(options) {
 	      ]);
 
   this.request =
-  $.ajax(this.options.server + '/create',
+  Pengine.network.ajax(this.options.server + '/create',
 	 { contentType: "application/json; charset=utf-8",
 	   dataType: "json",
 	   data: JSON.stringify(createOptions),
@@ -202,7 +202,7 @@ Pengine.prototype.abort = function() {
   }
 
   this.request =
-  $.get(this.options.server + '/abort',
+  Pengine.network.get(this.options.server + '/abort',
 	{ id: this.id,
 	  format: this.options.format
 	},
@@ -225,7 +225,7 @@ Pengine.prototype.ping = function(interval) {
 
   if ( interval == undefined ) {
     if ( this.id ) {				/* Might not be there yet */
-      $.get(this.options.server + '/ping',
+      Pengine.network.get(this.options.server + '/ping',
 	    { id: this.id,
 	      format: this.options.format
 	    },
@@ -268,7 +268,7 @@ Pengine.prototype.pull_response = function() {
   var pengine = this;
 
   this.request =
-  $.get(this.options.server + '/pull_response',
+  Pengine.network.get(this.options.server + '/pull_response',
 	{ id: this.id,
 	  format: this.options.format
 	},
@@ -298,13 +298,17 @@ Pengine.prototype.send = function(event) {
   var pengine = this;
 
   this.request =
-  $.ajax({ type: "POST",
+  Pengine.network.ajax({ type: "POST",
 	   url: pengine.options.server +
 		'/send?format=' + this.options.format +
 		'&id=' + this.id,
 	   data: event + " .\n",
 	   contentType: "application/x-prolog; charset=UTF-8",
 	   success: function(obj) {
+       if (typeof obj === 'string') {
+         // najax does not parse response as JSON automatically.
+         obj = JSON.parse(obj);
+       }
 	     pengine.process_response(obj);
 	   },
 	   error: function(jqXHR, textStatus, errorThrown) {
@@ -317,6 +321,9 @@ Pengine.prototype.send = function(event) {
 };
 
 Pengine.prototype.script_sources = function(src) {
+  if (typeof document === 'undefined') {
+    return src;
+  }
   var scripts = document.getElementsByTagName('script');
 
   src = src||[];
@@ -356,7 +363,12 @@ Pengine.prototype.error = function(jqXHR, textStatus, errorThrown) {
   if ( jqXHR.responseText ) {
     var msg = jqXHR.responseText.replace(/[^]*<body[^>]*>/, "")
 				.replace(/<\/body>/, "");
-    var plain = $("<div></div>").html(msg).text();
+    var plain;
+    if (typeof $ === 'undefined') {
+      plain = msg.replace(/(<([^>]+)>)/ig, '');
+    } else {
+      plain = $("<div></div>").html(msg).text();
+    }
     obj.data = plain;
     obj.dataHTML = msg;
   } else if ( textStatus )
@@ -655,7 +667,7 @@ Pengine.destroy_all = function(async) {
 
     for(var server in servers) {
       if ( servers.hasOwnProperty(server) ) {
-	$.ajax({ url:server + '/destroy_all?ids=' + servers[server],
+	Pengine.network.ajax({ url:server + '/destroy_all?ids=' + servers[server],
 	         async: async === undefined ? true : false,
 		 timeout: 1000
 	       });
@@ -664,6 +676,16 @@ Pengine.destroy_all = function(async) {
   }
 };
 
-$(window).on("beforeunload", function() {
-  Pengine.destroy_all();
-});
+if (typeof window === 'undefined') {
+  // Node.js
+  module.exports = Pengine;
+  var najax = require('najax');
+  Pengine.network = najax;
+  Pengine.network.ajax = najax;
+} else {
+  Pengine.network = $;
+  // Browser
+  $(window).on("beforeunload", function() {
+    Pengine.destroy_all();
+  });
+}
