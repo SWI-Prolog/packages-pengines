@@ -112,7 +112,7 @@ Start pengines server on port 8000:
 
 ```
 swipl -s examples/server.pl
-server(8000).
+-? server(8000).
 ```
 
 and run tests:
@@ -124,4 +124,4 @@ npm test
 
 ## License
 
-Pengines are licensed under the BSD 2-Clause license. See the header of pengines.js file.
+Pengines is licensed under the BSD 2-Clause license. See the header of web/js/pengines.js file.

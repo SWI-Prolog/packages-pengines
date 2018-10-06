@@ -1,6 +1,6 @@
 {
     "name": "pengines",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "dependencies": {
         "najax": "^1.0.4"
     },
@@ -9,5 +9,13 @@
     },
     "scripts": {
         "test": "mocha node/test.js"
-    }
+    },
+    "main": "web/js/pengines.js",
+    "license" : "BSD-2-Clause",
+    "bugs": {
+        "url" : "https://github.com/SWI-Prolog/packages-pengines/issues"
+    },
+    "files": [
+        "web/js/pengines.js"
+    ]
 }
