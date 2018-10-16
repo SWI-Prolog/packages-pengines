@@ -200,12 +200,10 @@ Pengine.prototype.abort = function() {
     this.request.pengine_aborted = true;
     this.request.abort();
   }
-
-  this.request =
-  Pengine.network.get(this.options.server + '/abort',
-	{ id: this.id,
-	  format: this.options.format
-	},
+  var url = this.options.server + '/abort' +
+    '?id=' + encodeURIComponent(this.id) +
+    '&format=' + encodeURIComponent(this.options.format);
+  this.request = Pengine.network.get(url,
 	function(obj) {
 	  pengine.process_response(obj);
 	}).fail(function(jqXHR, textStatus, errorThrown) {
@@ -225,10 +223,10 @@ Pengine.prototype.ping = function(interval) {
 
   if ( interval == undefined ) {
     if ( this.id ) {				/* Might not be there yet */
-      Pengine.network.get(this.options.server + '/ping',
-	    { id: this.id,
-	      format: this.options.format
-	    },
+      var url = this.options.server + '/ping' +
+        '?id=' + encodeURIComponent(this.id) +
+        '&format=' + encodeURIComponent(this.options.format);
+      Pengine.network.get(url,
 	    function(obj) {
 	      pengine.process_response(obj);
 	    }).fail(function(jqXHR, textStatus, errorThrown) {
@@ -267,11 +265,10 @@ Pengine.prototype.destroy = function() {
 Pengine.prototype.pull_response = function() {
   var pengine = this;
 
-  this.request =
-  Pengine.network.get(this.options.server + '/pull_response',
-	{ id: this.id,
-	  format: this.options.format
-	},
+  var url = this.options.server + '/pull_response' +
+    '?id=' + encodeURIComponent(this.id) +
+    '&format=' + encodeURIComponent(this.options.format);
+  this.request = Pengine.network.get(url,
 	function(obj) {
 	  if ( obj.event !== 'died')
 	    pengine.process_response(obj);
@@ -297,18 +294,14 @@ Pengine.prototype.pull_response = function() {
 Pengine.prototype.send = function(event) {
   var pengine = this;
 
-  this.request =
-  Pengine.network.ajax({ type: "POST",
-	   url: pengine.options.server +
-		'/send?format=' + this.options.format +
-		'&id=' + this.id,
+  var url = pengine.options.server +
+		'/send?format=' + encodeURIComponent(this.options.format) +
+		'&id=' + encodeURIComponent(this.id);
+  this.request = Pengine.network.ajax({ type: "POST",
+	   url: url,
 	   data: event + " .\n",
 	   contentType: "application/x-prolog; charset=UTF-8",
 	   success: function(obj) {
-       if (typeof obj === 'string') {
-         // najax does not parse response as JSON automatically.
-         obj = JSON.parse(obj);
-       }
 	     pengine.process_response(obj);
 	   },
 	   error: function(jqXHR, textStatus, errorThrown) {
@@ -336,7 +329,10 @@ Pengine.prototype.script_sources = function(src) {
   return src;
 };
 
-Pengine.prototype.process_response = function(obj) {
+Pengine.prototype.process_response = function(response) {
+  // Processes response coming from either jQuery or najax.
+  // najax does not parse JSON automatically.
+  var obj = typeof response === 'string' ? JSON.parse(response) : response;
   obj.pengine = this;
   Pengine.onresponse[obj.event].call(this, obj);
 };
