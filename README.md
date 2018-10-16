@@ -28,12 +28,10 @@ options is a JavaScript object contaning zero or more of
     <dd>The maximum number of solutions to retrieve in one chunk. 1 means no chunking (default).</dd>
     <dt>destroy:boolean</dt>
     <dd>Determines if the pengine is to destroy itself after having run a query to completion. Defaults to true.</dd>
-    <dt>srctext:string</dt>
+    <dt>src:string</dt>
     <dd>Prolog source code to be injected in the pengine before attempting to solve any queries.</dd>
-    <dt>srcurl:string</dt>
-    <dd>A URL resolving to a file containing Prolog source code to be injected in the pengine before attempting to solve any queries.</dd>
     <dt>format:string</dt>
-    <dd>Determines the format of event responses. Format is a string, either json (default), json-s or json-html. In addition, new formats can be added by defining event_to_json/3. See library(pengines_io).</dd>
+    <dd>Determines the format of event responses, default is json. New formats can be added by defining event_to_json/3. See library(pengines_io).</dd>
     <dt>oncreate:function</dt>
     <dd>JavaScript function to be called when a pengine has been created. The expression this.id in the scope of the function points to the id of the pengine.</dd>
     <dt>onsuccess:function</dt>
