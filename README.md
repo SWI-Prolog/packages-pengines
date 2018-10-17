@@ -97,28 +97,17 @@ and follow the JavaScript API description above.
 
 ## Testing
 
-To test Pengines in browser, you will need to install Slimerjs and Firefox.
-The Firefox version must be between 53 to 59.
+To test the Pengines JavaScript API, you need to install required
+testing dependencies using the `npm install` command in the
+project root directory.
+
+Then load `test_js.pl` in SWI-Prolog:
 
 ```
 -? [test_js].
 ```
 
-To run Node.js tests:
-
-Start pengines server on port 8000:
-
-```
-swipl -s examples/server.pl
--? server(8000).
-```
-
-and run tests:
-
-```
-npm install
-npm test
-```
+and run tests using `run_tests`.
 
 ## License
 

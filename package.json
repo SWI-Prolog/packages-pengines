@@ -5,15 +5,14 @@
         "najax": "^1.0.4"
     },
     "devDependencies": {
-        "mocha": "^5.2.0"
-    },
-    "scripts": {
-        "test": "mocha node/test.js"
+        "jquery": "^3.3.1",
+        "mocha": "^5.2.0",
+        "puppeteer": "^1.9.0"
     },
     "main": "web/js/pengines.js",
-    "license" : "BSD-2-Clause",
+    "license": "BSD-2-Clause",
     "bugs": {
-        "url" : "https://github.com/SWI-Prolog/packages-pengines/issues"
+        "url": "https://github.com/SWI-Prolog/packages-pengines/issues"
     },
     "files": [
         "web/js/pengines.js"
