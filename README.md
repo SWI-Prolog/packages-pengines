@@ -78,6 +78,12 @@ A pengine object also provides access to the following fields and methods.
     <dd>Destroys the pengine.</dd>
 </dl>
 
+## Examples
+
+Please refer to documentation at [here][documentation] for working examples.
+
+[documentation]:http://www.swi-prolog.org/pldoc/man?section=pengine-overview
+
 ## The Prolog API
 
 The Prolog API is documented in the following document: [Prolog API][prolog-api].
