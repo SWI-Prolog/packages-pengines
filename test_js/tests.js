@@ -32,7 +32,9 @@ function check(condition) {
   }
 }
 
-describe('JavaScript Pengines', function() {
+var name = typeof window === 'undefined' ? 'Node' : 'Browser';
+
+describe(name + ' Pengines', function() {
   it('should successfully create a pengine', function(done) {
     var pengine = new Pengine(testOptions(done, {
       oncreate: handleCreate
@@ -182,7 +184,7 @@ describe('JavaScript Pengines', function() {
     var pengine = new Pengine(testOptions(done, {
       oncreate: handleCreate,
       onsuccess: handleSuccess,
-      format: "json-html"
+      format: 'json-html'
     }));
     function handleCreate() {
       pengine.ask('q(X)');
@@ -198,7 +200,7 @@ describe('JavaScript Pengines', function() {
     var pengine = new Pengine(testOptions(done, {
       oncreate: handleCreate,
       onsuccess: handleSuccess,
-      format: "json-s"
+      format: 'json-s'
     }));
     function handleCreate() {
       pengine.ask('X = c(a)');
@@ -257,6 +259,251 @@ describe('JavaScript Pengines', function() {
       pengine.destroy();
     }
   });
-  // Test pengine_output.
-  // TODO test sandbox
+  it('should call the output handler when pengine_output is called', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      src: 'test_helper:- pengine_output(test_message).',
+      oncreate: handleCreate,
+      onoutput: handleOutput,
+    }));
+    function handleCreate() {
+      pengine.ask('test_helper');
+    }
+    function handleOutput() {
+      check(this.data === 'test_message');
+    }
+  });
+  it('should call the ping handler when single-shot ping is requested', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      oncreate: handleCreate,
+      onping: handlePing,
+    }));
+    function handleCreate() {
+      pengine.ping();
+    }
+    function handlePing() {
+      pengine.destroy();
+    }
+  });
+  it('should call the ping handler when periodic ping is requested', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      oncreate: handleCreate,
+      onping: handlePing,
+    }));
+    var count = 0;
+    function handleCreate() {
+      pengine.ping(100);
+    }
+    function handlePing() {
+      if (count > 3) {
+        pengine.destroy();
+      } else {
+        count += 1;
+      }
+    }
+  });
+  it('should call the prompt handler when input is requested', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      src: 'test_helper(X):- pengine_input(p, X).',
+      oncreate: handleCreate,
+      onprompt: handlePrompt,
+      onsuccess: handleSuccess
+    }));
+    function handleCreate() {
+      pengine.ask('test_helper(X)');
+    }
+    function handlePrompt() {
+      check(this.data === 'p');
+      pengine.respond('response_from_prompt');
+    }
+    function handleSuccess() {
+      check(this.data[0].X === 'response_from_prompt');
+    }
+  });
+  it('should correctly represent Prolog terms', function(done) {
+    // TODO: it does not seem to handle cyclic terms?
+    var terms = `
+      terms(tag{
+        integer: 1,
+        float: 1.0,
+        atom: abc,
+        string: "def",
+        compound: t(f,g),
+        list: [1,2,3],
+        variable: V,
+        incomplete_list: [1|_]
+      }).
+    `;
+    var pengine = new Pengine(testOptions(done, {
+      src: terms,
+      ask: 'terms(X)',
+      onsuccess: handleSuccess
+    }));
+    function handleSuccess() {
+      var dict = this.data[0].X;
+      check(dict.integer === 1);
+      check(dict.float === 1);
+      check(dict.atom === 'abc');
+      check(dict.string === 'def');
+      check(dict.compound.functor === 't');
+      check(dict.compound.args[0] === 'f');
+      check(dict.list.length === 3);
+      check(dict.list[0] === 1);
+      check(dict.variable === '_');
+      check(dict.incomplete_list.functor === '[|]');
+      pengine.destroy();
+    }
+  });
+  it('should not allow to call non-sandboxed predicates', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      src: 'test_helper:- read(_).',
+      oncreate: handleCreate,
+      onerror: handleError
+    }));
+    function handleCreate() {
+      pengine.ask('test_helper');
+    }
+    function handleError(err) {
+      check(err.code === 'permission_error');
+      pengine.destroy();
+    }
+  });
+  it('should handle child pengines', function(done) {
+    var src = `
+      start :-
+        pengine_create(
+          [ alias(foo),
+            src_text("foo(a). foo(b). foo(c). foo(d).")
+        ]),
+        pengine_create(
+          [ alias(bar),
+            src_text("bar(1). bar(2). bar(3). bar(4).")
+        ]),
+        pengine_event_loop(handler, []).
+
+	    :- dynamic seen_success/1.
+	    :- dynamic delay_next/1.
+
+      handler(create(ID, _)) :-
+        (  pengine_property(ID, alias(foo))
+        -> pengine_ask(ID, foo(X), [template(X)])
+        ;  pengine_property(ID, alias(bar))
+        -> pengine_ask(ID, bar(X), [template(X)])
+        ).
+      handler(success(_ID, Sol, false)) :-
+        pengine_output(Sol).
+      handler(success(ID, Sol, true)) :-
+	      (  seen_success(ID)
+		    -> true
+		    ;  asserta(seen_success(ID)),
+		       forall(retract(delay_next(ID)),
+			     pengine_next(ID, []))
+		    ),
+        pengine_output(Sol),
+        (  pengine_property(ID, alias(foo))
+        -> pengine_property(Bar, alias(bar)),
+		       (  seen_success(Bar)
+		       -> pengine_next(bar, [])
+		       ;  assertz(delay_next(Bar))
+		       )
+        ;  pengine_property(ID, alias(bar))
+        -> pengine_property(Foo, alias(foo)),
+		       (  seen_success(Foo)
+		       -> pengine_next(foo, [])
+		       ;  assertz(delay_next(Foo))
+		       )
+        ).
+    `;
+    var pengine = new Pengine(testOptions(done, {
+      src: src,
+      oncreate: handleCreate,
+      onoutput: handleOutput,
+      ondestroy: handleDestroy
+    }));
+    function handleCreate() {
+      pengine.ask('start');
+    }
+    var list = [];
+    function handleOutput() {
+      list.push(this.data[0]);
+    }
+    function handleDestroy() {
+      list.sort();
+      check(list.join(',') === '1,2,3,4,a,b,c,d');
+      done();
+    }
+  });
+  it('should automatically destroy the Pengine upon deterministic call completion', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      src: 'deterministic:- true.',
+      oncreate: handleCreate,
+      ondestroy: handleDestroy
+    }));
+    function handleCreate() {
+      pengine.ask('deterministic');
+    }
+    function handleDestroy() {
+      done();
+    }
+  });
+  it('should not automatically destroy the Pengine upon deterministic call completion when destroy: false', function(done) {
+    var pengine = new Pengine(testOptions(done, {
+      src: 'deterministic:- true.',
+      destroy: false,
+      oncreate: handleCreate,
+      ondestroy: handleDestroy,
+      onsuccess: handleSuccess
+    }));
+    function handleCreate() {
+      pengine.ask('deterministic');
+    }
+    var destroyCalled = false;
+    function handleSuccess() {
+      setTimeout(function() {
+        if (destroyCalled) {
+          done(new Error('Destroy handle was called prematurely.'));
+        } else {
+          // Call destroy explicitly.
+          pengine.destroy();
+        }
+      }, 300);
+    }    
+    function handleDestroy() {
+      destroyCalled = true;
+      done();
+    }
+  });
+  if (typeof window !== 'undefined') {
+    // Applies only in browser environment.
+    it('should pick up text/x-prolog code from the page', function(done) {
+      var pengine = new Pengine(testOptions(done, {
+        ask: 'page_prolog_pred(X)',
+        onsuccess: handleSuccess
+      }));
+      function handleSuccess() {
+        check(this.data[0].X === 'hello_from_page');
+        pengine.destroy();
+      }
+    });    
+  }
+  it('should abort infinite loop', function(done) {
+    // TODO: should test abort with ask option.
+    var pengine = new Pengine(testOptions(done, {
+      src: 'loop:- loop.',
+      oncreate: handleCreate,
+      onerror: handleError,
+      ondestroy: handleDestroy
+    }));
+    setTimeout(function() {
+      pengine.abort();
+    }, 500);
+    function handleCreate() {
+      pengine.ask('loop');
+    }
+    function handleDestroy() {
+      done();
+    }
+    function handleError(err) {
+      check(err.code === 'died');
+    }
+  });
 });
