@@ -283,15 +283,19 @@ message_lines([flush]) -->
     !.
 message_lines([ansi(Attributes, Fmt, Args)|T]) -->
     !,
-    { foldl(style, Attributes, Fmt-Args, HTML) },
+    {  is_list(Attributes)
+    -> foldl(style, Attributes, Fmt-Args, HTML)
+    ;  style(Attributes, Fmt-Args, HTML)
+    },
     html(HTML),
     message_lines(T).
 message_lines([H|T]) -->
     html(H),
     message_lines(T).
 
-style(bold, Content, b(Content)).
-style(fg(Color), Content, span(style('color:'+Color), Content)).
+style(bold, Content, b(Content)) :- !.
+style(fg(default), Content, span(style('color: black'), Content)) :- !.
+style(fg(Color), Content, span(style('color:'+Color), Content)) :- !.
 style(_, Content, Content).
 
 
