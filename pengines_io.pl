@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2017, VU University Amsterdam
+    Copyright (c)  2014-2018, VU University Amsterdam
+                              CWI, Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -601,6 +602,18 @@ map_output(ID, Term, json{event:output, id:ID, data:Data}) :-
     ->  Data = Term
     ;   term_string(Term, Data)
     ).
+
+
+%!  prolog_help:show_html_hook(+HTML)
+%
+%   Hook into help/1 to render the help output in the SWISH console.
+
+:- multifile
+    prolog_help:show_html_hook/1.
+
+prolog_help:show_html_hook(HTML) :-
+    pengine_output,
+    pengine_output(HTML).
 
 
                  /*******************************
