@@ -57,7 +57,9 @@
 
             pengine_io_predicate/1,     % ?Head
             pengine_bind_io_to_html/1,  % +Module
-            pengine_io_goal_expansion/2 % +Goal, -Expanded
+            pengine_io_goal_expansion/2,% +Goal, -Expanded
+
+            message_lines_to_html/3     % +Lines, +Classes, -HTML
           ]).
 :- use_module(library(lists)).
 :- use_module(library(pengines)).
@@ -265,14 +267,23 @@ user:message_hook(Term, Kind, Lines) :-
     Kind \== silent,
     pengine_self(_),
     atom_concat('msg-', Kind, Class),
-    phrase(html(pre(class(['prolog-message', Class]),
-                    \message_lines(Lines))), Tokens),
-    with_output_to(string(HTMlString), print_html(Tokens)),
+    message_lines_to_html(Lines, [Class], HTMlString),
     (   source_location(File, Line)
     ->  Src = File:Line
     ;   Src = (-)
     ),
     pengine_output(message(Term, Kind, HTMlString, Src)).
+
+%!  message_lines_to_html(+MessageLines, +Classes, -HTMLString) is det.
+%
+%   Helper that translates the `Lines` argument from user:message_hook/3
+%   into an HTML string. The  HTML  is   a  <pre>  object with the class
+%   `'prolog-message'` and the given Classes.
+
+message_lines_to_html(Lines, Classes, HTMlString) :-
+    phrase(html(pre(class(['prolog-message'|Classes]),
+                    \message_lines(Lines))), Tokens),
+    with_output_to(string(HTMlString), print_html(Tokens)).
 
 message_lines([]) -->
     !.
