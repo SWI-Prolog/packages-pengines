@@ -1267,11 +1267,13 @@ solve(Chunk, Template, Goal, ID) :-
     Time = time(Epoch),
     nb_current('$variable_names', Bindings),
     filter_template(Template, Bindings, Template2),
-    (   call_cleanup(catch(findnsols_no_empty(State, Template2,
+    '$current_typein_module'(CurrTypeIn),
+    (   '$set_typein_module'(ID),
+        call_cleanup(catch(findnsols_no_empty(State, Template2,
                                               set_projection(Goal, Bindings),
                                               Result),
                            Error, true),
-                     Det = true),
+                     query_done(Det, CurrTypeIn)),
         arg(1, Time, T0),
         statistics(cputime, T1),
         CPUTime is T1-T0,
@@ -1298,6 +1300,10 @@ solve(Chunk, Template, Goal, ID) :-
         destroy_or_continue(failure(ID, CPUTime))
     ).
 solve(_, _, _, _).                      % leave a choice point
+
+query_done(true, CurrTypeIn) :-
+    '$set_typein_module'(CurrTypeIn).
+
 
 %!  set_projection(:Goal, +Bindings)
 %
