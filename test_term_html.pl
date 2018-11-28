@@ -46,7 +46,8 @@
 :- use_module(library(xpath)).
 :- use_module(library(http/html_write)).
 
-:- use_module(http/term_html).
+:- asserta(user:file_search_path(library, '.')).
+:- use_module(library(http/term_html)).
 
 test_term_html :-
     run_tests([ term_html
