@@ -33,4 +33,5 @@ pkg_doc(pengines
 	SOURCE pendoc.md pendoc.tex
 	SUBSECTION
 	SOURCE pengines.pl penlib.tex
-	SOURCE term_to_json.pl termtojson.tex)
+	SOURCE term_to_json.pl termtojson.tex
+        IMAGES pltpsynch.png penarch.png pltpruncolour.png)
