@@ -187,7 +187,7 @@ pengine_write_term(Term, Options) :-
 %   Redirect the corresponding Prolog output predicates.
 
 pengine_write(Term) :-
-    pengine_write_term(Term, []).
+    pengine_write_term(Term, [numbervars(true)]).
 pengine_writeq(Term) :-
     pengine_write_term(Term, [quoted(true), numbervars(true)]).
 pengine_display(Term) :-
