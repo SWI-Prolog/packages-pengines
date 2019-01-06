@@ -1021,10 +1021,11 @@ pengine_create_option(user(_)).
 
 pengine_done :-
     thread_self(Me),
-    (   thread_property(Me, status(exception('$aborted')))
-    ->  pengine_self(Pengine),
-        pengine_reply(destroy(Pengine, abort(Pengine))),
-        thread_detach(Me)
+    (   thread_property(Me, status(exception('$aborted'))),
+        thread_detach(Me),
+        pengine_self(Pengine)
+    ->  catch(pengine_reply(destroy(Pengine, abort(Pengine))),
+              error(_,_), true)
     ;   true
     ),
     forall(child(_Name, Child),
