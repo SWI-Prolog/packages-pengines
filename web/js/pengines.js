@@ -95,6 +95,14 @@ function Pengine(options) {
     }
   }
 
+  // initialize network support in browser
+  if (typeof Pengine.network === "undefined") { 
+    Pengine.network = $;  // assume jQuery initialized by now
+    $(window).on("beforeunload", function() {
+      Pengine.destroy_all();
+    });
+  }
+
   // create instance
   this.options = fillDefaultOptions(options);
   this.id = null;
@@ -678,10 +686,4 @@ if (typeof window === 'undefined') {
   var najax = require('najax');
   Pengine.network = najax;
   Pengine.network.ajax = najax;
-} else {
-  Pengine.network = $;
-  // Browser
-  $(window).on("beforeunload", function() {
-    Pengine.destroy_all();
-  });
 }
