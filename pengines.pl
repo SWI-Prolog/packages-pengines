@@ -2586,6 +2586,8 @@ http_pengine_ping(Request) :-
 output_result(Format, Event) :-
     arg(1, Event, Pengine),
     thread_self(Thread),
+    cors_enable,            % contingent on http:cors setting
+    disable_client_cache,
     setup_call_cleanup(
         asserta(pengine_replying(Pengine, Thread), Ref),
         catch(output_result(Format, Event, _{}),
@@ -2593,6 +2595,9 @@ output_result(Format, Event) :-
               true),
         erase(Ref)).
 
+output_result(Lang, Event, Dict) :-
+    write_result(Lang, Event, Dict),
+    !.
 output_result(prolog, Event, _) :-
     !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
@@ -2604,16 +2609,11 @@ output_result(prolog, Event, _) :-
                  portray_goal(portray_blob),
                  nl(true)
                ]).
-output_result(Lang, Event, Dict) :-
-    write_result(Lang, Event, Dict),
-    !.
 output_result(Lang, Event, _) :-
     json_lang(Lang),
     !,
     (   event_term_to_json_data(Event, JSON, Lang)
-    ->  cors_enable,
-        disable_client_cache,
-        reply_json(JSON)
+    ->  reply_json(JSON)
     ;   assertion(event_term_to_json_data(Event, _, Lang))
     ).
 output_result(Lang, _Event, _) :-    % FIXME: allow for non-JSON format
