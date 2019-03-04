@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2018, VU University Amsterdam
+    Copyright (c)  2014-2019, VU University Amsterdam
                               CWI, Amsterdam
     All rights reserved.
 
@@ -76,7 +76,9 @@
 :- if(exists_source(library(prolog_stream))).
 :- use_module(library(prolog_stream)).
 :- endif.
+
 :- html_meta send_html(html).
+:- public send_html/1.
 
 :- meta_predicate
     pengine_format(+,:).
