@@ -2224,7 +2224,7 @@ create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Page ~D: got ~q from ~q', [Page, Event, Queue]),
             (   destroy_queue_from_http(Pengine, Event, Queue)
-            ->  !, output_result(Format, page(Page, Event))
+            ->  !, output_result(Format, page(Page, Event), Dict)
             ;   is_more_event(Event)
             ->  pengine_thread(Pengine, Thread),
                 thread_send_message(Thread, pengine_request(next)),
