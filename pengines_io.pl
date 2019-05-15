@@ -482,35 +482,67 @@ pengines:event_to_json(output(ID, Term), JSON, 'json-html') :-
 
 map_answer(ID, Bindings0, ResVars, Answer) :-
     dict_bindings(Bindings0, Bindings1),
-    select_residuals(Bindings1, Bindings2, ResVars, Residuals0),
+    select_residuals(Bindings1, Bindings2, ResVars, Residuals0, Clauses),
     append(Residuals0, Residuals1),
     prolog:translate_bindings(Bindings2, Bindings3, [], Residuals1,
                               ID:Residuals-_HiddenResiduals),
     maplist(binding_to_html(ID), Bindings3, VarBindings),
-    (   Residuals == []
-    ->  Answer = json{variables:VarBindings}
-    ;   residuals_html(Residuals, ID, ResHTML),
-        Answer = json{variables:VarBindings, residuals:ResHTML}
-    ).
+    final_answer(ID, VarBindings, Residuals, Clauses, Answer).
+
+final_answer(_Id, VarBindings, [], [], Answer) :-
+    !,
+    Answer = json{variables:VarBindings}.
+final_answer(ID, VarBindings, Residuals, [], Answer) :-
+    !,
+    residuals_html(Residuals, ID, ResHTML),
+    Answer = json{variables:VarBindings, residuals:ResHTML}.
+final_answer(ID, VarBindings, [], Clauses, Answer) :-
+    !,
+    clauses_html(Clauses, ID, ClausesHTML),
+    Answer = json{variables:VarBindings, wfs_residual_program:ClausesHTML}.
+final_answer(ID, VarBindings, Residuals, Clauses, Answer) :-
+    !,
+    residuals_html(Residuals, ID, ResHTML),
+    clauses_html(Clauses, ID, ClausesHTML),
+    Answer = json{variables:VarBindings,
+                  residuals:ResHTML,
+                  wfs_residual_program:ClausesHTML}.
 
 residuals_html([], _, []).
 residuals_html([H0|T0], Module, [H|T]) :-
     term_html_string(H0, [], Module, H, [priority(999)]),
     residuals_html(T0, Module, T).
 
+clauses_html(Clauses, _ID, HTMLString) :-
+    with_output_to(string(Program), list_clauses(Clauses)),
+    phrase(html(pre([class('wfs-residual-program')], Program)), Tokens),
+    with_output_to(string(HTMLString), print_html(Tokens)).
+
+list_clauses([]).
+list_clauses([H|T]) :-
+    portray_clause(H),
+    list_clauses(T).
+
 dict_bindings(Dict, Bindings) :-
     dict_pairs(Dict, _Tag, Pairs),
     maplist([N-V,N=V]>>true, Pairs, Bindings).
 
-select_residuals([], [], [], []).
-select_residuals([H|T], Bindings, Vars, Residuals) :-
+select_residuals([], [], [], [], []).
+select_residuals([H|T], Bindings, Vars, Residuals, Clauses) :-
     binding_residual(H, Var, Residual),
     !,
     Vars = [Var|TV],
     Residuals = [Residual|TR],
-    select_residuals(T, Bindings, TV, TR).
-select_residuals([H|T0], [H|T], Vars, Residuals) :-
-    select_residuals(T0, T, Vars, Residuals).
+    select_residuals(T, Bindings, TV, TR, Clauses).
+select_residuals([H|T], Bindings, Vars, Residuals, Clauses) :-
+    binding_residual_clauses(H, Var, Delays, Clauses0),
+    !,
+    Vars = [Var|TV],
+    Residuals = [Delays|TR],
+    append(Clauses0, CT, Clauses),
+    select_residuals(T, Bindings, TV, TR, CT).
+select_residuals([H|T0], [H|T], Vars, Residuals, Clauses) :-
+    select_residuals(T0, T, Vars, Residuals, Clauses).
 
 binding_residual('_residuals' = '$residuals'(Residuals), '_residuals', Residuals) :-
     is_list(Residuals).
@@ -518,6 +550,15 @@ binding_residual('Residuals' = '$residuals'(Residuals), 'Residuals', Residuals) 
     is_list(Residuals).
 binding_residual('Residual'  = '$residual'(Residual),   'Residual', [Residual]) :-
     callable(Residual).
+
+binding_residual_clauses(
+    '_wfs_residual_program' = '$wfs_residual_program'(Delays, Clauses),
+    '_wfs_residual_program', Residuals, Clauses) :-
+    phrase(comma_list(Delays), Residuals).
+
+comma_list(true) --> !.
+comma_list((A,B)) --> !, comma_list(A), comma_list(B).
+comma_list(A) --> [A].
 
 add_projection(-, _, JSON, JSON) :- !.
 add_projection(VarNames0, ResVars0, JSON0, JSON) :-
