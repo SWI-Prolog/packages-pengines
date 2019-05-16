@@ -4,7 +4,7 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2016, Torbjörn Lager,
+    Copyright (C): 2014-2019, Torbjörn Lager,
                               VU University Amsterdam
     All rights reserved.
 
@@ -373,7 +373,8 @@ pengine_reply(Queue, Event0) :-
     wrap_first_answer(ID, Event0, Event),
     random_delay,
     debug(pengine(event), 'Reply to ~p: ~p', [Queue, Event]),
-    (   pengine_self(ID)
+    (   pengine_self(ID),
+        \+ pengine_detached(ID, _)
     ->  get_pengine_application(ID, Application),
         setting(Application:idle_limit, IdleLimit),
         debug(pengine(reply), 'Sending ~p, timout: ~q', [Event, IdleLimit]),
@@ -616,13 +617,15 @@ pengine_destroy(ID, _) :-
     pengine_queue/4,                % Id, Queue, TimeOut, Time
     output_queue/3,                 % Id, Queue, Time
     pengine_user/2,                 % Id, User
-    pengine_data/2.                 % Id, Data
+    pengine_data/2,                 % Id, Data
+    pengine_detached/2.             % Id, Data
 :- volatile
     current_pengine/6,
     pengine_queue/4,
     output_queue/3,
     pengine_user/2,
-    pengine_data/2.
+    pengine_data/2,
+    pengine_detached/2.
 
 :- thread_local
     child/2.                        % ?Name, ?Child
@@ -848,6 +851,8 @@ properties are:
   * source(?SourceID, ?Source)
     Source is the source code with the given SourceID. May be present if
     the setting `debug_info` is present.
+  * detached(?Time)
+    Pengine was detached at Time.
 */
 
 
@@ -878,6 +883,8 @@ pengine_property2(parent(Parent), Id) :-
     current_pengine(Id, Parent, _Thread, _URL, _Application, _Destroy).
 pengine_property2(source(SourceID, Source), Id) :-
     pengine_data(Id, source(SourceID, Source)).
+pengine_property2(detached(When), Id) :-
+    pengine_detached(Id, When).
 
 /** pengine_output(+Term) is det
 
@@ -2058,6 +2065,8 @@ pengine_rpc_output(_ID, Term) :-
 :- http_handler(root(pengine/pull_response), http_pengine_pull_response,
                 [ time_limit(infinite), spawn([]) ]).
 :- http_handler(root(pengine/abort),         http_pengine_abort,         []).
+:- http_handler(root(pengine/detach),        http_pengine_detach,        []).
+:- http_handler(root(pengine/list),          http_pengine_list,          []).
 :- http_handler(root(pengine/ping),          http_pengine_ping,          []).
 :- http_handler(root(pengine/destroy_all),   http_pengine_destroy_all,   []).
 
@@ -2508,6 +2517,7 @@ http_pengine_pull_response(Request) :-
             [   id(ID, []),
                 format(Format, [default(prolog)])
             ]),
+    reattach(ID),
     (   (   pengine_queue(ID, Queue, TimeLimit, _)
         ->  true
         ;   output_queue(ID, Queue, _),
@@ -2525,7 +2535,7 @@ http_pengine_pull_response(Request) :-
 %   wait_and_output_result/4.
 
 http_pengine_abort(Request) :-
-    reply_options(Request, [get]),
+    reply_options(Request, [get,post]),
     !.
 http_pengine_abort(Request) :-
     http_parameters(Request,
@@ -2541,15 +2551,64 @@ http_pengine_abort(Request) :-
     ;   http_404([], Request)
     ).
 
+%!  http_pengine_detach(+Request)
+%
+%   Detach a Pengine while keeping it running.  This has the following
+%   consequences:
+%
+%     - `/destroy_all` including the id of this pengine is ignored.
+%     - Output from the pengine is stored in the queue without
+%       waiting for the queue to drain.
+%     - The Pengine becomes available through `/list`
+
+http_pengine_detach(Request) :-
+    reply_options(Request, [post]),
+    !.
+http_pengine_detach(Request) :-
+    http_parameters(Request,
+                    [ id(ID, [])
+                    ]),
+    http_read_json_dict(Request, ClientData),
+    (   pengine_property(ID, application(Application)),
+        allowed(Request, Application),
+        authenticate(Request, Application, _UserOptions)
+    ->  get_time(Now),
+        assertz(pengine_detached(ID, ClientData.put(time, Now))),
+        pengine_queue(ID, Queue, _TimeLimit, _Now),
+        message_queue_set(Queue, max_size(1000)),
+        pengine_reply(Queue, detached(ID)),
+        reply_json(true)
+    ;   http_404([], Request)
+    ).
+
+:- if(\+current_predicate(message_queue_set/2)).
+message_queue_set(_,_).
+:- endif.
+
+reattach(ID) :-
+    (   retract(pengine_detached(ID, _Data)),
+        pengine_queue(ID, Queue, _TimeLimit, _Now)
+    ->  message_queue_set(Queue, max_size(25))
+    ;   true
+    ).
+
+
+%!  http_pengine_destroy_all(+Request)
+%
+%   Destroy a list of pengines. Normally   called  by pengines.js if the
+%   browser window is closed.
+
 http_pengine_destroy_all(Request) :-
-    reply_options(Request, [get]),
+    reply_options(Request, [get,post]),
     !.
 http_pengine_destroy_all(Request) :-
     http_parameters(Request,
                     [ ids(IDsAtom, [])
                     ]),
     atomic_list_concat(IDs, ',', IDsAtom),
-    forall(member(ID, IDs),
+    forall(( member(ID, IDs),
+             \+ pengine_detached(ID, _)
+           ),
            pengine_destroy(ID, [force(true)])),
     reply_json("ok").
 
@@ -2571,6 +2630,42 @@ http_pengine_ping(Request) :-
         catch(thread_statistics(Thread, Stats), _, fail)
     ->  output_result(Format, ping(Pengine, Stats))
     ;   output_result(Format, died(Pengine))
+    ).
+
+%!  http_pengine_list(+Request)
+%
+%   HTTP  handler  for  `/pengine/list`,   providing  information  about
+%   running Pengines.
+%
+%   @tbd Only list detached Pengines associated to the logged in user.
+
+http_pengine_list(Request) :-
+    reply_options(Request, [get]),
+    !.
+http_pengine_list(Request) :-
+    http_parameters(Request,
+                    [ status(Status, [default(detached), oneof([detached])]),
+                      application(Application, [default(pengine_sandbox)])
+                    ]),
+    allowed(Request, Application),
+    authenticate(Request, Application, _UserOptions),
+    findall(Term, listed_pengine(Application, Status, Term), Terms),
+    reply_json(json{pengines: Terms}).
+
+listed_pengine(Application, detached, State) :-
+    State = pengine{id:Id,
+                    detached:Time,
+                    queued:Queued,
+                    stats:Stats},
+
+    pengine_property(Id, application(Application)),
+    pengine_property(Id, detached(Time)),
+    pengine_queue(Id, Queue, _TimeLimit, _Now),
+    message_queue_property(Queue, size(Queued)),
+    (   pengine_thread(Id, Thread),
+        catch(thread_statistics(Thread, Stats), _, fail)
+    ->  true
+    ;   Stats = thread{status:died}
     ).
 
 

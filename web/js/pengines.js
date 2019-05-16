@@ -58,6 +58,7 @@
  * @param {Function} [options.ondebug]
  * @param {Function} [options.onping]
  * @param {Function} [options.onabort]
+ * @param {Function} [options.ondetach]
  * @param {Function} [options.ondestroy]
  * Callback functions.  The callback function is called with an object
  * argument.  This object always has a property `pengine` that refers
@@ -96,7 +97,7 @@ function Pengine(options) {
   }
 
   // initialize network support in browser
-  if (typeof Pengine.network === "undefined") { 
+  if (typeof Pengine.network === "undefined") {
     Pengine.network = $;  // assume jQuery initialized by now
     $(window).on("beforeunload", function() {
       Pengine.destroy_all();
@@ -122,22 +123,28 @@ function Pengine(options) {
 		"destroy"
 	      ]);
 
-  this.request =
-  Pengine.network.ajax(this.options.server + '/create',
-	 { contentType: "application/json; charset=utf-8",
-	   dataType: "json",
-	   data: JSON.stringify(createOptions),
-	   type: "POST",
-	   success: function(obj) {
-	     that.process_response(obj);
-	   },
-	   error: function(jqXHR, textStatus, errorThrown) {
-	     that.error(jqXHR, textStatus, errorThrown);
-	   },
-	   complete: function() {
-	     that.request = undefined;
-	   }
-	 });
+  if ( options.id ) {				/* re-attaching */
+    this.id = options.id;
+    Pengine.alive.push(this);
+    this.pull_response();
+  } else {
+    this.request =
+    Pengine.network.ajax(this.options.server + '/create',
+	   { contentType: "application/json; charset=utf-8",
+	     dataType: "json",
+	     data: JSON.stringify(createOptions),
+	     type: "POST",
+	     success: function(obj) {
+	       that.process_response(obj);
+	     },
+	     error: function(jqXHR, textStatus, errorThrown) {
+	       that.error(jqXHR, textStatus, errorThrown);
+	     },
+	     complete: function() {
+	       that.request = undefined;
+	     }
+	   });
+  }
 
 }/*end of Pengine()*/
 
@@ -218,6 +225,43 @@ Pengine.prototype.abort = function() {
 	  pengine.error(jqXHR, textStatus, errorThrown);
 	}).always(function() {
 	  pengine.request = undefined;
+	});
+};
+
+/**
+ * Detach the pengine.  This causes the Pengine to keep running,
+ * even if the browser is closed.
+ *
+ * @param {Object} [data] provides additional data that is stored
+ * on the server with the detached Pengine and made available to
+ * the client on request.
+ */
+Pengine.prototype.detach = function(data) {
+  var pengine = this;
+
+  if ( data == undefined )
+    data = {};
+
+  this.ping(0);					/* stop pinging */
+
+  var url = this.options.server + '/detach' +
+    '?id=' + encodeURIComponent(this.id) +
+    '&format=' + encodeURIComponent(this.options.format);
+  this.request =
+  Pengine.network.ajax(url,
+	{ contentType: "application/json; charset=utf-8",
+	  dataType: "json",
+	  data: JSON.stringify(data),
+	  type: "POST",
+	  success: function(obj) {
+	  // Should reply `true`
+	  },
+	  error: function(jqXHR, textStatus, errorThrown) {
+	    pengine.error(jqXHR, textStatus, errorThrown);
+	  },
+	  complete: function() {
+	    pengine.request = undefined;
+	  }
 	});
 };
 
@@ -467,6 +511,12 @@ Pengine.onresponse = {
     this.callback('onabort', obj);
   },
 
+  detached: function(obj) {
+    this.detached = true;
+    unregisterPengine(this);
+    this.callback('ondetach', obj);
+  },
+
   destroy: function(obj) {
     unregisterPengine(this);
     if ( obj.data )
@@ -500,7 +550,8 @@ function unregisterPengine(pengine) {
   if ( index > -1 )
     Pengine.alive.splice(index, 1);
 
-  pengine.died = true;
+  if ( !this.detached )
+    pengine.died = true;
 }
 
 /**
