@@ -2539,15 +2539,13 @@ http_pengine_abort(Request) :-
     !.
 http_pengine_abort(Request) :-
     http_parameters(Request,
-            [   id(ID, []),
-                format(Format, [default(prolog)])
+            [   id(ID, [])
             ]),
-    (   pengine_thread(ID, _Thread),
-        pengine_queue(ID, Queue, TimeLimit, _)
+    (   pengine_thread(ID, _Thread)
     ->  broadcast(pengine(abort(ID))),
         abort_pending_output(ID),
         pengine_abort(ID),
-        wait_and_output_result(ID, Queue, Format, TimeLimit)
+        reply_json(true)
     ;   http_404([], Request)
     ).
 
@@ -2572,7 +2570,8 @@ http_pengine_detach(Request) :-
     (   pengine_property(ID, application(Application)),
         allowed(Request, Application),
         authenticate(Request, Application, _UserOptions)
-    ->  get_time(Now),
+    ->  broadcast(pengine(detach(ID))),
+        get_time(Now),
         assertz(pengine_detached(ID, ClientData.put(time, Now))),
         pengine_queue(ID, Queue, _TimeLimit, _Now),
         message_queue_set(Queue, max_size(1000)),
