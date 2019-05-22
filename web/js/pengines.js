@@ -128,7 +128,6 @@ function Pengine(options) {
     Pengine.alive.push(this);
     this.pull_response();
   } else {
-    this.request =
     Pengine.network.ajax(this.options.server + '/create',
 	   { contentType: "application/json; charset=utf-8",
 	     dataType: "json",
@@ -139,9 +138,6 @@ function Pengine(options) {
 	     },
 	     error: function(jqXHR, textStatus, errorThrown) {
 	       that.error(jqXHR, textStatus, errorThrown);
-	     },
-	     complete: function() {
-	       that.request = undefined;
 	     }
 	   });
   }
@@ -211,20 +207,14 @@ Pengine.prototype.respond = function(input) {
 Pengine.prototype.abort = function() {
   var pengine = this;
 
-  if ( this.request ) {
-    this.request.pengine_aborted = true;
-    this.request.abort();
-  }
   var url = this.options.server + '/abort' +
     '?id=' + encodeURIComponent(this.id) +
     '&format=' + encodeURIComponent(this.options.format);
-  this.request = Pengine.network.get(url,
+  Pengine.network.get(url,
 	function(obj) {
-	  pengine.process_response(obj);
+	  // Should reply `true`
 	}).fail(function(jqXHR, textStatus, errorThrown) {
 	  pengine.error(jqXHR, textStatus, errorThrown);
-	}).always(function() {
-	  pengine.request = undefined;
 	});
 };
 
@@ -247,7 +237,6 @@ Pengine.prototype.detach = function(data) {
   var url = this.options.server + '/detach' +
     '?id=' + encodeURIComponent(this.id) +
     '&format=' + encodeURIComponent(this.options.format);
-  this.request =
   Pengine.network.ajax(url,
 	{ contentType: "application/json; charset=utf-8",
 	  dataType: "json",
@@ -258,9 +247,6 @@ Pengine.prototype.detach = function(data) {
 	  },
 	  error: function(jqXHR, textStatus, errorThrown) {
 	    pengine.error(jqXHR, textStatus, errorThrown);
-	  },
-	  complete: function() {
-	    pengine.request = undefined;
 	  }
 	});
 };
@@ -320,14 +306,12 @@ Pengine.prototype.pull_response = function() {
   var url = this.options.server + '/pull_response' +
     '?id=' + encodeURIComponent(this.id) +
     '&format=' + encodeURIComponent(this.options.format);
-  this.request = Pengine.network.get(url,
+  Pengine.network.get(url,
 	function(obj) {
 	  if ( obj.event !== 'died')
 	    pengine.process_response(obj);
 	}).fail(function(jqXHR, textStatus, errorThrown) {
 	  pengine.error(jqXHR, textStatus, errorThrown);
-	}).always(function() {
-	  pengine.request = undefined;
 	});
 };
 
@@ -349,7 +333,7 @@ Pengine.prototype.send = function(event) {
   var url = pengine.options.server +
 		'/send?format=' + encodeURIComponent(this.options.format) +
 		'&id=' + encodeURIComponent(this.id);
-  this.request = Pengine.network.ajax({ type: "POST",
+  Pengine.network.ajax({ type: "POST",
 	   url: url,
 	   data: event + " .\n",
 	   contentType: "application/x-prolog; charset=UTF-8",
@@ -358,9 +342,6 @@ Pengine.prototype.send = function(event) {
 	   },
 	   error: function(jqXHR, textStatus, errorThrown) {
 	     pengine.error(jqXHR, textStatus, errorThrown);
-	   },
-	   complete: function() {
-	     pengine.request = undefined;
 	   }
          });
 };
