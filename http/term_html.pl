@@ -563,6 +563,3 @@ primitive_class(Class, _, _, Class).
 %   without having to examine the blob. If this predicate fails, the
 %   blob is rendered as an HTML SPAN with class 'pl-blob' containing
 %   BlobType as text.
-
-:- multifile blob_rendering//3.
-
