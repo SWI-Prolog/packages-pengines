@@ -129,7 +129,7 @@ pengine_ask/3 with the option template(X) would instead produce the output
 
 main :-
     pengine_create([
-        server('http://pengines.swi-prolog.org'),
+        server('https://pengines.swi-prolog.org'),
         src_text("
             q(X) :- p(X).
             p(a). p(b). p(c).
@@ -145,6 +145,7 @@ handle(success(_ID, [X], false)) :-
 handle(success(ID, [X], true)) :-
     writeln(X),
     pengine_next(ID, []).
+
 ==
 
 Here is another example, showing  how  to   create  and  interact with a
@@ -156,11 +157,22 @@ stops there, else it repeats. Note that   I/O  works as expected. All we
 need  to  do  is  to   use    pengine_input/1   instead  of  read/1  and
 pengine_output/1 instead of write/1.
 
+**See Also:**
+
+ - [pengines.js documentation](https://pengines.swi-prolog.org/docs/documentation.html)
+
 ==
 <html lang="en">
     <head>
-        <script src="/vendor/jquery/jquery-2.0.3.min.js"></script>
-        <script src="/pengine/pengines.js"></script>
+        <title>Pengine Example</title>
+    </head>
+    <body>
+	    <h1>Pengine Example</h1>
+        <div id="out"></div>
+
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+        <script src="https://pengines.swi-prolog.org/pengine/pengines.js"></script>
+
         <script type="text/x-prolog">
 
             main :-
@@ -186,9 +198,6 @@ pengine_output/1 instead of write/1.
                 $('#out').html(this.data);
             }
         </script>
-    </head>
-    <body>
-        <div id="out"></div>
     </body>
 </html>
 ==
@@ -201,12 +210,13 @@ locally:
 ?- use_module(library(pengines)).
 
 ?- member(X, [a, b, c, d]),
-   pengine_rpc('http://pengines.org', p(X), [
+   pengine_rpc('https://pengines.swi-prolog.org', p(X), [
        src_list([p(b), p(c), p(d), p(e)])
    ]),
    member(X, [c, d, e, f]).
 X = c ;
 X = d.
+
 ?-
 ==
 
