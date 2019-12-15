@@ -1020,8 +1020,9 @@ pengine_create_option(user(_)).
 
 %!  pengine_done is det.
 %
-%   Called  from  the  pengine  thread  =at_exit=  option.  Destroys
-%   _child_ pengines using pengine_destroy/1.
+%   Called from the pengine thread   `at_exit`  option. Destroys _child_
+%   pengines  using  pengine_destroy/1.  Cleaning  up   the  Pengine  is
+%   synchronised by the `pengine_done` mutex. See read_event/6.
 
 :- public
     pengine_done/0.
@@ -1038,7 +1039,7 @@ pengine_done :-
     forall(child(_Name, Child),
            pengine_destroy(Child)),
     pengine_self(Id),
-    pengine_unregister(Id).
+    with_mutex(pengine_done, pengine_unregister(Id)).
 
 
 %!  pengine_main(+Parent, +Options, +Application)
@@ -2424,14 +2425,20 @@ pengine_died(Format, Pengine) :-
 
 %!  read_event(+Pengine, +Request, +Format, +EventString, -Event) is det
 %
-%   Read an event on behalve of Pengine.
+%   Read an event on behalve of Pengine.  Note that the pengine's module
+%   should not be  deleted  while  we   are  reading  using  its  syntax
+%   (module). This is ensured using the `pengine_done` mutex.
+%
+%   @see pengine_done/0.
 
 read_event(Pengine, Request, Format, EventString, Event) :-
-    pengine_thread(Pengine, _Thread),           % check existence
-    get_pengine_module(Pengine, Module),
-    current_module(Module),
+    with_mutex(
+        pengine_done,
+        ( pengine_thread(Pengine, _Thread),           % check existence
+          get_pengine_module(Pengine, Module),
+          read_event_2(Request, EventString, Module, Event0, Bindings)
+        )),
     !,
-    read_event_2(Request, EventString, Module, Event0, Bindings),
     fix_bindings(Format, Event0, Bindings, Event).
 read_event(Pengine, Request, _Format, _EventString, _Event) :-
     debug(pengine(event), 'Pengine ~q vanished', [Pengine]),
