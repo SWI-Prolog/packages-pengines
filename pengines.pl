@@ -2397,26 +2397,24 @@ http_pengine_send(Request) :-
                       event(EventString, [optional(true)]),
                       format(Format, [default(prolog)])
                     ]),
-    (   catch(read_event(ID, Request, Format, EventString, Event),
-              Error,
-              true)
-    ->  (   var(Error)
-        ->  debug(pengine(event), 'HTTP send: ~p', [Event]),
-            (   pengine_thread(ID, Thread)
-            ->  pengine_queue(ID, Queue, TimeLimit, _),
-                random_delay,
-                broadcast(pengine(send(ID, Event))),
-                thread_send_message(Thread, pengine_request(Event)),
-                wait_and_output_result(ID, Queue, Format, TimeLimit)
-            ;   atom(ID)
-            ->  pengine_died(Format, ID)
-            ;   http_404([], Request)
-            )
-        ;   output_result(Format, error(ID, Error))
+    catch(read_event(ID, Request, Format, EventString, Event),
+          Error,
+          true),
+    (   var(Error)
+    ->  debug(pengine(event), 'HTTP send: ~p', [Event]),
+        (   pengine_thread(ID, Thread)
+        ->  pengine_queue(ID, Queue, TimeLimit, _),
+            random_delay,
+            broadcast(pengine(send(ID, Event))),
+            thread_send_message(Thread, pengine_request(Event)),
+            wait_and_output_result(ID, Queue, Format, TimeLimit)
+        ;   atom(ID)
+        ->  pengine_died(Format, ID)
+        ;   http_404([], Request)
         )
-    ;   debug(pengine(event), 'Pengine ~q vanished', [ID]),
-        discard_post_data(Request),
-        pengine_died(Format, ID)
+    ;   Error = error(existence_error(pengine, ID), _)
+    ->  pengine_died(Format, ID)
+    ;   output_result(Format, error(ID, Error))
     ).
 
 pengine_died(Format, Pengine) :-
@@ -2424,15 +2422,22 @@ pengine_died(Format, Pengine) :-
                                 error(existence_error(pengine, Pengine),_))).
 
 
-%!  read_event(+Pengine, +Request, +Format, +EventString, -Event) is semidet
+%!  read_event(+Pengine, +Request, +Format, +EventString, -Event) is det
 %
-%   Read an event on behalve of Pengine.  Fails if Pengine has gone.
+%   Read an event on behalve of Pengine.
 
 read_event(Pengine, Request, Format, EventString, Event) :-
+    pengine_thread(Pengine, _Thread),           % check existence
     get_pengine_module(Pengine, Module),
     current_module(Module),
+    !,
     read_event_2(Request, EventString, Module, Event0, Bindings),
     fix_bindings(Format, Event0, Bindings, Event).
+read_event(Pengine, Request, _Format, _EventString, _Event) :-
+    debug(pengine(event), 'Pengine ~q vanished', [Pengine]),
+    discard_post_data(Request),
+    existence_error(pengine, Pengine).
+
 
 %%  read_event_(+Request, +EventString, +Module, -Event, -Bindings)
 %
