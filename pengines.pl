@@ -2397,20 +2397,16 @@ http_pengine_send(Request) :-
                       event(EventString, [optional(true)]),
                       format(Format, [default(prolog)])
                     ]),
-    get_pengine_module(ID, Module),
-    (   current_module(Module)          % avoid re-creating the module
-    ->  catch(( read_event(Request, EventString, Module, Event0, Bindings),
-                fix_bindings(Format, Event0, Bindings, Event1)
-              ),
+    (   catch(read_event(ID, Request, Format, EventString, Event),
               Error,
-              true),
-        (   var(Error)
-        ->  debug(pengine(event), 'HTTP send: ~p', [Event1]),
+              true)
+    ->  (   var(Error)
+        ->  debug(pengine(event), 'HTTP send: ~p', [Event]),
             (   pengine_thread(ID, Thread)
             ->  pengine_queue(ID, Queue, TimeLimit, _),
                 random_delay,
-                broadcast(pengine(send(ID, Event1))),
-                thread_send_message(Thread, pengine_request(Event1)),
+                broadcast(pengine(send(ID, Event))),
+                thread_send_message(Thread, pengine_request(Event)),
                 wait_and_output_result(ID, Queue, Format, TimeLimit)
             ;   atom(ID)
             ->  pengine_died(Format, ID)
@@ -2418,7 +2414,7 @@ http_pengine_send(Request) :-
             )
         ;   output_result(Format, error(ID, Error))
         )
-    ;   debug(pengine(event), 'Pengine module ~q vanished', [Module]),
+    ;   debug(pengine(event), 'Pengine ~q vanished', [ID]),
         discard_post_data(Request),
         pengine_died(Format, ID)
     ).
@@ -2428,19 +2424,29 @@ pengine_died(Format, Pengine) :-
                                 error(existence_error(pengine, Pengine),_))).
 
 
-%%  read_event(+Request, +EventString, +Module, -Event, -Bindings)
+%!  read_event(+Pengine, +Request, +Format, +EventString, -Event) is semidet
+%
+%   Read an event on behalve of Pengine.  Fails if Pengine has gone.
+
+read_event(Pengine, Request, Format, EventString, Event) :-
+    get_pengine_module(Pengine, Module),
+    current_module(Module),
+    read_event_2(Request, EventString, Module, Event0, Bindings),
+    fix_bindings(Format, Event0, Bindings, Event).
+
+%%  read_event_(+Request, +EventString, +Module, -Event, -Bindings)
 %
 %   Read the sent event. The event is a   Prolog  term that is either in
 %   the =event= parameter or as a posted document.
 
-read_event(_Request, EventString, Module, Event, Bindings) :-
+read_event_2(_Request, EventString, Module, Event, Bindings) :-
     nonvar(EventString),
     !,
     term_string(Event, EventString,
                 [ variable_names(Bindings),
                   module(Module)
                 ]).
-read_event(Request, _EventString, Module, Event, Bindings) :-
+read_event_2(Request, _EventString, Module, Event, Bindings) :-
     option(method(post), Request),
     http_read_data(Request,     Event,
                    [ content_type('application/x-prolog'),
