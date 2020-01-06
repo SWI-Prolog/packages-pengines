@@ -2644,7 +2644,8 @@ http_pengine_ping(Request) :-
                       format(Format, [default(prolog)])
                     ]),
     (   pengine_thread(Pengine, Thread),
-        catch(thread_statistics(Thread, Stats), _, fail)
+        Error = error(_,_),
+        catch(thread_statistics(Thread, Stats), Error, fail)
     ->  output_result(Format, ping(Pengine, Stats))
     ;   output_result(Format, died(Pengine))
     ).
