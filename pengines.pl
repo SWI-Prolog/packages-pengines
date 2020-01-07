@@ -696,6 +696,34 @@ pengine_uuid(Id) :-
     atom_number(Id, Num).
 :- endif.
 
+%!  protect_pengine(+Id, :Goal) is semidet.
+%
+%   Run Goal while protecting the Pengine  Id from being destroyed. Used
+%   by the HTTP  I/O  routines  to   avoid  that  the  Pengine's  module
+%   disappears while I/O is in progress. We  use a pool of locks because
+%   the lock may be held relatively long by output routines.
+%
+%   This also runs Goal if the Pengine no longer exists. This deals with
+%   Pengines terminated through destroy_or_continue/1.
+%
+%   @bug After destroy_or_continue/1 takes the destroy route, the module
+%   may drop-out at any point in time,   resulting  in a possible crash.
+%   Seems the only safe way out is   to  do (de)serialization inside the
+%   Pengine.
+
+:- meta_predicate protect_pengine(+, 0).
+
+protect_pengine(Id, Goal) :-
+    term_hash(Id, Hash),
+    LockN is Hash mod 64,
+    atom_concat(pengine_done_, LockN, Lock),
+    with_mutex(Lock,
+               (   pengine_thread(Id, _)
+               ->  Goal
+               ;   Goal
+               )).
+
+
 /** pengine_application(+Application) is det.
 
 Directive that must be used to declare a pengine application module. The
@@ -1039,7 +1067,7 @@ pengine_done :-
     forall(child(_Name, Child),
            pengine_destroy(Child)),
     pengine_self(Id),
-    with_mutex(pengine_done, pengine_unregister(Id)).
+    protect_pengine(Id, pengine_unregister(Id)).
 
 
 %!  pengine_main(+Parent, +Options, +Application)
@@ -2210,7 +2238,7 @@ wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
             ignore(destroy_queue_from_http(Pengine, Event, Queue)),
-            output_result(Format, Event)
+            protect_pengine(Pengine, output_result(Format, Event))
         ;   output_result(Format, died(Pengine))
         )
     ;   time_limit_exceeded(Pengine, Format)
@@ -2234,13 +2262,18 @@ create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Page ~D: got ~q from ~q', [Page, Event, Queue]),
             (   destroy_queue_from_http(Pengine, Event, Queue)
-            ->  !, output_result(Format, page(Page, Event), Dict)
+            ->  !,
+                protect_pengine(Pengine,
+                                output_result(Format, page(Page, Event), Dict))
             ;   is_more_event(Event)
             ->  pengine_thread(Pengine, Thread),
                 thread_send_message(Thread, pengine_request(next)),
-                output_result(Format, page(Page, Event), Dict),
+                protect_pengine(Pengine,
+                                output_result(Format, page(Page, Event), Dict)),
                 fail
-            ;   !, output_result(Format, page(Page, Event), Dict)
+            ;   !,
+                protect_pengine(Pengine,
+                                output_result(Format, page(Page, Event), Dict))
             )
         ;   !, output_result(Format, died(Pengine))
         )
@@ -2432,10 +2465,9 @@ pengine_died(Format, Pengine) :-
 %   @see pengine_done/0.
 
 read_event(Pengine, Request, Format, EventString, Event) :-
-    with_mutex(
-        pengine_done,
-        ( pengine_thread(Pengine, _Thread),           % check existence
-          get_pengine_module(Pengine, Module),
+    protect_pengine(
+        Pengine,
+        ( get_pengine_module(Pengine, Module),
           read_event_2(Request, EventString, Module, Event0, Bindings)
         )),
     !,
