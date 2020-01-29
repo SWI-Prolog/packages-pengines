@@ -125,7 +125,7 @@ compound(List, Options) -->
       ;   List = [_|_]                              % May have unbound tail
       ),
       !,
-      arg_options(Options, ArgOptions)
+      arg_options(Options, _{priority:999}, ArgOptions)
     },
     list(List, ArgOptions).
 compound({X}, Options) -->
