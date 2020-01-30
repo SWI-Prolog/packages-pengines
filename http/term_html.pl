@@ -533,11 +533,12 @@ is_solo('!').
 %   True if Term is a primitive term, rendered using the CSS
 %   class Class.
 
-primitive(Term, Type) :- var(Term),     !, Type = 'pl-avar'.
-primitive(Term, Type) :- atom(Term),    !, Type = 'pl-atom'.
-primitive(Term, Type) :- string(Term),  !, Type = 'pl-string'.
-primitive(Term, Type) :- integer(Term), !, Type = 'pl-int'.
-primitive(Term, Type) :- float(Term),   !, Type = 'pl-float'.
+primitive(Term, Type) :- var(Term),      !, Type = 'pl-avar'.
+primitive(Term, Type) :- atom(Term),     !, Type = 'pl-atom'.
+primitive(Term, Type) :- string(Term),   !, Type = 'pl-string'.
+primitive(Term, Type) :- integer(Term),  !, Type = 'pl-int'.
+primitive(Term, Type) :- rational(Term), !, Type = 'pl-rational'.
+primitive(Term, Type) :- float(Term),    !, Type = 'pl-float'.
 
 %!  primitive_class(+Class0, +Value, -String, -Class) is det.
 %
