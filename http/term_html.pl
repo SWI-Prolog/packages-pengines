@@ -499,6 +499,12 @@ quote_atomic(Float, String, Options) :-
     Format = Options.get(float_format),
     !,
     format(string(String), Format, [Float]).
+quote_atomic(Plain, String, Options) :-
+    rational(Plain),
+    \+ integer(Plain),
+    !,
+    operator_module(Module, Options),
+    format(string(String), '~W', [Plain, [module(Module)]]).
 quote_atomic(Plain, Plain, _) :-
     number(Plain),
     !.
