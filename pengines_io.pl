@@ -578,11 +578,19 @@ add_projection(VarNames0, ResVars0, JSON0, JSON) :-
 
 binding_to_html(ID, binding(Vars,Term,Substitutions), JSON) :-
     JSON0 = json{variables:Vars, value:HTMLString},
-    term_html_string(Term, Vars, ID, HTMLString, [priority(699)]),
+    binding_write_options(ID, Options),
+    term_html_string(Term, Vars, ID, HTMLString, Options),
     (   Substitutions == []
     ->  JSON = JSON0
     ;   maplist(subst_to_html(ID), Substitutions, HTMLSubst),
         JSON = JSON0.put(substitutions, HTMLSubst)
+    ).
+
+binding_write_options(Pengine, Options) :-
+    (   current_predicate(Pengine:screen_property/1),
+        Pengine:screen_property(tabled(true))
+    ->  Options = []
+    ;   Options = [priority(699)]
     ).
 
 %!  term_html_string(+Term, +VarNames, +Module, -HTMLString,
@@ -629,7 +637,8 @@ term_html(Term, _Vars, WriteOptions) -->
 
 subst_to_html(ID, '$VAR'(Name)=Value, json{var:Name, value:HTMLString}) :-
     !,
-    term_html_string(Value, [Name], ID, HTMLString, [priority(699)]).
+    binding_write_options(ID, Options),
+    term_html_string(Value, [Name], ID, HTMLString, Options).
 subst_to_html(_, Term, _) :-
     assertion(Term = '$VAR'(_)).
 
