@@ -4,7 +4,7 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2019, Torbjörn Lager,
+    Copyright (C): 2014-2020, Torbjörn Lager,
                               VU University Amsterdam
     All rights reserved.
 
@@ -691,7 +691,10 @@ pengine_uuid(Id) :-
 :- else.
 :- use_module(library(random)).
 pengine_uuid(Id) :-
-    Max is 1<<128,
+    (   current_prolog_flag(max_integer, Max1)
+    ->  Max is Max1-1
+    ;   Max is 1<<128
+    ),
     random_between(0, Max, Num),
     atom_number(Id, Num).
 :- endif.
