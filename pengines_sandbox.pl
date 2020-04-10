@@ -34,8 +34,8 @@
 
 :- module(pengines_sandbox, []).
 :- use_module(library(pengines), []).
-:- use_module(library(lists)).
-:- use_module(library(error)).
+:- autoload(library(error),[instantiation_error/1]).
+:- autoload(library(lists),[append/3]).
 
 /** <module> Declare Pengine interaction sandbox-safe
 

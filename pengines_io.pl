@@ -61,20 +61,28 @@
 
             message_lines_to_html/3     % +Lines, +Classes, -HTML
           ]).
-:- use_module(library(lists)).
-:- use_module(library(pengines)).
-:- use_module(library(option)).
-:- use_module(library(debug)).
-:- use_module(library(error)).
-:- use_module(library(apply)).
-:- use_module(library(settings)).
-:- use_module(library(listing)).
-:- use_module(library(yall)).
+:- autoload(library(apply),[foldl/4,maplist/3,maplist/4]).
+:- autoload(library(backcomp),[thread_at_exit/1]).
+:- autoload(library(debug),[assertion/1]).
+:- autoload(library(error),[must_be/2]).
+:- autoload(library(listing),[listing/1,portray_clause/1]).
+:- autoload(library(lists),[append/2,append/3,subtract/3]).
+:- autoload(library(option),[option/3,merge_options/3]).
+:- autoload(library(pengines),
+	    [ pengine_self/1,
+	      pengine_output/1,
+	      pengine_input/2,
+	      pengine_property/2
+	    ]).
+:- autoload(library(prolog_stream),[open_prolog_stream/4]).
+:- autoload(library(readutil),[read_line_to_string/2]).
+:- autoload(library(yall),[(>>)/4]).
+:- autoload(library(http/html_write),[html/3,print_html/1]).
+:- autoload(library(http/term_html),[term/4]).
+:- use_module(library(settings),[setting/4,setting/2]).
+
 :- use_module(library(sandbox), []).
-:- use_module(library(http/html_write)).
-:- use_module(library(http/term_html)).
 :- if(exists_source(library(prolog_stream))).
-:- use_module(library(prolog_stream)).
 :- endif.
 
 :- html_meta send_html(html).

@@ -36,7 +36,6 @@
           [ test_term_html/0,
             term_html_string/3                  % @Term, -String, +Options
           ]).
-:- include(test_local).
 
 :- use_module(library(plunit)).
 :- use_module(library(debug)).

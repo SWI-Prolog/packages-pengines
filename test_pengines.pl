@@ -36,7 +36,6 @@
           [ test_pengines/0,
             pengine_server/0                    % start server
           ]).
-:- include(test_local).
 
 :- debug(pengine(delay)).
 % run pengine server for remote tests in a separate process.

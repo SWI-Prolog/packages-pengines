@@ -38,8 +38,8 @@
           [ term_to_json/3,                     % +Term, +Bindings, -Json
             term_to_json/2                      % +Term, -Json
           ]).
-:- use_module(library(apply)).
-:- use_module(library(error)).
+:- autoload(library(apply),[maplist/2,maplist/3]).
+:- autoload(library(error),[must_be/2,domain_error/2]).
 
 %!  term_to_json(+Term, +Bindings, -JsonTerm) is det.
 %!  term_to_json(+Term, -JsonTerm) is det.

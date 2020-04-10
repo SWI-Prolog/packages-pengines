@@ -67,32 +67,53 @@ from Prolog or JavaScript.
 @author Torbjörn Lager and Jan Wielemaker
 */
 
-:- use_module(library(http/http_dispatch)).
-:- use_module(library(http/http_parameters)).
-:- use_module(library(http/http_client)).
-:- use_module(library(http/http_json)).
-:- use_module(library(http/http_open)).
-:- use_module(library(http/http_stream)).
-:- use_module(library(http/http_wrapper)).
-:- use_module(library(http/http_cors)).
-:- use_module(library(thread_pool)).
-:- use_module(library(broadcast)).
-:- use_module(library(uri)).
-:- use_module(library(filesex)).
-:- use_module(library(time)).
-:- use_module(library(lists)).
-:- use_module(library(charsio)).
-:- use_module(library(apply)).
-:- use_module(library(aggregate)).
-:- use_module(library(option)).
-:- use_module(library(settings)).
-:- use_module(library(debug)).
-:- use_module(library(error)).
-:- use_module(library(sandbox)).
-:- use_module(library(modules)).
-:- use_module(library(term_to_json)).
+:- autoload(library(aggregate),[aggregate_all/3]).
+:- autoload(library(apply),[maplist/2,partition/4,exclude/3,maplist/3]).
+:- autoload(library(broadcast),[broadcast/1]).
+:- autoload(library(charsio),[open_chars_stream/2]).
+:- autoload(library(debug),[debug/1,debugging/1,debug/3,assertion/1]).
+:- autoload(library(error),
+	    [ must_be/2,
+	      existence_error/2,
+	      permission_error/3,
+	      domain_error/2
+	    ]).
+:- autoload(library(filesex),[directory_file_path/3]).
+:- autoload(library(listing),[listing/1]).
+:- autoload(library(lists),[member/2,flatten/2,select/3,append/3]).
+:- autoload(library(modules),[in_temporary_module/3]).
+:- autoload(library(occurs),[sub_term/2]).
+:- autoload(library(option),
+	    [select_option/3,option/2,option/3,select_option/4]).
+:- autoload(library(prolog_stack),[print_prolog_backtrace/2]).
+:- autoload(library(sandbox),[safe_goal/1]).
+:- autoload(library(statistics),[thread_statistics/2]).
+:- autoload(library(term_to_json),[term_to_json/2]).
+:- autoload(library(thread_pool),
+	    [thread_pool_create/3,thread_create_in_pool/4]).
+:- autoload(library(time),[alarm/4,call_with_time_limit/2]).
+:- autoload(library(uri),
+	    [ uri_components/2,
+	      uri_query_components/2,
+	      uri_data/3,
+	      uri_data/4,
+	      uri_encoded/3
+	    ]).
+:- autoload(library(http/http_client),[http_read_data/3]).
+:- autoload(library(http/http_cors),[cors_enable/0,cors_enable/2]).
+:- autoload(library(http/http_dispatch),
+	    [http_handler/3,http_404/2,http_reply_file/3]).
+:- autoload(library(http/http_open),[http_open/3]).
+:- autoload(library(http/http_parameters),[http_parameters/2]).
+:- autoload(library(http/http_stream),[is_cgi_stream/1]).
+:- autoload(library(http/http_wrapper),[http_peer/2]).
+
+:- use_module(library(settings),[setting/2,setting/4]).
+:- use_module(library(http/http_json),
+              [http_read_json_dict/2,reply_json/1]).
+
 :- if(exists_source(library(uuid))).
-:- use_module(library(uuid)).
+:- autoload(library(uuid), [uuid/2]).
 :- endif.
 
 
@@ -689,7 +710,6 @@ get_pengine_module(Pengine, Pengine).
 pengine_uuid(Id) :-
     uuid(Id, [version(4)]).             % Version 4 is random.
 :- else.
-:- use_module(library(random)).
 pengine_uuid(Id) :-
     (   current_prolog_flag(max_integer, Max1)
     ->  Max is Max1-1
@@ -973,6 +993,8 @@ local_pengine_create(Options) :-
 %!  thread_pool:create_pool(+Application) is det.
 %
 %   On demand creation of a thread pool for a pengine application.
+
+:- multifile thread_pool:create_pool/1.
 
 thread_pool:create_pool(Application) :-
     current_application(Application),
