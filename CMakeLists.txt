@@ -23,8 +23,7 @@ swipl_plugin(pengines_css
 	     PL_LIBS web/css/plterm.css)
 
 test_libs(pengines term_html
-	  PACKAGES clib sgml http
-	  TEST_FILES test_local.pl)
+	  PACKAGES clib sgml http)
 
 swipl_examples(examples/client.pl examples/server.pl)
 swipl_examples(${WEB_EXAMPLES} SUBDIR web)
