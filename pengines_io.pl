@@ -77,8 +77,9 @@
 :- autoload(library(prolog_stream),[open_prolog_stream/4]).
 :- autoload(library(readutil),[read_line_to_string/2]).
 :- autoload(library(yall),[(>>)/4]).
-:- autoload(library(http/html_write),[html/3,print_html/1]).
 :- autoload(library(http/term_html),[term/4]).
+
+:- use_module(library(http/html_write),[html/3,print_html/1, op(_,_,_)]).
 :- use_module(library(settings),[setting/4,setting/2]).
 
 :- use_module(library(sandbox), []).
