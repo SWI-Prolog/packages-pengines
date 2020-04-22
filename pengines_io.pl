@@ -529,8 +529,15 @@ clauses_html(Clauses, _ID, HTMLString) :-
 
 list_clauses([]).
 list_clauses([H|T]) :-
-    portray_clause(H),
+    (   system_undefined(H)
+    ->  true
+    ;   portray_clause(H)
+    ),
     list_clauses(T).
+
+system_undefined((undefined :- tnot(undefined))).
+system_undefined((answer_count_restraint :- tnot(answer_count_restraint))).
+system_undefined((radial_restraint :- tnot(radial_restraint))).
 
 dict_bindings(Dict, Bindings) :-
     dict_pairs(Dict, _Tag, Pairs),
