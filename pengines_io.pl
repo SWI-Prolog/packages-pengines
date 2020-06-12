@@ -83,8 +83,6 @@
 :- use_module(library(settings),[setting/4,setting/2]).
 
 :- use_module(library(sandbox), []).
-:- if(exists_source(library(prolog_stream))).
-:- endif.
 
 :- html_meta send_html(html).
 :- public send_html/1.
