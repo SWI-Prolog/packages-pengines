@@ -83,6 +83,7 @@
 :- use_module(library(settings),[setting/4,setting/2]).
 
 :- use_module(library(sandbox), []).
+:- autoload(library(thread), [call_in_thread/2]).
 
 :- html_meta send_html(html).
 :- public send_html/1.
@@ -774,11 +775,19 @@ pengine_io_goal_expansion(_, _).
 :- thread_local
     pengine_io/2.
 
-stream_write(_Stream, Out) :-
-    send_html(pre(class(console), Out)).
-stream_read(_Stream, Data) :-
-    prompt(Prompt, Prompt),
-    pengine_input(_{type:console, prompt:Prompt}, Data).
+stream_write(Stream, Out) :-
+    (   pengine_io(_,_)
+    ->  send_html(pre(class(console), Out))
+    ;   current_prolog_flag(pengine_main_thread, TID),
+        thread_signal(TID, stream_write(Stream, Out))
+    ).
+stream_read(Stream, Data) :-
+    (   pengine_io(_,_)
+    ->  prompt(Prompt, Prompt),
+        pengine_input(_{type:console, prompt:Prompt}, Data)
+    ;   current_prolog_flag(pengine_main_thread, TID),
+        call_in_thread(TID, stream_read(Stream, Data))
+    ).
 stream_close(_Stream).
 
 %!  pengine_bind_user_streams
@@ -800,6 +809,9 @@ pengine_bind_user_streams :-
     set_stream(In,  alias(current_input)),
     set_stream(Out, alias(current_output)),
     assertz(pengine_io(In, Out)),
+    thread_self(Me),
+    thread_property(Me, id(Id)),
+    set_prolog_flag(pengine_main_thread, Id),
     thread_at_exit(close_io).
 
 close_io :-
