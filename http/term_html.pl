@@ -397,12 +397,12 @@ end_code_type(List, Type, _) :-
     Type = punct.
 end_code_type(OpTerm, Type, Options) :-
     compound_name_arity(OpTerm, Name, 1),
-    is_op1(Name, Type, Pri, ArgPri, Options),
+    is_op1(Name, OpType, Pri, ArgPri, Options),
     \+ Options.get(ignore_ops) == true,
     !,
     (   Pri > Options.priority
     ->  Type = punct
-    ;   (   Type == prefix
+    ;   (   OpType == prefix
         ->  end_code_type(Name, Type, Options)
         ;   arg(1, OpTerm, Arg),
             arg_options(Options, ArgOptions),
