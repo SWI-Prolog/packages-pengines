@@ -56,9 +56,12 @@ terms as structured HTML.
 %   passed to write_term/3. In addition,   the following options are
 %   processed:
 %
+%     - format(+Format)
+%     Used for atomic values.  Typically this is used to
+%     render a single value.
 %     - float_format(+Format)
 %     If a float is rendered, it is rendered using
-%     `format(string(S), Format, [Float])`%
+%     `format(string(S), Format, [Float])`
 %
 %   @tbd    Cyclic terms.
 %   @tbd    Attributed terms.
@@ -503,6 +506,11 @@ quote_atomic(Float, String, Options) :-
     Format = Options.get(float_format),
     !,
     format(string(String), Format, [Float]).
+quote_atomic(Plain, String, Options) :-
+    atomic(Plain),
+    Format = Options.get(format),
+    !,
+    format(string(String), Format, [Plain]).
 quote_atomic(Plain, String, Options) :-
     rational(Plain),
     \+ integer(Plain),
