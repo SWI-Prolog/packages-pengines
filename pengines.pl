@@ -909,7 +909,7 @@ properties are:
 
 pengine_property(Id, Prop) :-
     nonvar(Id), nonvar(Prop),
-    pengine_property2(Id, Prop),
+    pengine_property2(Prop, Id),
     !.
 pengine_property(Id, Prop) :-
     pengine_property2(Prop, Id).
