@@ -36,6 +36,7 @@
 :- module(pengines_io,
           [ pengine_writeln/1,          % +Term
             pengine_nl/0,
+            pengine_tab/1,
             pengine_flush_output/0,
             pengine_format/1,           % +Format
             pengine_format/2,           % +Format, +Args
@@ -159,6 +160,20 @@ pengine_nl :-
     send_html(br([])).
 pengine_nl :-
     nl.
+
+%!  pengine_tab(+N)
+%
+%   Emit N spaces
+
+pengine_tab(N) :-
+    pengine_output,
+    !,
+    length(List, N),
+    maplist(=(&(nbsp)), List),
+    send_html(List).
+pengine_tab(N) :-
+    tab(N).
+
 
 %!  pengine_flush_output
 %
@@ -704,6 +719,7 @@ prolog_help:show_html_hook(HTML) :-
 
 sandbox:safe_primitive(pengines_io:pengine_listing(_)).
 sandbox:safe_primitive(pengines_io:pengine_nl).
+sandbox:safe_primitive(pengines_io:pengine_tab(_)).
 sandbox:safe_primitive(pengines_io:pengine_flush_output).
 sandbox:safe_primitive(pengines_io:pengine_print(_)).
 sandbox:safe_primitive(pengines_io:pengine_write(_)).
@@ -734,6 +750,7 @@ sandbox:safe_meta(pengines_io:pengine_format(Format, Args), Calls) :-
 
 pengine_io_predicate(writeln(_)).
 pengine_io_predicate(nl).
+pengine_io_predicate(tab(_)).
 pengine_io_predicate(flush_output).
 pengine_io_predicate(format(_)).
 pengine_io_predicate(format(_,_)).
