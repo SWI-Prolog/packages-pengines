@@ -77,7 +77,7 @@ term(Term, Options) -->
                       depth(0)
                     ],
                     Options1),
-      dict_create(Dict, _, Options1)
+      dict_options(Dict, Options1)
     },
     any(Term, Dict).
 
