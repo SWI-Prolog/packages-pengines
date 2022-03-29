@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014, VU University Amsterdam
+    Copyright (c)  2014-2022, VU University Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -39,10 +40,12 @@
 :- use_module(library(option)).
 :- use_module(library(error)).
 :- use_module(library(debug)).
+:- use_module(library(http/json)).
 
 :- multifile
     blob_rendering//3,              % +Type, +Blob, +Options
-    portray//2.                     % +Term, +Options
+    portray//2,                     % +Term, +Options
+    layout/3.                       % +Term, -Layout, +Options
 
 /** <module> Represent Prolog terms as HTML
 
@@ -83,6 +86,8 @@ term(Term, Options) -->
     any(Term, Dict),
     finalize_term(Term, Dict).
 
+:- html_meta
+    embrace(html,?,?).
 
 any(_, Options) -->
     { Options.depth >= Options.max_depth },
@@ -99,9 +104,10 @@ any(Term, Options) -->
     { primitive(Term, Class0),
       !,
       quote_atomic(Term, S, Options),
-      primitive_class(Class0, Term, S, Class)
+      primitive_class(Class0, Term, S, Class),
+      class_title(Class, Term, Title)
     },
-    html(span(class(Class), S)).
+    html(span([class(Class), title(Title)], S)).
 any(Term, Options) -->
     { blob(Term,Type), Term \== [] },
     !,
@@ -131,7 +137,7 @@ compound('$VAR'(Var), Options) -->
       ;   Class = 'pl-var'
       )
     },
-    html(span(class(Class), S)).
+    html(span([class(Class), title('Variable')], S)).
 compound(List, Options) -->
     { (   List == []
       ;   List = [_|_]                              % May have unbound tail
@@ -153,28 +159,44 @@ compound(OpTerm, Options) -->
     op1(Type, Pri, OpTerm, ArgPri, Options).
 compound(OpTerm, Options) -->
     { compound_name_arity(OpTerm, Name, 2),
-      is_op2(Name, LeftPri, Pri, RightPri, Options),
+      is_op2(Name, Type, LeftPri, Pri, RightPri, Options),
       \+ Options.get(ignore_ops) == true
     },
     !,
-    op2(Pri, OpTerm, LeftPri, RightPri, Options).
+    op2(Pri, OpTerm, Type, LeftPri, RightPri, Options).
 compound(Compound, Options) -->
     { compound_name_arity(Compound, Name, Arity),
       quote_atomic(Name, S, Options.put(embrace, never)),
       arg_options(Options, _{priority:999}, ArgOptions),
-      extra_classes(Classes, Options)
+      extra_classes(Compound, Classes, Attrs, Options)
     },
-    html(span(class(['pl-compound'|Classes]),
-              [ span(class('pl-functor'), S),
-                '(',
-                \args(0, Arity, Compound, ArgOptions),
-                ')'
+    html(span([ class(['pl-compound'|Classes]),
+                title('Compound ~q/~D'-[Name,Arity])
+              | Attrs
+              ],
+              [ span(class('pl-functor'),
+                     [ S, '(' ]),
+                span(class('pl-compound-args'),
+                     [ \args(0, Arity, Compound, ArgOptions)
+                     ])
               ])).
 
-extra_classes(['pl-level-0'], Options) :-
-    Options.depth == 0,
-    !.
-extra_classes([], _).
+extra_classes(Term, Classes, OAttrs, Options) :-
+    findall(A, extra_attr(Term, A, Options), Attrs),
+    partition(is_class_attr, Attrs, CAttrs, OAttrs),
+    maplist(arg(1), CAttrs, Classes).
+
+is_class_attr(class(_)).
+
+extra_attr(_, class('pl-level-0'), Options) :-
+    Options.depth == 0.
+extra_attr(Term, 'data-layout'(Data), Options) :-
+    layout(Term, Layout, Options),
+    (   is_dict(Layout)
+    ->  atom_json_dict(Data, Layout, [])
+    ;   Data = Layout
+    ).
+
 
 %!  arg_options(+Options, -OptionsOut) is det.
 %!  arg_options(+Options, +Extra, -OptionsOut) is det.
@@ -195,12 +217,15 @@ args(I, Arity, Compound, ArgOptions) -->
     { NI is I + 1,
       arg(NI, Compound, Arg)
     },
-    any(Arg, ArgOptions),
     (   {NI == Arity}
-    ->  []
-    ;   html(', '),
+    ->  html([ span(class('pl-compound-arg'), \any(Arg, ArgOptions)),
+               span(class('pl-compound-close'), ')')
+             ])
+    ;   html(span(class('pl-compound-arg'),
+                  [ \any(Arg, ArgOptions), ',' ])),
         args(NI, Arity, Compound, ArgOptions)
     ).
+
 
 %!  list(+List, +Options)//
 %
@@ -253,11 +278,11 @@ argpri(fy, prefix,  Pri,  Pri).
 argpri(xf, postfix, Pri0, Pri) :- Pri is Pri0 - 1.
 argpri(yf, postfix, Pri,  Pri).
 
-%!  is_op2(+Name, -LeftPri, -Pri, -RightPri, +Options) is semidet.
+% ! is_op2(+Name, -Type, -LeftPri, -Pri, -RightPri, +Options) is semidet.
 %
 %   True if Name is an operator taking two arguments of Type.
 
-is_op2(Name, LeftPri, Pri, RightPri, Options) :-
+is_op2(Name, Type, LeftPri, Pri, RightPri, Options) :-
     operator_module(Module, Options),
     current_op(Pri, Type, Module:Name),
     infix_argpri(Type, LeftPri, Pri, RightPri),
@@ -282,7 +307,7 @@ operator_module(TypeIn, _) :-
 op1(Type, Pri, Term, ArgPri, Options) -->
     { Pri > Options.priority },
     !,
-    html(['(', \op1(Type, Term, ArgPri, Options), ')']).
+    embrace(\op1(Type, Term, ArgPri, Options)).
 op1(Type, _, Term, ArgPri, Options) -->
     op1(Type, Term, ArgPri, Options).
 
@@ -292,9 +317,12 @@ op1(prefix, Term, ArgPri, Options) -->
       FuncOptions = DepthOptions.put(embrace, never),
       ArgOptions  = DepthOptions.put(priority, ArgPri),
       quote_atomic(Functor, S, FuncOptions),
-      extra_classes(Classes, Options)
+      extra_classes(Term, Classes, Attrs, Options.put(op, prefix))
     },
-    html(span(class(['pl-compound'|Classes]),
+    html(span([ class(['pl-compound', 'pl-op', 'pl-prefix-op'|Classes]),
+                title('Prefix op ~q'-[Functor])
+              | Attrs
+              ],
               [ span(class('pl-prefix'), S),
                 \space(Functor, Arg, FuncOptions, ArgOptions),
                 \any(Arg, ArgOptions)
@@ -305,24 +333,39 @@ op1(postfix, Term, ArgPri, Options) -->
       ArgOptions = DepthOptions.put(priority, ArgPri),
       FuncOptions = DepthOptions.put(embrace, never),
       quote_atomic(Functor, S, FuncOptions),
-      extra_classes(Classes, Options)
+      extra_classes(Term, Classes, Attrs, Options.put(op, postfix))
     },
-    html(span(class(['pl-compound'|Classes]),
+    html(span([ class(['pl-compound', 'pl-op', 'pl-postfix-op'|Classes]),
+                title('Postfix op ~q'-[Functor])
+              | Attrs
+              ],
               [ \any(Arg, ArgOptions),
                 \space(Arg, Functor, ArgOptions, FuncOptions),
                 span(class('pl-postfix'), S)
               ])).
 
-%!  op2(+Pri, +Term, +LeftPri, +RightPri, +Options)// is det.
+%!  op2(+Pri, +Term, +Type, +LeftPri, +RightPri, +Options)// is det.
 
-op2(Pri, Term, LeftPri, RightPri, Options) -->
+op2(Pri, Term, Type, LeftPri, RightPri, Options) -->
     { Pri > Options.priority },
     !,
-    html(['(', \op2(Term, LeftPri, RightPri, Options), ')']).
-op2(_, Term, LeftPri, RightPri, Options) -->
-    op2(Term, LeftPri, RightPri, Options).
+    embrace(\op2(Term, Type, LeftPri, RightPri, Options)).
+op2(_, Term, Type, LeftPri, RightPri, Options) -->
+    op2(Term, Type, LeftPri, RightPri, Options).
 
-op2(Term, LeftPri, RightPri, Options) -->
+op2(Term, xfy, LeftPri, RightPri, Options) -->
+    { functor(Term, Functor, 2),
+      quote_op(Functor, S, Options),
+      xfy_list(Term, Functor, List),
+      arg_options(Options, DepthOptions),
+      ArgOptions  = DepthOptions.put(#{priority:LeftPri, quoted_op:S}),
+      extra_classes(Term, Classes, Attrs, Options.put(op, infix))
+    },
+    html(span([ class(['pl-op-seq'|Classes])
+              | Attrs
+              ],
+              \op_seq(List, Functor, RightPri, ArgOptions))).
+op2(Term, _Type, LeftPri, RightPri, Options) -->
     { Term =.. [Functor,Left,Right],
       arg_options(Options, DepthOptions),
       LeftOptions  = DepthOptions.put(priority, LeftPri),
@@ -335,14 +378,58 @@ op2(Term, LeftPri, RightPri, Options) -->
       ;   Space = ''
       ),
       quote_op(Functor, S, Options),
-      extra_classes(Classes, Options)
+      extra_classes(Term, Classes, Attrs, Options.put(op, infix))
     },
-    html(span(class(['pl-compound'|Classes]),
+    html(span([ class(['pl-compound', 'pl-op', 'pl-infix-op'|Classes]),
+                title('Infix op ~q'-[Functor])
+              | Attrs
+              ],
               [ \any(Left, LeftOptions),
                 Space,
                 span(class('pl-infix'), S),
                 Space,
                 \any(Right, RightOptions)
+              ])).
+
+op_seq([Last], _Functor, LastPri, Options) -->
+    !,
+    { LastOptions = Options.put(priority, LastPri)
+    },
+    html(span(class('pl-op-seq-el'), \any(Last, LastOptions))).
+op_seq([H|T], Functor, LastPri, Options) -->
+    html(span(class('pl-op-seq-el'),
+              [ \any(H, Options),
+                \left_space(H, Functor, Options),
+                span(class('pl-infix'), Options.quoted_op)
+              ])),
+    op_seq(T, Functor, LastPri, Options).
+
+left_space(Left, Functor, Options) -->
+    { need_space(Left, Functor, Options, Options.put(embrace, never))
+    },
+    !,
+    html(' ').
+left_space(_,_,_) -->
+    [].
+
+xfy_list(Term, Name, List),
+    compound(Term),
+    compound_name_arguments(Term, _, [A,B]) =>
+    List = [A|T],
+    xfy_list(B, Name, T).
+xfy_list(Term, _, List) =>
+    List = [Term].
+
+%!  embrace(+HTML)//
+%
+%   Place parenthesis around HTML  with  a   DOM  that  allows to easily
+%   justify the height of the parenthesis.
+
+embrace(HTML) -->
+    html(span(class('pl-embrace'),
+              [ span(class('pl-parenthesis'), '('),
+                span(class('pl-embraced'),\html(HTML)),
+                span(class('pl-parenthesis'), ')')
               ])).
 
 %!  space(@T1, @T2, +Options)//
@@ -423,7 +510,7 @@ end_code_type(OpTerm, Type, Options) :-
     ).
 end_code_type(OpTerm, Type, Options) :-
     compound_name_arity(OpTerm, Name, 2),
-    is_op2(Name, LeftPri, Pri, _RightPri, Options),
+    is_op2(Name, _Type, LeftPri, Pri, _RightPri, Options),
     \+ Options.get(ignore_ops) == true,
     !,
     (   Pri > Options.priority
@@ -577,6 +664,14 @@ primitive_class('pl-atom', Atom, String, Class) :-
     !,
     Class = 'pl-quoted-atom'.
 primitive_class(Class, _, _, Class).
+
+class_title('pl-avar',        _, 'Singleton variable').
+class_title('pl-atom',        _, 'Atom').
+class_title('pl-quoted-atom', _, 'Quoted atom').
+class_title('pl-string',      _, 'String').
+class_title('pl-int',         _, 'Integer').
+class_title('pl-rational',    _, 'Rational number (Q)').
+class_title('pl-float',       _, 'Floating point number').
 
 
 %!  finalize_term(+Term, +Dict)// is det.
