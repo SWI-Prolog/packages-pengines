@@ -254,30 +254,35 @@ list_content([], _Options) -->
 list_content([H|T], Options) -->
     !,
     { arg_options(Options, ArgOptions),
-      (   T \== [],
-          Options.depth + 1 < Options.max_depth
-      ->  Sep = [span(class('pl-punct'), ',')]
-      ;   Sep = []
+      (   T == []
+      ->  Sep = [],
+          Next = end
+      ;   Options.depth + 1 >= Options.max_depth
+      ->  Sep = [span(class('pl-punct'), '|')],
+          Next = depth_limit
+      ;   (var(T) ; \+ T = [_|_])
+      ->  Sep = [span(class('pl-punct'), '|')],
+          Next = tail
+      ;   Sep = [span(class('pl-punct'), [',', ' '])],
+          Next = list
       )
     },
     html(span(class('pl-list-el'),
               [ \any(H, Options) | Sep ])),
-    (   {T == []}
-    ->  []
-    ;   { Options.depth + 1 >= Options.max_depth }
-    ->  html(['|',span(class('pl-ellipsis'), ...)])
-    ;   {var(T) ; \+ T = [_|_]}
-    ->  html('|'),
-        tail(T, ArgOptions)
-    ;   list_content(T, ArgOptions)
-    ).
+    list_next(Next, T, ArgOptions).
 
-tail(Value, Options) -->
+list_next(end, _, _) --> !.
+list_next(depth_limit, _, _) -->
+    !,
+    html(span(class('pl-ellipsis'), ...)).
+list_next(tail, Value, Options) -->
     {   var(Value)
     ->  Class = 'pl-var-tail'
     ;   Class = 'pl-nonvar-tail'
     },
     html(span(class(Class), \any(Value, Options))).
+list_next(list, Tail, Options) -->
+    list_content(Tail, Options).
 
 %!  is_op1(+Name, -Type, -Priority, -ArgPriority, +Options) is semidet.
 %
@@ -611,7 +616,7 @@ dict_kvs2([K-V|T], Options) -->
       arg_options(Options, ArgOptions),
       (   T == []
       ->  Sep = []
-      ;   Sep = [\punct(',')]
+      ;   Sep = [\punct(','), ' ']
       )
     },
     html(span(class('pl-dict-kv'),
