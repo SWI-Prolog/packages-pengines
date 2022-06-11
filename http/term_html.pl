@@ -415,7 +415,7 @@ op2(Term, _Type, LeftPri, RightPri, Options) -->
                 \op_arg(Right, RightOptions)
               ])).
 
-%!  op_arg(+Term, +Options
+%!  op_arg(+Term, +Options)// is det.
 
 op_arg(Atom, Options) -->
     { atom(Atom),
