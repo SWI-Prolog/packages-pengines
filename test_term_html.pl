@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014, VU University Amsterdam
+    Copyright (c)  2014-2022, VU University Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -112,6 +113,8 @@ test(op) :- test_term_html("_ is 1/9").
 test(op) :- test_term_html("_ is (*)/9").
 test(op) :- test_term_html("_ is a mod b").
 test(op) :- test_term_html("_ is ... mod b").
+test(op) :- test_term_html("[cat, is, no, dog]").
+test(op) :- test_term_html("[dynamic, :-]").
 
 test(compound) :- test_term_html("a(b)").
 test(compound) :- test_term_html("a(1/c)").
