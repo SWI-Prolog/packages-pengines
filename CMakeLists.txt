@@ -12,9 +12,6 @@ prepend(WEB_EXAMPLES examples/web/ ${WEB_EXAMPLES})
 
 swipl_plugin(pengines
 	     PL_LIBS ${PENGINES_PL})
-swipl_plugin(pengines_http
-	     PL_LIB_SUBDIR http
-	     PL_LIBS http/term_html.pl)
 swipl_plugin(pengines_js
 	     PL_LIB_SUBDIR http/web/js
 	     PL_LIBS web/js/pengines.js)
@@ -22,7 +19,7 @@ swipl_plugin(pengines_css
 	     PL_LIB_SUBDIR http/web/css
 	     PL_LIBS web/css/plterm.css)
 
-test_libs(pengines term_html
+test_libs(pengines
 	  PACKAGES clib sgml http)
 
 swipl_examples(examples/client.pl examples/server.pl)
