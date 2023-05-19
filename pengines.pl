@@ -409,7 +409,7 @@ pengine_reply(Queue, Event0) :-
         \+ pengine_detached(ID, _)
     ->  get_pengine_application(ID, Application),
         setting(Application:idle_limit, IdleLimit),
-        debug(pengine(reply), 'Sending ~p, timout: ~q', [Event, IdleLimit]),
+        debug(pengine(reply), 'Sending ~p, timeout: ~q', [Event, IdleLimit]),
         (   thread_send_message(Queue, pengine_event(ID, Event),
                                 [ timeout(IdleLimit)
                                 ])
