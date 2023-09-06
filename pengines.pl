@@ -169,7 +169,7 @@ from Prolog or JavaScript.
                      ]).
 :- predicate_options(pengine_event/2, 2,
                      [ listen(atom),
-                       pass_to(thread_get_message/3, 3)
+                       pass_to(system:thread_get_message/3, 3)
                      ]).
 :- predicate_options(pengine_pull_response/2, 2,
                      [ pass_to(http_open/3, 3)
