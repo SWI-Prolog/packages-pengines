@@ -64,7 +64,7 @@
           ]).
 :- autoload(library(apply),[foldl/4,maplist/3,maplist/4]).
 :- autoload(library(backcomp),[thread_at_exit/1]).
-:- autoload(library(debug),[assertion/1]).
+:- use_module(library(debug),[assertion/1]).
 :- autoload(library(error),[must_be/2]).
 :- autoload(library(listing),[listing/1,portray_clause/1]).
 :- autoload(library(lists),[append/2,append/3,subtract/3]).
