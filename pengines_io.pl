@@ -3,8 +3,9 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2019, VU University Amsterdam
+    Copyright (c)  2014-2023, VU University Amsterdam
                               CWI, Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -77,9 +78,9 @@
 	    ]).
 :- autoload(library(prolog_stream),[open_prolog_stream/4]).
 :- autoload(library(readutil),[read_line_to_string/2]).
-:- autoload(library(yall),[(>>)/4]).
 :- autoload(library(http/term_html),[term/4]).
 
+:- use_module(library(yall),[(>>)/4]).
 :- use_module(library(http/html_write),[html/3,print_html/1, op(_,_,_)]).
 :- use_module(library(settings),[setting/4,setting/2]).
 
