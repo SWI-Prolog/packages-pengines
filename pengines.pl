@@ -192,7 +192,7 @@ do_random_delay :-
 
 :- meta_predicate                       % internal meta predicates
     solve(+, ?, 0, +),
-    findnsols_no_empty(+, ?, 0, -),
+    findsols(+, ?, 0, -),
     pengine_event_loop(+, 1, +).
 
 /**  pengine_create(:Options) is det.
@@ -1335,16 +1335,14 @@ pengine_terminate(ID) :-
 
 solve(Chunk, Template, Goal, ID) :-
     prolog_current_choice(Choice),
-    State = count(Chunk),
+    (integer(Chunk) -> State = count(Chunk); State = no_chunk),
     statistics(cputime, Epoch),
     Time = time(Epoch),
     nb_current('$variable_names', Bindings),
     filter_template(Template, Bindings, Template2),
     '$current_typein_module'(CurrTypeIn),
     (   '$set_typein_module'(ID),
-        call_cleanup(catch(findnsols_no_empty(State, Template2,
-                                              set_projection(Goal, Bindings),
-                                              Result),
+        call_cleanup(catch(findsols(State, Template2, set_projection(Goal, Bindings), Result),
                            Error, true),
                      query_done(Det, CurrTypeIn)),
         arg(1, Time, T0),
@@ -1408,7 +1406,9 @@ filter_template(Template0, Bindings, Template) :-
     dict_create(Template, swish_default_template, Bindings).
 filter_template(Template, _Bindings, Template).
 
-findnsols_no_empty(N, Template, Goal, List) :-
+findsols(no_chunk, Template, Goal, List) :-
+    (call(Goal) *-> List = [Template] ; List = []).
+findsols(count(N), Template, Goal, List) :-
     findnsols(N, Template, Goal, List),
     List \== [].
 
@@ -1485,7 +1485,7 @@ ask(ID, Goal, Options) :-
     !,
     (   var(Error)
     ->  option(template(Template), Options, Goal),
-        option(chunk(N), Options, 1),
+        option(chunk(N), Options, no_chunk),
         solve(N, Template, Goal1, ID)
     ;   pengine_reply(error(ID, Error)),
         guarded_main_loop(ID)
@@ -2179,7 +2179,7 @@ http_pengine_create(Request) :-
     OptString = [string|Optional],
     Form = [ format(Format, [default(prolog)]),
              application(Application, [default(pengine_sandbox)]),
-             chunk(_, [integer, default(1)]),
+             chunk(_, [integer, optional(true)]),
              solutions(_, [oneof([all,chunked]), default(chunked)]),
              ask(_, OptString),
              template(_, OptString),
@@ -2558,7 +2558,7 @@ fix_bindings(Format,
     !,
     exclude(anon, Bindings, NamedBindings),
     template(NamedBindings, Template, Options0, Options1),
-    select_option(chunk(Paging), Options1, Options2, 1),
+    select_option(chunk(Paging), Options1, Options2, no_chunk),
     NewOptions = [ template(Template),
                    chunk(Paging),
                    bindings(NamedBindings)
