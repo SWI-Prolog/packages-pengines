@@ -4,8 +4,9 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2020, Torbjörn Lager,
+    Copyright (C): 2014-2023, Torbjörn Lager,
                               VU University Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -138,7 +139,7 @@ from Prolog or JavaScript.
                        server(atom),
                        ask(compound),
                        template(compound),
-                       chunk(integer),
+                       chunk(integer;oneof([false])),
                        bindings(list),
                        src_list(list),
                        src_text(any),           % text
@@ -147,7 +148,7 @@ from Prolog or JavaScript.
                      ]).
 :- predicate_options(pengine_ask/3, 3,
                      [ template(any),
-                       chunk(integer),
+                       chunk(integer;oneof([false])),
                        bindings(list)
                      ]).
 :- predicate_options(pengine_next/2, 2,
@@ -161,7 +162,7 @@ from Prolog or JavaScript.
                      [ pass_to(pengine_send/3, 3)
                      ]).
 :- predicate_options(pengine_rpc/3, 3,
-                     [ chunk(integer),
+                     [ chunk(integer;oneof([false])),
                        pass_to(pengine_create/1, 1)
                      ]).
 :- predicate_options(pengine_send/3, 3,
@@ -456,10 +457,14 @@ Options is a list of options:
       with the query. By default, the template is identical to the
       query.
 
-    * chunk(+Integer)
+    * chunk(+IntegerOrFalse)
       Retrieve solutions in chunks of Integer rather than one by one. 1
       means no chunking (default). Other integers indicate the maximum
-      number of solutions to retrieve in one chunk.
+      number of solutions to retrieve in one chunk.  If `false`, the
+      Pengine goal is not executed using findall/3 and friends and
+      we do not backtrack immediately over the goal.  As a result,
+      changes to backtrackable global state are retained.  This is
+      similar that using set_prolog_flag(toplevel_mode, recursive).
 
     * bindings(+Bindings)
       Sets the global variable '$variable_names' to a list of
@@ -525,7 +530,8 @@ pengine_ask/3. Defined options are:
 
     * chunk(+Count)
     Modify the chunk-size to Count before asking the next set of
-    solutions.
+    solutions.  This may not be used if the goal was started with
+    chunk(false).
 
 Remaining  options  are  passed  to    pengine_send/3.   The  result  of
 re-executing the current goal is returned  to the caller's message queue
@@ -1335,7 +1341,12 @@ pengine_terminate(ID) :-
 
 solve(Chunk, Template, Goal, ID) :-
     prolog_current_choice(Choice),
-    State = count(Chunk),
+    (   integer(Chunk)
+    ->  State = count(Chunk)
+    ;   Chunk == false
+    ->  State = no_chunk
+    ;   domain_error(chunk, Chunk)
+    ),
     statistics(cputime, Epoch),
     Time = time(Epoch),
     nb_current('$variable_names', Bindings),
@@ -1380,9 +1391,9 @@ query_done(true, CurrTypeIn) :-
 
 %!  set_projection(:Goal, +Bindings)
 %
-%   findnsols/4 copies its goal  and   template  to  avoid instantiation
-%   thereof when it stops after finding   N solutions. Using this helper
-%   we can a renamed version of Bindings that we can set.
+%   findnsols_no_empty/4  copies  its  goal  and    template   to  avoid
+%   instantiation thereof when it stops after finding N solutions. Using
+%   this helper we can a renamed version of Bindings that we can set.
 
 set_projection(Goal, Bindings) :-
     b_setval('$variable_names', Bindings),
@@ -1408,8 +1419,10 @@ filter_template(Template0, Bindings, Template) :-
     dict_create(Template, swish_default_template, Bindings).
 filter_template(Template, _Bindings, Template).
 
-findnsols_no_empty(N, Template, Goal, List) :-
-    findnsols(N, Template, Goal, List),
+findnsols_no_empty(no_chunk, Template, Goal, [Template]) =>
+    call(Goal).
+findnsols_no_empty(State, Template, Goal, List) =>
+    findnsols(State, Template, Goal, List),
     List \== [].
 
 destroy_or_continue(Event) :-
@@ -1454,6 +1467,7 @@ more_solutions(next, ID, _Choice, _State, Time) :-
     fail.
 more_solutions(next(Count), ID, _Choice, State, Time) :-
     Count > 0,
+    State = count(_),                   % else fallthrough to protocol error
     !,
     debug(pengine(transition), '~q: 6 = ~q => 3', [ID, next(Count)]),
     nb_setarg(1, State, Count),
@@ -1968,7 +1982,7 @@ to by URL, rather than locally.
 
 Valid options are:
 
-    - chunk(+Integer)
+    - chunk(+IntegerOrFalse)
       Can be used to reduce the number of network roundtrips being made.
       See pengine_ask/3.
     - timeout(+Time)
@@ -2162,6 +2176,9 @@ pengine_rpc_output(_ID, Term) :-
 %     HTTP reply. This is currently only  implemented by the CSV backend
 %     that is part of SWISH for   downloading unbounded result sets with
 %     limited memory resources.
+%
+%     Using  `chunk=false`  simulates  the   _recursive  toplevel_.  See
+%     pengine_ask/3.
 
 http_pengine_create(Request) :-
     reply_options(Request, [post]),
@@ -2179,7 +2196,7 @@ http_pengine_create(Request) :-
     OptString = [string|Optional],
     Form = [ format(Format, [default(prolog)]),
              application(Application, [default(pengine_sandbox)]),
-             chunk(_, [integer, default(1)]),
+             chunk(_, [nonneg;oneof([false]), default(1)]),
              solutions(_, [oneof([all,chunked]), default(chunked)]),
              ask(_, OptString),
              template(_, OptString),
