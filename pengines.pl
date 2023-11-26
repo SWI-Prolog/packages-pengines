@@ -1419,7 +1419,8 @@ filter_template(Template0, Bindings, Template) :-
     dict_create(Template, swish_default_template, Bindings).
 filter_template(Template, _Bindings, Template).
 
-findnsols_no_empty(no_chunk, Template, Goal, [Template]) =>
+findnsols_no_empty(no_chunk, Template, Goal, List) =>
+    List = [Template],
     call(Goal).
 findnsols_no_empty(State, Template, Goal, List) =>
     findnsols(State, Template, Goal, List),
