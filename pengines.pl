@@ -1820,14 +1820,10 @@ bind(Var = Value) :-
     Var = Value.
 
 server_url(Server, Action, Params, URL) :-
-    uri_components(Server, Components0),
-    uri_query_components(Query, Params),
-    uri_data(path, Components0, Path0),
     atom_concat('pengine/', Action, PAction),
-    directory_file_path(Path0, PAction, Path),
-    uri_data(path, Components0, Path, Components),
-    uri_data(search, Components, Query),
-    uri_components(URL, Components).
+    uri_edit([ path(PAction),
+               search(Params)
+             ], Server, URL).
 
 
 /** pengine_event(?EventTerm) is det.
