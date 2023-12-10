@@ -36,21 +36,22 @@
           [ test_pengines/0,
             pengine_server/0                    % start server
           ]).
-
-:- debug(pengine(delay)).
-% run pengine server for remote tests in a separate process.
-% :- debug(pengine(external_server)).
-
-% the regular things we need for testing.
 :- use_module(library(plunit)).
 :- use_module(library(lists)).
 :- use_module(library(debug)).
 :- use_module(library(pengines)).
 :- use_module(library(pengines_sandbox)).
-:- use_module(library(option)).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_files)).
+:- use_module(library(apply)).
+:- use_module(library(process)).
+:- use_module(library(readutil)).
+:- use_module(library(settings)).
+
+:- debug(pengine(delay)).
+% run pengine server for remote tests in a separate process.
+% :- debug(pengine(external_server)).
 
 /** <module> Test suite for pengines
 */
