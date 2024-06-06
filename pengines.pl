@@ -4,7 +4,7 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2023, Torbjörn Lager,
+    Copyright (C): 2014-2024, Torbjörn Lager,
                               VU University Amsterdam
                               SWI-Prolog Solutions b.v.
     All rights reserved.
@@ -2161,6 +2161,7 @@ pengine_rpc_output(_ID, Term) :-
 %     | format        | `prolog`          | Output format              |
 %     | application   | `pengine_sandbox` | Pengine application        |
 %     | chunk         | 1                 | Chunk-size for results     |
+%     | collate       | 0 (off)           | Join output events         |
 %     | solutions     | chunked           | If `all`, emit all results |
 %     | ask           | -                 | The query                  |
 %     | template      | -                 | Output template            |
@@ -2194,6 +2195,7 @@ http_pengine_create(Request) :-
     Form = [ format(Format, [default(prolog)]),
              application(Application, [default(pengine_sandbox)]),
              chunk(_, [nonneg;oneof([false]), default(1)]),
+             collate(_, [number, default(0)]),
              solutions(_, [oneof([all,chunked]), default(chunked)]),
              ask(_, OptString),
              template(_, OptString),
@@ -2249,7 +2251,7 @@ http_pengine_create(Request, Application, Format, Dict) :-
 http_pengine_create(_Request, Application, Format, _Dict) :-
     Error = existence_error(pengine_application, Application),
     pengine_uuid(ID),
-    output_result(Format, error(ID, error(Error, _))).
+    output_result(ID, Format, error(ID, error(Error, _))).
 
 
 dict_to_options(Dict, Application, CreateOptions) :-
@@ -2270,7 +2272,7 @@ pairs_create_options([_|T0], App, T) :-
     pairs_create_options(T0, App, T).
 
 %!  wait_and_output_result(+Pengine, +Queue,
-%!                         +Format, +TimeLimit) is det.
+%!                         +Format, +TimeLimit, +Collate) is det.
 %
 %   Wait for the Pengine's Queue and if  there is a message, send it
 %   to the requester using  output_result/1.   If  Pengine  does not
@@ -2278,19 +2280,63 @@ pairs_create_options([_|T0], App, T) :-
 %   Pengine is aborted and the  result is error(time_limit_exceeded,
 %   _).
 
-wait_and_output_result(Pengine, Queue, Format, TimeLimit) :-
+wait_and_output_result(Pengine, Queue, Format, TimeLimit, Collate0) :-
+    Collate is min(Collate0, TimeLimit/10),
+    get_time(Epoch),
     (   catch(thread_get_message(Queue, pengine_event(_, Event),
                                  [ timeout(TimeLimit)
                                  ]),
               Error, true)
     ->  (   var(Error)
         ->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
-            ignore(destroy_queue_from_http(Pengine, Event, Queue)),
-            protect_pengine(Pengine, output_result(Format, Event))
-        ;   output_result(Format, died(Pengine))
+            (   collating_event(Collate, Event)
+            ->  Deadline is Epoch+TimeLimit,
+                collect_events(Pengine, Collate, Queue, Deadline, 100, More),
+                Events = [Event|More],
+                ignore(destroy_queue_from_http(Pengine, Events, Queue)),
+                protect_pengine(Pengine, output_result(Pengine, Format, Events))
+            ;   ignore(destroy_queue_from_http(Pengine, Event, Queue)),
+                protect_pengine(Pengine, output_result(Pengine, Format, Event))
+            )
+        ;   output_result(Pengine, Format, died(Pengine))
         )
     ;   time_limit_exceeded(Pengine, Format)
     ).
+
+%!  collect_events(+Pengine, +CollateTime, +Queue, +Deadline, +Max, -Events)
+%
+%   Collect more events as long as they   are not separated by more than
+%   CollateTime seconds and collect at most Max.
+
+collect_events(_Pengine, _Collate, _Queue, _Deadline, 0, []) :-
+    !.
+collect_events(Pengine, Collate, Queue, Deadline, Max, Events) :-
+    debug(pengine(wait), 'Waiting to collate events', []),
+    (   catch(thread_get_message(Queue, pengine_event(_, Event),
+                                 [ timeout(Collate)
+                                 ]),
+              Error, true)
+    ->  (   var(Error)
+        ->  debug(pengine(wait), 'Got ~q from ~q', [Event, Queue]),
+            Events = [Event|More],
+            (   collating_event(Collate, Event)
+            ->  Max2 is Max - 1,
+                collect_events(Pengine, Collate, Queue, Deadline, Max2, More)
+            ;   More = []
+            )
+        ;   Events = [died(Pengine)]
+        )
+    ;   get_time(Now),
+        Now > Deadline
+    ->  time_limit_event(Pengine, TimeLimitEvent),
+        Events = [TimeLimitEvent]
+    ;   Events = []
+    ).
+
+collating_event(0, _) :-
+    !,
+    fail.
+collating_event(_, output(_,_)).
 
 %!  create_wait_and_output_result(+Pengine, +Queue, +Format,
 %!                                +TimeLimit, +Dict) is det.
@@ -2312,24 +2358,24 @@ create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
             (   destroy_queue_from_http(Pengine, Event, Queue)
             ->  !,
                 protect_pengine(Pengine,
-                                output_result(Format, page(Page, Event), Dict))
+                                output_result_2(Format, page(Page, Event), Dict))
             ;   is_more_event(Event)
             ->  pengine_thread(Pengine, Thread),
                 thread_send_message(Thread, pengine_request(next)),
                 protect_pengine(Pengine,
-                                output_result(Format, page(Page, Event), Dict)),
+                                output_result_2(Format, page(Page, Event), Dict)),
                 fail
             ;   !,
                 protect_pengine(Pengine,
-                                output_result(Format, page(Page, Event), Dict))
+                                output_result_2(Format, page(Page, Event), Dict))
             )
-        ;   !, output_result(Format, died(Pengine))
+        ;   !, output_result(Pengine, Format, died(Pengine))
         )
     ;   !, time_limit_exceeded(Pengine, Format)
     ),
     !.
-create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, _Dict) :-
-    wait_and_output_result(Pengine, Queue, Format, TimeLimit).
+create_wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict) :-
+    wait_and_output_result(Pengine, Queue, Format, TimeLimit, Dict.get(collate,0)).
 
 is_more_event(success(_Id, _Answers, _Projection, _Time, true)).
 is_more_event(create(_, Options)) :-
@@ -2349,11 +2395,21 @@ is_more_event(create(_, Options)) :-
 %   which cannot be caught and thus destroys the Pengine.
 
 time_limit_exceeded(Pengine, Format) :-
+    time_limit_event(Pengine, Event),
     call_cleanup(
         pengine_destroy(Pengine, [force(true)]),
-        output_result(Format,
-                      destroy(Pengine,
-                              error(Pengine, time_limit_exceeded)))).
+        output_result(Pengine, Format, Event)).
+
+time_limit_event(Pengine,
+                 destroy(Pengine, error(Pengine, time_limit_exceeded))).
+
+destroy_pengine_after_output(Pengine, Events) :-
+    is_list(Events),
+    last(Events, Last),
+    time_limit_event(Pengine,  Last),
+    !,
+    catch(ignore(pengine_destroy(Pengine, [force(true)])), error(_,_), true).
+destroy_pengine_after_output(_, _).
 
 
 %!  destroy_queue_from_http(+Pengine, +Event, +Queue) is semidet.
@@ -2439,7 +2495,7 @@ consider_queue_gc :-
 %     Called (indirectly) from pengine_done/1 if the pengine's
 %     thread dies.
 %     * sync_destroy_queue_from_http(+Pengine, +Queue)
-%     Called from destroy_queue/3, from wait_and_output_result/4,
+%     Called from destroy_queue/3, from wait_and_output_result/5,
 %     i.e., from the HTTP side.
 
 :- dynamic output_queue_destroyed/1.
@@ -2477,6 +2533,7 @@ http_pengine_send(Request) :-
     http_parameters(Request,
                     [ id(ID, [ type(atom) ]),
                       event(EventString, [optional(true)]),
+                      collate(Collate, [number, default(0)]),
                       format(Format, [default(prolog)])
                     ]),
     catch(read_event(ID, Request, Format, EventString, Event),
@@ -2489,19 +2546,19 @@ http_pengine_send(Request) :-
             random_delay,
             broadcast(pengine(send(ID, Event))),
             thread_send_message(Thread, pengine_request(Event)),
-            wait_and_output_result(ID, Queue, Format, TimeLimit)
+            wait_and_output_result(ID, Queue, Format, TimeLimit, Collate)
         ;   atom(ID)
         ->  pengine_died(Format, ID)
         ;   http_404([], Request)
         )
     ;   Error = error(existence_error(pengine, ID), _)
     ->  pengine_died(Format, ID)
-    ;   output_result(Format, error(ID, Error))
+    ;   output_result(ID, Format, error(ID, Error))
     ).
 
 pengine_died(Format, Pengine) :-
-    output_result(Format, error(Pengine,
-                                error(existence_error(pengine, Pengine),_))).
+    output_result(Pengine, Format,
+                  error(Pengine, error(existence_error(pengine, Pengine),_))).
 
 
 %!  read_event(+Pengine, +Request, +Format, +EventString, -Event) is det
@@ -2613,7 +2670,8 @@ http_pengine_pull_response(Request) :-
 http_pengine_pull_response(Request) :-
     http_parameters(Request,
             [   id(ID, []),
-                format(Format, [default(prolog)])
+                format(Format, [default(prolog)]),
+                collate(Collate, [number, default(0)])
             ]),
     reattach(ID),
     (   (   pengine_queue(ID, Queue, TimeLimit, _)
@@ -2621,7 +2679,7 @@ http_pengine_pull_response(Request) :-
         ;   output_queue(ID, Queue, _),
             TimeLimit = 0
         )
-    ->  wait_and_output_result(ID, Queue, Format, TimeLimit)
+    ->  wait_and_output_result(ID, Queue, Format, TimeLimit, Collate)
     ;   http_404([], Request)
     ).
 
@@ -2630,7 +2688,7 @@ http_pengine_pull_response(Request) :-
 %   HTTP handler for /pengine/abort. Note that  abort may be sent at
 %   any time and the reply may  be   handled  by a pull_response. In
 %   that case, our  pengine  has  already   died  before  we  get to
-%   wait_and_output_result/4.
+%   wait_and_output_result/5.
 
 http_pengine_abort(Request) :-
     reply_options(Request, [get,post]),
@@ -2678,10 +2736,6 @@ http_pengine_detach(Request) :-
     ;   http_404([], Request)
     ).
 
-:- if(\+current_predicate(message_queue_set/2)).
-message_queue_set(_,_).
-:- endif.
-
 reattach(ID) :-
     (   retract(pengine_detached(ID, _Data)),
         pengine_queue(ID, Queue, _TimeLimit, _Now)
@@ -2726,8 +2780,8 @@ http_pengine_ping(Request) :-
     (   pengine_thread(Pengine, Thread),
         Error = error(_,_),
         catch(thread_statistics(Thread, Stats), Error, fail)
-    ->  output_result(Format, ping(Pengine, Stats))
-    ;   output_result(Format, died(Pengine))
+    ->  output_result(Pengine, Format, ping(Pengine, Stats))
+    ;   output_result(Pengine, Format, died(Pengine))
     ).
 
 %!  http_pengine_list(+Request)
@@ -2767,31 +2821,33 @@ listed_pengine(Application, detached, State) :-
     ).
 
 
-%!  output_result(+Format, +EventTerm) is det.
-%!  output_result(+Format, +EventTerm, +OptionsDict) is det.
+%!  output_result(+Pengine, +Format, +EventTerm) is det.
+%!  output_result(+Pengine, +Format, +EventTerm, +OptionsDict) is det.
 %
 %   Formulate an HTTP response from a pengine event term. Format is
 %   one of =prolog=, =json= or =json-s=.
+%
+%   @arg EventTerm is either a single event or a list of events.
 
 :- dynamic
     pengine_replying/2.             % +Pengine, +Thread
 
-output_result(Format, Event) :-
-    arg(1, Event, Pengine),
+output_result(Pengine, Format, Event) :-
     thread_self(Thread),
     cors_enable,            % contingent on http:cors setting
     disable_client_cache,
     setup_call_cleanup(
         asserta(pengine_replying(Pengine, Thread), Ref),
-        catch(output_result(Format, Event, _{}),
+        catch(output_result_2(Format, Event, _{}),
               pengine_abort_output,
               true),
-        erase(Ref)).
+        erase(Ref)),
+    destroy_pengine_after_output(Pengine, Event).
 
-output_result(Lang, Event, Dict) :-
+output_result_2(Lang, Event, Dict) :-
     write_result(Lang, Event, Dict),
     !.
-output_result(prolog, Event, _) :-
+output_result_2(prolog, Event, _) :-
     !,
     format('Content-type: text/x-prolog; charset=UTF-8~n~n'),
     write_term(Event,
@@ -2802,14 +2858,14 @@ output_result(prolog, Event, _) :-
                  portray_goal(portray_blob),
                  nl(true)
                ]).
-output_result(Lang, Event, _) :-
+output_result_2(Lang, Event, _) :-
     json_lang(Lang),
     !,
     (   event_term_to_json_data(Event, JSON, Lang)
     ->  reply_json(JSON)
     ;   assertion(event_term_to_json_data(Event, _, Lang))
     ).
-output_result(Lang, _Event, _) :-    % FIXME: allow for non-JSON format
+output_result_2(Lang, _Event, _) :-    % FIXME: allow for non-JSON format
     domain_error(pengine_format, Lang).
 
 %!  portray_blob(+Blob, +Options) is det.
@@ -2858,6 +2914,10 @@ disable_client_cache :-
             Pragma: no-cache\r\n\c
             Expires: 0\r\n').
 
+event_term_to_json_data(Events, JSON, Lang) :-
+    is_list(Events),
+    !,
+    events_to_json_data(Events, JSON, Lang).
 event_term_to_json_data(Event, JSON, Lang) :-
     event_to_json(Event, JSON, Lang),
     !.
@@ -2901,6 +2961,11 @@ event_term_to_json_data(EventTerm, json{event:F, id:ID, data:JSON}, _) :-
     arg(1, EventTerm, ID),
     arg(2, EventTerm, Data),
     term_to_json(Data, JSON).
+
+events_to_json_data([], [], _).
+events_to_json_data([E|T0], [J|T], Lang) :-
+    event_term_to_json_data(E, J, Lang),
+    events_to_json_data(T0, T, Lang).
 
 :- public add_error_details/3.
 
@@ -2963,9 +3028,9 @@ add_error_location(_, Term, Term).
 %!  event_to_json(+Event, -JSONTerm, +Lang) is semidet.
 %
 %   Hook that translates a Pengine event  structure into a term suitable
-%   for reply_json/1, according to the language specification Lang. This
-%   can be used to massage general Prolog terms, notably associated with
-%   `success(ID, Bindings, Projection,  Time,   More)`  and  `output(ID,
+%   for reply_json_dict/1, according to the language specification Lang.
+%   This can be used to massage general Prolog terms, notably associated
+%   with `success(ID, Bindings, Projection, Time, More)` and `output(ID,
 %   Term)` into a format suitable for processing at the client side.
 
 %:- multifile pengines:event_to_json/3.

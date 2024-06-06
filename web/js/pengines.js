@@ -46,6 +46,10 @@
  * if initial query has finished.
  * @param {Int} [options.chunk=1] Provide answers in chunks of this
  * size.
+ * @param {Number} [options.collate=0] Collate `output` events if they
+ * happen within the specified time in seconds.  Default is `0` (no
+ * collation).  A reasonable time is somewhere around the network
+ * latency.
  * @param {String} [options.applicatio="pengine_sandbox"] Application in
  * which to execute the query.
  * @param {Function} [options.oncreate]
@@ -120,6 +124,7 @@ function Pengine(options) {
 		"ask",
 		"template",
 		"chunk",
+		"collate",
 		"destroy"
 	      ]);
 
@@ -306,6 +311,9 @@ Pengine.prototype.pull_response = function() {
   var url = this.options.server + '/pull_response' +
     '?id=' + encodeURIComponent(this.id) +
     '&format=' + encodeURIComponent(this.options.format);
+  if ( pengine.options.collate )
+    url += '&collate='+pengine.options.collate;
+
   Pengine.network.get(url,
 	function(obj) {
 	  if ( obj.event !== 'died')
@@ -333,6 +341,9 @@ Pengine.prototype.send = function(event) {
   var url = pengine.options.server +
 		'/send?format=' + encodeURIComponent(this.options.format) +
 		'&id=' + encodeURIComponent(this.id);
+  if ( pengine.options.collate )
+    url += '&collate='+pengine.options.collate;
+
   Pengine.network.ajax({ type: "POST",
 	   url: url,
 	   data: event + " .\n",
@@ -366,8 +377,20 @@ Pengine.prototype.process_response = function(response) {
   // Processes response coming from either jQuery or najax.
   // najax does not parse JSON automatically.
   var obj = typeof response === 'string' ? JSON.parse(response) : response;
-  obj.pengine = this;
-  Pengine.onresponse[obj.event].call(this, obj);
+  const pengine = this;
+
+  function process_one(r, collate) {
+    r.pengine = pengine;
+    Pengine.onresponse[r.event].call(pengine, r, collate);
+  }
+
+  if ( Array.isArray(obj) ) {
+    const last = obj.pop();
+    for(const el of obj)
+      process_one(el, true);
+    process_one(last);
+  } else
+    process_one(obj);
 };
 
 Pengine.prototype.callback = function(f, obj) {
@@ -470,11 +493,12 @@ Pengine.onresponse = {
       this.report('error', obj.data);
   },
 
-  output: function(obj) {
+  output: function(obj, collated) {
     if ( !this.id )
       this.id = obj.id;
     this.callback('onoutput', obj);
-    this.pull_response();
+    if ( !collated )
+      this.pull_response();
   },
 
   ping: function(obj) {
@@ -704,7 +728,7 @@ Pengine.destroy_all = function(async) {
     for(var server in servers) {
       if ( servers.hasOwnProperty(server) ) {
 	Pengine.network.ajax({ url:server + '/destroy_all?ids=' + servers[server],
-	         async: async === undefined ? true : false,
+		 async: async === undefined ? true : false,
 		 timeout: 1000
 	       });
       }
