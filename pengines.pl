@@ -111,7 +111,7 @@ from Prolog or JavaScript.
 
 :- use_module(library(settings),[setting/2,setting/4]).
 :- use_module(library(http/http_json),
-              [http_read_json_dict/2,reply_json/1]).
+              [http_read_json_dict/2,reply_json_dict/1]).
 
 :- if(exists_source(library(uuid))).
 :- autoload(library(uuid), [uuid/2]).
@@ -2701,7 +2701,7 @@ http_pengine_abort(Request) :-
     ->  broadcast(pengine(abort(ID))),
         abort_pending_output(ID),
         pengine_abort(ID),
-        reply_json(true)
+        reply_json_dict(true)
     ;   http_404([], Request)
     ).
 
@@ -2732,7 +2732,7 @@ http_pengine_detach(Request) :-
         pengine_queue(ID, Queue, _TimeLimit, _Now),
         message_queue_set(Queue, max_size(1000)),
         pengine_reply(Queue, detached(ID)),
-        reply_json(true)
+        reply_json_dict(true)
     ;   http_404([], Request)
     ).
 
@@ -2761,7 +2761,7 @@ http_pengine_destroy_all(Request) :-
              \+ pengine_detached(ID, _)
            ),
            pengine_destroy(ID, [force(true)])),
-    reply_json("ok").
+    reply_json_dict("ok").
 
 %!  http_pengine_ping(+Request)
 %
@@ -2802,7 +2802,7 @@ http_pengine_list(Request) :-
     allowed(Request, Application),
     authenticate(Request, Application, _UserOptions),
     findall(Term, listed_pengine(Application, Status, Term), Terms),
-    reply_json(json{pengines: Terms}).
+    reply_json_dict(json{pengines: Terms}).
 
 listed_pengine(Application, detached, State) :-
     State = pengine{id:Id,
@@ -2862,7 +2862,7 @@ output_result_2(Lang, Event, _) :-
     json_lang(Lang),
     !,
     (   event_term_to_json_data(Event, JSON, Lang)
-    ->  reply_json(JSON)
+    ->  reply_json_dict(JSON)
     ;   assertion(event_term_to_json_data(Event, _, Lang))
     ).
 output_result_2(Lang, _Event, _) :-    % FIXME: allow for non-JSON format
