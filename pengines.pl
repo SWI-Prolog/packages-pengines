@@ -129,7 +129,8 @@ from Prolog or JavaScript.
     prepare_module/3,               % +Module, +Application, +Options
     prepare_goal/3,                 % +GoalIn, -GoalOut, +Options
     authentication_hook/3,          % +Request, +Application, -User
-    not_sandboxed/2.                % +User, +App
+    not_sandboxed/2,                % +User, +App
+    pengine_flush_output_hook/0.
 
 :- predicate_options(pengine_create/1, 1,
                      [ id(-atom),
@@ -1361,6 +1362,7 @@ solve(Chunk, Template, Goal, ID) :-
         arg(1, Time, T0),
         statistics(cputime, T1),
         CPUTime is T1-T0,
+        forall(pengine_flush_output_hook, true),
         (   var(Error)
         ->  projection(Projection),
             (   var(Det)

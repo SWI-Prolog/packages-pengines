@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2023, VU University Amsterdam
+    Copyright (c)  2014-2024, VU University Amsterdam
                               CWI, Amsterdam
                               SWI-Prolog Solutions b.v.
     All rights reserved.
@@ -184,9 +184,16 @@ pengine_tab(N) :-
 
 pengine_flush_output :-
     pengine_output,
+    \+ pengine_io(_,_),
     !.
 pengine_flush_output :-
     flush_output.
+
+:- multifile
+    pengines:pengine_flush_output_hook/0.
+
+pengines:pengine_flush_output_hook :-
+    pengine_flush_output.
 
 %!  pengine_write_term(+Term, +Options)
 %
@@ -760,6 +767,8 @@ sandbox:safe_primitive(pengines_io:pengine_portray_clause(_)).
 sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
 sandbox:safe_primitive(system:statistics(_,_)).
+sandbox:safe_primitive(system:put_code(_)).
+sandbox:safe_primitive(system:put_char(_)).
 
 sandbox:safe_meta(pengines_io:pengine_format(Format, Args), Calls) :-
     sandbox:format_calls(Format, Args, Calls).
