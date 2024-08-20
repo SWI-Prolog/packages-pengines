@@ -1786,7 +1786,7 @@ remote_send_rec(Server, Action, ID, Params, Reply, Options) :-
 
 remote_post_rec(Server, Action, Data, Reply, Options) :-
     server_url(Server, Action, [], URL),
-    probe(Action, URL),
+    probe(Action, URL, Options),
     http_open(URL, Stream,
               [ post(json(Data))
               | Options
@@ -1801,11 +1801,11 @@ remote_post_rec(Server, Action, Data, Reply, Options) :-
 %   document and be faced with an authentication challenge. Possibly
 %   we should make this an option for simpler scenarios.
 
-probe(create, URL) :-
+probe(create, URL, Options) :-
     !,
-    http_open(URL, Stream, [method(options)]),
+    http_open(URL, Stream, [method(options)|Options]),
     close(Stream).
-probe(_, _).
+probe(_, _, _).
 
 read_prolog_reply(In, Reply) :-
     set_stream(In, encoding(utf8)),
