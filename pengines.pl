@@ -633,8 +633,8 @@ pengine_destroy(Name, Options) :-
               error(existence_error(thread, _), _), true)
     ;   true
     ).
-pengine_destroy(ID, _) :-
-    catch(pengine_send(ID, destroy),
+pengine_destroy(ID, Options) :-
+    catch(pengine_send(ID, destroy, Options),
           error(existence_error(pengine, ID), _),
           retractall(child(_,ID))).
 
@@ -2014,14 +2014,14 @@ pengine_rpc(URL, Query, M:Options0) :-
                        ]),
         wait_event(Template, State, [listen(Id)|Options]),
         Why,
-        pengine_destroy_and_wait(State, Id, Why)).
+        pengine_destroy_and_wait(State, Id, Why, Options)).
 
-pengine_destroy_and_wait(destroy(true), Id, Why) :-
+pengine_destroy_and_wait(destroy(true), Id, Why, Options) :-
     !,
     debug(pengine(rpc), 'Destroying RPC because of ~p', [Why]),
-    pengine_destroy(Id),
+    pengine_destroy(Id, Options),
     wait_destroy(Id, 10).
-pengine_destroy_and_wait(_, _, Why) :-
+pengine_destroy_and_wait(_, _, Why, _) :-
     debug(pengine(rpc), 'Not destroying RPC (~p)', [Why]).
 
 wait_destroy(Id, _) :-
