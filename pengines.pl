@@ -1100,7 +1100,8 @@ pengine_create_option(user(_)).
 
 pengine_done :-
     thread_self(Me),
-    (   thread_property(Me, status(exception('$aborted'))),
+    (   thread_property(Me, status(exception(Ex))),
+        abort_exception(Ex),
         thread_detach(Me),
         pengine_self(Pengine)
     ->  catch(pengine_reply(destroy(Pengine, abort(Pengine))),
@@ -1112,6 +1113,8 @@ pengine_done :-
     pengine_self(Id),
     protect_pengine(Id, pengine_unregister(Id)).
 
+abort_exception('$aborted').
+abort_exception(unwind(abort)).
 
 %!  pengine_main(+Parent, +Options, +Application)
 %
