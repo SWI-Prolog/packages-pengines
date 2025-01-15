@@ -2135,23 +2135,26 @@ pengine_rpc_output(_ID, Term) :-
 %   call http_spawn/2 to continue waiting on   a  new thread. That would
 %   improve the performance and reduce the usage of threads.
 
-:- http_handler(root(pengine),               http_404([]),
-                [ id(pengines) ]).
-:- http_handler(root(pengine/create),        http_pengine_create,
-                [ time_limit(infinite), spawn([]) ]).
-:- http_handler(root(pengine/send),          http_pengine_send,
-                [ time_limit(infinite), spawn([]) ]).
-:- http_handler(root(pengine/pull_response), http_pengine_pull_response,
-                [ time_limit(infinite), spawn([]) ]).
-:- http_handler(root(pengine/abort),         http_pengine_abort,         []).
-:- http_handler(root(pengine/detach),        http_pengine_detach,        []).
-:- http_handler(root(pengine/list),          http_pengine_list,          []).
-:- http_handler(root(pengine/ping),          http_pengine_ping,          []).
-:- http_handler(root(pengine/destroy_all),   http_pengine_destroy_all,   []).
+:- multifile http:location/3.
+http:location(pengine, root(pengine), [-100]).
 
-:- http_handler(root(pengine/'pengines.js'),
+:- http_handler(pengine(.),             http_404([]),
+                [ id(pengines) ]).
+:- http_handler(pengine(create),        http_pengine_create,
+                [ time_limit(infinite), spawn([]) ]).
+:- http_handler(pengine(send),          http_pengine_send,
+                [ time_limit(infinite), spawn([]) ]).
+:- http_handler(pengine(pull_response), http_pengine_pull_response,
+                [ time_limit(infinite), spawn([]) ]).
+:- http_handler(pengine(abort),         http_pengine_abort,         []).
+:- http_handler(pengine(detach),        http_pengine_detach,        []).
+:- http_handler(pengine(list),          http_pengine_list,          []).
+:- http_handler(pengine(ping),          http_pengine_ping,          []).
+:- http_handler(pengine(destroy_all),   http_pengine_destroy_all,   []).
+
+:- http_handler(pengine('pengines.js'),
                 http_reply_file(library('http/web/js/pengines.js'), []), []).
-:- http_handler(root(pengine/'plterm.css'),
+:- http_handler(pengine('plterm.css'),
                 http_reply_file(library('http/web/css/plterm.css'), []), []).
 
 
