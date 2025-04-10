@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2024, VU University Amsterdam
+    Copyright (c)  2014-2025, VU University Amsterdam
                               CWI, Amsterdam
                               SWI-Prolog Solutions b.v.
     All rights reserved.
@@ -70,12 +70,12 @@
 :- autoload(library(listing),[listing/1,portray_clause/1]).
 :- autoload(library(lists),[append/2,append/3,subtract/3]).
 :- autoload(library(option),[option/3,merge_options/3]).
-:- autoload(library(pengines),
-	    [ pengine_self/1,
-	      pengine_output/1,
-	      pengine_input/2,
-	      pengine_property/2
-	    ]).
+:- use_module(library(pengines),
+              [ pengine_self/1,
+                pengine_output/1,
+                pengine_input/2,
+                pengine_property/2
+              ]).
 :- autoload(library(prolog_stream),[open_prolog_stream/4]).
 :- autoload(library(readutil),[read_line_to_string/2]).
 :- autoload(library(http/term_html),[term/4]).

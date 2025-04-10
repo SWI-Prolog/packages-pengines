@@ -4,7 +4,7 @@
     Author:        Torbjörn Lager and Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2014-2024, Torbjörn Lager,
+    Copyright (C): 2014-2025, Torbjörn Lager,
                               VU University Amsterdam
                               SWI-Prolog Solutions b.v.
     All rights reserved.
@@ -102,8 +102,8 @@ from Prolog or JavaScript.
 	    ]).
 :- autoload(library(http/http_client),[http_read_data/3]).
 :- autoload(library(http/http_cors),[cors_enable/0,cors_enable/2]).
-:- autoload(library(http/http_dispatch),
-	    [http_handler/3,http_404/2,http_reply_file/3]).
+:- use_module(library(http/http_dispatch),
+              [http_handler/3,http_404/2,http_reply_file/3]).
 :- autoload(library(http/http_open),[http_open/3]).
 :- autoload(library(http/http_parameters),[http_parameters/2]).
 :- autoload(library(http/http_stream),[is_cgi_stream/1]).
