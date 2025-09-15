@@ -1684,11 +1684,11 @@ replace_blobs(Term, Term).
 
 remote_pengine_create(BaseURL, Options) :-
     partition(pengine_create_option, Options, PengineOptions0, RestOptions),
-        (       option(ask(Query), PengineOptions0),
-                \+ option(template(_Template), PengineOptions0)
-        ->      PengineOptions = [template(Query)|PengineOptions0]
-        ;       PengineOptions = PengineOptions0
-        ),
+    (   option(ask(Query), PengineOptions0),
+        \+ option(template(_Template), PengineOptions0)
+    ->  PengineOptions = [template(Query)|PengineOptions0]
+    ;   PengineOptions = PengineOptions0
+    ),
     options_to_dict(PengineOptions, PostData),
     remote_post_rec(BaseURL, create, PostData, Reply, RestOptions),
     arg(1, Reply, ID),
