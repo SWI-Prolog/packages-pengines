@@ -87,7 +87,6 @@ from Prolog or JavaScript.
 :- autoload(library(option),
 	    [select_option/3,option/2,option/3,select_option/4]).
 :- autoload(library(prolog_stack),[print_prolog_backtrace/2]).
-:- autoload(library(sandbox),[safe_goal/1]).
 :- autoload(library(statistics),[thread_statistics/2]).
 :- autoload(library(term_to_json),[term_to_json/2]).
 :- autoload(library(thread_pool),
@@ -112,6 +111,7 @@ from Prolog or JavaScript.
 :- use_module(library(settings),[setting/2,setting/4]).
 :- use_module(library(http/http_json),
               [http_read_json_dict/2,reply_json_dict/1]).
+:- use_module(library(sandbox),[safe_goal/1]).
 
 :- if(exists_source(library(uuid))).
 :- autoload(library(uuid), [uuid/2]).
