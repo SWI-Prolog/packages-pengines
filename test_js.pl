@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2014-2018, VU University Amsterdam
+    Copyright (c)  2014-2025, VU University Amsterdam
+                              SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -73,7 +74,7 @@ To run this code, install all required dependencies using NPM:
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_files)).
 :- use_module(library(http/http_dispatch)).
-:- use_module(library(http/json)).
+:- use_module(library(json)).
 :- use_module(library(http/jquery)).
 
 :- pengine_application(swish).
@@ -102,7 +103,7 @@ run_test_script(Script, Status):-
                ]).
 
 test(browser):-
-    run_test_script('test_js/browser.js', Status),    
+    run_test_script('test_js/browser.js', Status),
     assertion(Status == exit(0)).
 
 test(node):-
