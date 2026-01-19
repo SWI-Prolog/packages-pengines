@@ -97,6 +97,7 @@ from Prolog or JavaScript.
 	      uri_query_components/2,
 	      uri_data/3,
 	      uri_data/4,
+	      uri_edit/3,
 	      uri_encoded/3
 	    ]).
 :- autoload(library(http/http_client),[http_read_data/3]).
