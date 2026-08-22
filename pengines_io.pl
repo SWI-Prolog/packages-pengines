@@ -341,11 +341,31 @@ message_lines([url(Pos)|T]) -->
     message_lines(T).
 message_lines([url(HREF, Label)|T]) -->
     !,
-    html(a(href(HREF),Label)),
+    { msg_label(Label, Text) },
+    (   { atomic(HREF) }
+    ->  html(a(href(HREF), Text))
+    ;   html([Text])                    % a source location: not a web link
+    ),
     message_lines(T).
 message_lines([H|T]) -->
     html(H),
     message_lines(T).
+
+%!  msg_label(+Label, -Text) is det.
+%
+%   Text is the text of the _label_ of an url/2 message element.  See
+%   print_message_lines/3.
+
+msg_label(ansi(_Style, Fmt, Args), Text) :-
+    !,
+    format(string(Text), Fmt, Args).
+msg_label(ansi(_Style, Fmt, Args, _Ctx), Text) :-
+    !,
+    format(string(Text), Fmt, Args).
+msg_label(Fmt-Args, Text) :-
+    !,
+    format(string(Text), Fmt, Args).
+msg_label(Text, Text).
 
 location(File:Line:Column) -->
     !,
