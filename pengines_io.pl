@@ -780,11 +780,9 @@ sandbox:safe_primitive(pengines_io:pengine_read(_)).
 sandbox:safe_primitive(pengines_io:pengine_read_line_to_string(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_read_line_to_codes(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_write_canonical(_)).
-sandbox:safe_primitive(pengines_io:pengine_write_term(_,_)).
 sandbox:safe_primitive(pengines_io:pengine_writeln(_)).
 sandbox:safe_primitive(pengines_io:pengine_writeq(_)).
 sandbox:safe_primitive(pengines_io:pengine_portray_clause(_)).
-sandbox:safe_primitive(system:write_term(_,_)).
 sandbox:safe_primitive(system:prompt(_,_)).
 sandbox:safe_primitive(system:statistics(_,_)).
 sandbox:safe_primitive(system:put_code(_)).
@@ -792,6 +790,8 @@ sandbox:safe_primitive(system:put_char(_)).
 
 sandbox:safe_meta(pengines_io:pengine_format(Format, Args), Calls) :-
     sandbox:format_calls(Format, Args, Calls).
+sandbox:safe_meta(pengines_io:pengine_write_term(_Term, Options), Calls) :-
+    sandbox:write_options_calls(Options, Calls).
 
 
                  /*******************************
