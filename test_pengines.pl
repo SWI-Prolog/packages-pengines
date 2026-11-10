@@ -308,6 +308,45 @@ test(listing, error(permission_error(list, qualified_predicate, _))) :-
     pengines_io:pengine_listing(lists:append/3).
 test(listing, error(permission_error(list, qualified_predicate, _))) :-
     pengines_io:pengine_listing([foo/1, lists:append/3]).
+test(foreign_pengine, Error = error(permission_error(access, pengine, A), _)) :-
+    pengine_create([id(A)]),
+    call_cleanup(
+        ( pengine_create([ id(B),
+                           ask(catch(pengine_destroy(A, [force(true)]),
+                                     E, true)),
+                           template(E)
+                         ]),
+          first_answer(B, Error)
+        ),
+        pengine_destroy(A)).
+test(own_child, Answer == true) :-
+    pengine_create([ id(B),
+                     ask(( pengine_create([id(C)]),
+                           pengine_destroy(C),
+                           Answer = true
+                         )),
+                     template(Answer)
+                   ]),
+    first_answer(B, Answer).
+
+first_answer(Pengine, Answer) :-
+    pengine_event(Event, [listen(Pengine), timeout(10)]),
+    (   event_answer(Event, Pengine, Answer)
+    ->  true
+    ;   Event == timeout
+    ->  fail
+    ;   first_answer(Pengine, Answer)
+    ).
+
+event_answer(create(Pengine, Props), Pengine, Answer) :-
+    memberchk(answer(Event), Props),
+    event_answer(Event, Pengine, Answer).
+event_answer(destroy(Pengine, Event), Pengine, Answer) :-
+    event_answer(Event, Pengine, Answer).
+event_answer(Success, Pengine, Answer) :-
+    compound(Success),
+    Success =.. [success, Pengine, [Answer|_]|_].
+event_answer(error(Pengine, Error), Pengine, Error).
 
 :- end_tests(pengine_sandbox).
 

@@ -337,7 +337,25 @@ pengine_send2(Name, Event, Options) :-
     !,
     delay_message(pengine(Target), Event, Options).
 pengine_send2(Target, Event, Options) :-
+    check_target(Target),
     delay_message(pengine(Target), Event, Options).
+
+%!  check_target(+Pengine) is det.
+%
+%   A sandboxed pengine may only interact with itself and the pengines
+%   it created.  Other pengines are not its business.
+
+check_target(Target) :-
+    pengine_self(Me),
+    \+ pengine_not_sandboxed(Me),
+    !,
+    (   (   Target == Me
+        ;   child(_, Target)
+        )
+    ->  true
+    ;   permission_error(access, pengine, Target)
+    ).
+check_target(_).
 
 delay_message(Target, Event, Options) :-
     option(delay(Delay), Options),
@@ -625,7 +643,8 @@ pengine_destroy(ID) :-
 pengine_destroy(Name, Options) :-
     (   child(Name, ID)
     ->  true
-    ;   ID = Name
+    ;   ID = Name,
+        check_target(ID)
     ),
     option(force(true), Options),
     !,
@@ -1596,6 +1615,7 @@ remote process, else does nothing at all.
 */
 
 pengine_pull_response(Pengine, Options) :-
+    check_target(Pengine),
     pengine_remote(Pengine, Server),
     !,
     remote_pengine_pull_response(Server, Pengine, Options).
