@@ -252,13 +252,26 @@ test(ask_simple_no_template, Results = [p(a),p(b),p(c)]) :-
     assertion(no_more_pengines).
 test(rpc_nested, Xs == [1,2,3]) :-
     pengine_server(Server),
+    setting(pengine_sandbox:allow_remote, Old),
+    setup_call_cleanup(
+        set_setting(pengine_sandbox:allow_remote, true),
+        findall(X, pengine_rpc(Server,
+                               pengine_rpc(Server,
+                                           member(X, [1,2,3]),
+                                           []),
+                               []),
+                Xs),
+        set_setting(pengine_sandbox:allow_remote, Old)),
+    assertion(no_more_pengines).
+test(rpc_nested_denied,
+     error(permission_error(access, remote_pengine, _))) :-
+    pengine_server(Server),
     findall(X, pengine_rpc(Server,
                            pengine_rpc(Server,
                                        member(X, [1,2,3]),
                                        []),
                            []),
-            Xs),
-    assertion(no_more_pengines).
+            _Xs).
 
 :- end_tests(remote_pengines).
 
@@ -304,6 +317,31 @@ test(src_predicates, error(permission_error(list, qualified_predicate, _))) :-
                          [src_predicates([lists:append/3])])).
 test(src_predicates, error(instantiation_error)) :-
     sbx_safe(pengine_create(_)).
+test(remote_options) :-
+    sbx_safe(pengine_rpc('https://example.org', true,
+                         [ timeout(10),
+                           proxy(proxy:8080),
+                           authorization(basic(u,p)),
+                           cacerts([system(root_certificates)])
+                         ])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengine_rpc('https://example.org', true,
+                         [cacerts([file('/etc/passwd')])])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengine_rpc('https://example.org', true,
+                         [certificate_file('/etc/passwd')])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengine_rpc('https://example.org', true,
+                         [post(file('/etc/passwd'))])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengine_destroy(x, [post(file('/etc/passwd'))])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengines:pengine_send(x, ping, [method(get)])).
+test(remote_options, error(permission_error(use, option, _))) :-
+    sbx_safe(pengine_create([user(admin)])).
+test(remote_options, error(permission_error(call, sandboxed, _))) :-
+    sbx_safe(pengine_rpc('https://example.org', true,
+                         [cert_verify_hook(shell)])).
 test(listing, error(permission_error(list, qualified_predicate, _))) :-
     pengines_io:pengine_listing(lists:append/3).
 test(listing, error(permission_error(list, qualified_predicate, _))) :-

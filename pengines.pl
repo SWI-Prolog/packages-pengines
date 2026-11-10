@@ -131,6 +131,7 @@ from Prolog or JavaScript.
     prepare_goal/3,                 % +GoalIn, -GoalOut, +Options
     authentication_hook/3,          % +Request, +Application, -User
     not_sandboxed/2,                % +User, +App
+    allow_remote_server/2,          % +App, +URL
     pengine_flush_output_hook/0.
 
 :- predicate_options(pengine_create/1, 1,
@@ -254,9 +255,59 @@ An error will be returned if the pengine could not be created:
 pengine_create(M:Options0) :-
     translate_local_sources(Options0, Options, M),
     (   select_option(server(BaseURL), Options, RestOptions)
-    ->  remote_pengine_create(BaseURL, RestOptions)
-    ;   local_pengine_create(Options)
+    ->  check_remote_access(BaseURL),
+        remote_pengine_create(BaseURL, RestOptions)
+    ;   check_local_create(Options),
+        local_pengine_create(Options)
     ).
+
+%!  sandboxed_pengine(-Me) is semidet.
+%
+%   True when the calling thread is a pengine that runs sandboxed.
+
+sandboxed_pengine(Me) :-
+    pengine_self(Me),
+    \+ pengine_not_sandboxed(Me).
+
+%!  check_remote_access(+URL) is det.
+%
+%   A sandboxed pengine may only access  remote resources if the setting
+%   `allow_remote` of its application is `true` and, if the hook
+%   allow_remote_server/2 is defined, this hook succeeds.
+
+check_remote_access(URL) :-
+    sandboxed_pengine(Me),
+    !,
+    get_pengine_application(Me, Application),
+    (   setting(Application:allow_remote, true)
+    ->  true
+    ;   permission_error(access, remote_pengine, URL)
+    ),
+    (   \+ clause(allow_remote_server(_,_), _)
+    ->  true
+    ;   allow_remote_server(Application, URL)
+    ->  true
+    ;   permission_error(access, remote_pengine, URL)
+    ).
+check_remote_access(_).
+
+%!  check_local_create(+Options) is det.
+%
+%   A sandboxed pengine may not claim a user for the pengines it
+%   creates and src_url(URL) is a remote access.
+
+check_local_create(Options) :-
+    sandboxed_pengine(_),
+    !,
+    (   option(user(User), Options)
+    ->  permission_error(set, pengine_user, User)
+    ;   true
+    ),
+    (   option(src_url(URL), Options)
+    ->  check_remote_access(URL)
+    ;   true
+    ).
+check_local_create(_).
 
 %!  translate_local_sources(+OptionsIn, -Options, +Module) is det.
 %
@@ -346,8 +397,7 @@ pengine_send2(Target, Event, Options) :-
 %   it created.  Other pengines are not its business.
 
 check_target(Target) :-
-    pengine_self(Me),
-    \+ pengine_not_sandboxed(Me),
+    sandboxed_pengine(Me),
     !,
     (   (   Target == Me
         ;   child(_, Target)
@@ -839,6 +889,8 @@ current_pengine_application(Application) :-
            'IP addresses from which remotes are NOT allowed to connect').
 :- setting(debug_info, boolean, false,
            'Keep information to support source-level debugging').
+:- setting(allow_remote, boolean, false,
+           'Allow sandboxed pengines to access remote pengines').
 
 
 system:term_expansion((:- pengine_application(Application)), Expanded) :-
@@ -893,6 +945,11 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
                             'Keep information to support source-level \c
                             debugging')),
                 DebugInfoSetting),
+    expand_term((:- setting(Application:allow_remote, boolean,
+                            setting(pengines:allow_remote),
+                            'Allow sandboxed pengines to access \c
+                            remote pengines')),
+                AllowRemoteSetting),
     flatten([ pengines:current_application(Application),
               ThreadPoolSizeSetting,
               ThreadPoolStacksSetting,
@@ -903,7 +960,8 @@ system:term_expansion((:- pengine_application(Application)), Expanded) :-
               ProgramSpaceSetting,
               AllowFromSetting,
               DenyFromSetting,
-              DebugInfoSetting
+              DebugInfoSetting,
+              AllowRemoteSetting
             ], Expanded).
 
 % Register default application
@@ -1593,6 +1651,14 @@ pengine_not_sandboxed(ID) :-
     pengine_property(ID, application(App)),
     not_sandboxed(User, App),
     !.
+
+%%  allow_remote_server(+Application, +URL) is semidet.
+%
+%   Hook to restrict the remote resources a sandboxed pengine of
+%   Application may access if the setting `allow_remote` is `true`.
+%   If this hook is defined, a sandboxed pengine may only create a
+%   remote pengine at URL or load source from URL (`src_url` option)
+%   if this hook succeeds.
 
 %%  not_sandboxed(+User, +Application) is semidet.
 %
