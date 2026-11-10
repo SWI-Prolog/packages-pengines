@@ -66,7 +66,7 @@
 :- autoload(library(apply),[foldl/4,maplist/3,maplist/4]).
 :- autoload(library(backcomp),[thread_at_exit/1]).
 :- use_module(library(debug),[assertion/1]).
-:- autoload(library(error),[must_be/2]).
+:- autoload(library(error),[must_be/2, permission_error/3]).
 :- autoload(library(listing),[listing/1,portray_clause/1]).
 :- autoload(library(lists),[append/2,append/3,subtract/3]).
 :- autoload(library(option),[option/3,merge_options/3]).
@@ -271,6 +271,12 @@ pengine_listing :-
     pengine_listing(_).
 
 pengine_listing(Spec) :-
+    (   sub_term(Sub, Spec),
+        compound(Sub),
+        Sub = _:_
+    ->  permission_error(list, qualified_predicate, Spec)
+    ;   true
+    ),
     pengine_self(Module),
     with_output_to(string(String), listing(Module:Spec)),
     split_string(String, "", "\n", [Pre]),

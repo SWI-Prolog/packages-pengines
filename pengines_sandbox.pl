@@ -34,7 +34,8 @@
 
 :- module(pengines_sandbox, []).
 :- use_module(library(pengines), []).
-:- autoload(library(error),[instantiation_error/1]).
+:- autoload(library(error),
+            [instantiation_error/1, type_error/2, permission_error/3]).
 :- autoload(library(lists),[append/3]).
 
 /** <module> Declare Pengine interaction sandbox-safe
@@ -78,8 +79,46 @@ sandbox:safe_primitive(system:'#file'(_,_)).
 %   pengine calling predicates  are  safe   because  the  safety  is
 %   guaranteed by the recieving pengine.
 
-sandbox:safe_meta(pengines:pengine_create(_), []).
-sandbox:safe_meta(pengines:pengine_rpc(_, _, _), []).
+sandbox:safe_meta(pengines:pengine_create(Options), []) :-
+    safe_create_options(Options).
+sandbox:safe_meta(pengines:pengine_rpc(_, _, Options), []) :-
+    safe_create_options(Options).
+
+%!  safe_create_options(+Options) is det.
+%
+%   The option src_predicates(PIs) lists the predicates PIs as source
+%   for the new pengine.  Only allow for predicates of the calling
+%   module.
+
+safe_create_options(Options) :-
+    var(Options),
+    !,
+    instantiation_error(Options).
+safe_create_options([]) :-
+    !.
+safe_create_options([H|T]) :-
+    !,
+    safe_create_option(H),
+    safe_create_options(T).
+safe_create_options(Options) :-
+    type_error(list, Options).
+
+safe_create_option(Opt) :-
+    var(Opt),
+    !,
+    instantiation_error(Opt).
+safe_create_option(src_predicates(PIs)) :-
+    !,
+    (   ground(PIs)
+    ->  (   sub_term(Sub, PIs),
+            compound(Sub),
+            Sub = _:_
+        ->  permission_error(list, qualified_predicate, PIs)
+        ;   true
+        )
+    ;   instantiation_error(PIs)
+    ).
+safe_create_option(_).
 sandbox:safe_meta(pengines:pengine_event_loop(_,Closure,_,_), [Closure1]) :-
     extend_goal(Closure, [_], Closure1).
 

@@ -59,7 +59,8 @@
 test_pengines :-
     run_tests([ local_pengines,
                 remote_pengines,
-                application
+                application,
+                pengine_sandbox
               ]).
 
 % :- debug(pengine(_)).
@@ -284,6 +285,31 @@ test(noapp, error(existence_error(pengine_application, nopapp))) :-
     assertion(no_more_pengines).
 
 :- end_tests(application).
+
+:- begin_tests(pengine_sandbox).
+
+:- use_module(library(sandbox)).
+:- use_module(library(pengines_io)).
+
+sbx_safe(G) :-
+    psbx:use_module(library(pengines)),
+    safe_goal(psbx:G).
+
+test(src_predicates) :-
+    sbx_safe(pengine_create([src_predicates([foo/1])])).
+test(src_predicates, error(permission_error(list, qualified_predicate, _))) :-
+    sbx_safe(pengine_create([src_predicates([lists:append/3])])).
+test(src_predicates, error(permission_error(list, qualified_predicate, _))) :-
+    sbx_safe(pengine_rpc('http://localhost/', true,
+                         [src_predicates([lists:append/3])])).
+test(src_predicates, error(instantiation_error)) :-
+    sbx_safe(pengine_create(_)).
+test(listing, error(permission_error(list, qualified_predicate, _))) :-
+    pengines_io:pengine_listing(lists:append/3).
+test(listing, error(permission_error(list, qualified_predicate, _))) :-
+    pengines_io:pengine_listing([foo/1, lists:append/3]).
+
+:- end_tests(pengine_sandbox).
 
 
                  /*******************************
