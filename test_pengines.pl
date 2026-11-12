@@ -60,7 +60,8 @@ test_pengines :-
     run_tests([ local_pengines,
                 remote_pengines,
                 application,
-                pengine_sandbox
+                pengine_sandbox,
+                remote_error
               ]).
 
 % :- debug(pengine(_)).
@@ -387,6 +388,52 @@ event_answer(Success, Pengine, Answer) :-
 event_answer(error(Pengine, Error), Pengine, Error).
 
 :- end_tests(pengine_sandbox).
+
+%   An error received from a remote pengine is data.  A bare
+%   format(Fmt, Args) ball would be formatted when printed, and ~@ calls
+%   a goal: a malicious server could run code on the client.  The client
+%   passes it on as error(format(Fmt, Args), _), which is printed
+%   without calling goals.
+
+:- begin_tests(remote_error).
+
+test(rpc_error, [ E = error(format(_,_), _), Ran == false ]) :-
+    catch(pengines:process_event(error(id, format('~@', [test_pengines:mark])),
+                                 _, _, []),
+          E, true),
+    printed_runs(E, Ran).
+test(event_loop_error, [ E = error(format(_,_), _), Ran == false ]) :-
+    catch(pengines:pengine_process_event(
+                       error(id, format('~@', [test_pengines:mark])),
+                       test_pengines:keep_error, _, []),
+          _, true),
+    retract(test_pengines:kept_error(E)),
+    printed_runs(E, Ran).
+test(other_error_unchanged, E =@= error(type_error(integer, a), _)) :-
+    catch(pengines:process_event(error(id, error(type_error(integer, a), _)),
+                                 _, _, []),
+          E, true).
+
+:- end_tests(remote_error).
+
+:- dynamic kept_error/1.
+
+keep_error(error(_, E)) :-
+    assertz(kept_error(E)).
+
+%!  printed_runs(+Error, -Ran) is det.
+%
+%   Print Error as print_message/2 does and tell whether mark/0 ran.
+
+printed_runs(Error, Ran) :-
+    nb_setval(test_pengines_ran, false),
+    '$messages':translate_message(Error, Lines, []),
+    with_output_to(string(_),
+                   print_message_lines(current_output, '', Lines)),
+    nb_getval(test_pengines_ran, Ran).
+
+mark :-
+    nb_setval(test_pengines_ran, true).
 
 
                  /*******************************

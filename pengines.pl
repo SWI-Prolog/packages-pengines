@@ -2037,8 +2037,9 @@ pengine_process_event(success(ID, Sol, _Proj, _Time, More), Closure, true, _) :-
 pengine_process_event(failure(ID, _Time), Closure, true, _Options) :-
     debug(pengine(transition), '~q: 3 = /~q => 2', [ID, failure]),
     ignore(call(Closure, failure(ID))).
-pengine_process_event(error(ID, Error), Closure, Continue, _Options) :-
-    debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Error)]),
+pengine_process_event(error(ID, Error0), Closure, Continue, _Options) :-
+    debug(pengine(transition), '~q: 3 = /~q => 2', [ID, error(Error0)]),
+    remote_error(Error0, Error),
     (   call(Closure, error(ID, Error))
     ->  Continue = true
     ;   forall(child(_,Child), pengine_destroy(Child)),
@@ -2137,8 +2138,10 @@ wait_event(Template, State, Options) :-
 process_event(create(_ID, Features), Template, State, Options) :-
     memberchk(answer(First), Features),
     process_event(First, Template, State, Options).
-process_event(error(_ID, Error), _Template, _, _Options) :-
+process_event(error(_ID, Error0), _Template, _, _Options) :-
+    remote_error(Error0, Error),
     throw(Error).
+
 process_event(failure(_ID, _Time), _Template, _, _Options) :-
     fail.
 process_event(prompt(ID, Prompt), Template, State, Options) :-
@@ -2175,6 +2178,21 @@ process_event(success(ID, Solutions, Time, More),
     process_event(success(ID, Solutions, _Proj, Time, More),
                   Template, State, Options).
 
+
+%!  remote_error(+Error0, -Error) is det.
+%
+%   An error received from a (remote) pengine is data.  If it is a bare
+%   format(Fmt, Args) ball, printing it as a message would format it
+%   with Fmt, which may call goals using ~@ (code execution by the
+%   server).  We wrap it as error(format(Fmt, Args), _), which is
+%   printed without calling goals.
+
+remote_error(Error0, Error) :-
+    nonvar(Error0),
+    Error0 = format(Fmt, Args),
+    !,
+    Error = error(format(Fmt, Args), _).
+remote_error(Error, Error).
 
 pengine_rpc_prompt(ID, Prompt, Term) :-
     prompt(ID, Prompt, Term0),
