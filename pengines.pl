@@ -2675,7 +2675,11 @@ http_pengine_send(Request) :-
             random_delay,
             broadcast(pengine(send(ID, Event))),
             thread_send_message(Thread, pengine_request(Event)),
-            wait_and_output_result(ID, Queue, Format, TimeLimit, Collate)
+            wait_and_output_result(ID, Queue, Format, TimeLimit, Collate),
+            (   Event == destroy
+            ->  destroy_if_busy(ID, Thread)
+            ;   true
+            )
         ;   atom(ID)
         ->  pengine_died(Format, ID)
         ;   http_404([], Request)
@@ -2684,6 +2688,21 @@ http_pengine_send(Request) :-
     ->  pengine_died(Format, ID)
     ;   output_result(ID, Format, error(ID, Error))
     ).
+
+%!  destroy_if_busy(+Pengine, +Thread) is det.
+%
+%   A destroy request is processed when the pengine waits for a
+%   request.  If the pengine is running a query, we answer the HTTP
+%   request with pending output of the query, after which nothing
+%   supervises the pengine and the query may run forever.  Therefore,
+%   if the pengine did not yet read the destroy request, we abort it.
+
+destroy_if_busy(Pengine, Thread) :-
+    catch(thread_peek_message(Thread, pengine_request(destroy)), _, fail),
+    !,
+    debug(pengine(event), 'Pengine ~q is busy; forcing destroy', [Pengine]),
+    catch(pengine_destroy(Pengine, [force(true)]), _, true).
+destroy_if_busy(_, _).
 
 pengine_died(Format, Pengine) :-
     output_result(Pengine, Format,
