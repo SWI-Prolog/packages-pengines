@@ -118,6 +118,22 @@ from Prolog or JavaScript.
 :- autoload(library(uuid), [uuid/2]).
 :- endif.
 
+%   Each pengine runs in a temporary module (see in_temporary_module/3).
+%   These are only reclaimed if code garbage collection includes
+%   modules.  We raise the Prolog flag gc_code to `module` unless it is
+%   `false`, which is used for debugging.
+
+:- if(current_prolog_flag(gc_code, _)).
+enable_module_gc :-
+    current_prolog_flag(gc_code, Level),
+    (   ( Level == clause ; Level == procedure )
+    ->  set_prolog_flag(gc_code, module)
+    ;   true
+    ).
+
+:- initialization(enable_module_gc).
+:- endif.
+
 
 :- meta_predicate
     pengine_create(:),
